@@ -1,0 +1,247 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // Adjust to "mysql" if you are not using Postgres
+}
+
+// ==========================================
+// ENUMS
+// ==========================================
+
+enum Role {
+  SUPERADMIN
+  ADMIN
+  GURU
+  SISWA
+}
+
+enum TipeSoal {
+  MCQ
+  ESSAY
+}
+
+enum StatusUjian {
+  DRAFT
+  SCHEDULED
+  ONGOING
+  COMPLETED
+}
+
+// ==========================================
+// USERS & TENANCY
+// ==========================================
+
+model Sekolah {
+  id          Int      @id @default(autoincrement())
+  namaSekolah String   @map("nama_sekolah")
+  alamat      String?  @db.Text
+
+  users       User[]
+  kelas       Kelas[]
+
+  @@map("sekolah")
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  name      String
+  email     String   @unique
+  password  String
+  role      Role
+
+  sekolahId Int?     @map("sekolah_id") // Nullable for Superadmins
+  sekolah   Sekolah? @relation(fields: [sekolahId], references: [id])
+
+  keanggotaan KelasMember[]
+  bukuDibuat  Buku[]
+  ujianDibuat Ujian[]
+  sesiUjian   SesiUjianSiswa[]
+
+  kelasDiajar Kelas[]          @relation("GuruKelas")
+
+  @@map("users")
+}
+
+model Kelas {
+  id        Int      @id @default(autoincrement())
+  namaKelas String   @map("nama_kelas")
+  
+  sekolahId Int      @map("sekolah_id")
+  sekolah   Sekolah  @relation(fields: [sekolahId], references: [id])
+
+  teacherId   Int      @map("teacher_id")
+  teacher     User     @relation("GuruKelas", fields: [teacherId], references: [id])
+
+  members     KelasMember[]
+  jadwalUjian JadwalUjian[]
+
+  @@map("kelas")
+}
+
+model KelasMember {
+  kelasId Int   @map("kelas_id")
+  userId  Int   @map("user_id")
+
+  kelas   Kelas @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  user    User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([kelasId, userId]) // Composite Primary Key
+  @@map("keanggotaan_kelas")
+}
+
+// ==========================================
+// CONTENT BANK
+// ==========================================
+
+model Buku {
+  id      Int    @id @default(autoincrement())
+  judul   String
+  
+  guruId  Int    @map("guru_id")
+  guru    User   @relation(fields: [guruId], references: [id])
+
+  bab     Bab[]
+
+  @@map("buku")
+}
+
+model Bab {
+  id       Int    @id @default(autoincrement())
+  judulBab String @map("judul_bab")
+  
+  bukuId   Int    @map("buku_id")
+  buku     Buku   @relation(fields: [bukuId], references: [id], onDelete: Cascade)
+
+  soal     BankSoal[]
+
+  @@map("bab")
+}
+
+model BankSoal {
+  id               Int      @id @default(autoincrement())
+  teksSoal         String   @map("teks_soal") @db.Text
+  opsiJawaban      Json?    @map("opsi_jawaban") // Nullable for essays
+  jawabanBenarMcq  String?  @map("jawaban_benar_mcq") // Nullable for essays
+  type             TipeSoal 
+  
+  babId            Int      @map("bab_id")
+  bab              Bab      @relation(fields: [babId], references: [id], onDelete: Cascade)
+
+  detailUjian      DetailUjian[]
+  jawabanSiswa     JawabanSiswa[]
+
+  @@map("bank_soal")
+}
+
+// ==========================================
+// EXAM TEMPLATES & SCHEDULING
+// ==========================================
+
+model TipeUjian {
+  id            Int    @id @default(autoincrement())
+  namaTipeUjian String @map("nama_tipe_ujian")
+
+  jadwalUjian   JadwalUjian[]
+
+  @@map("tipe_ujian")
+}
+
+model Ujian {
+  id          Int      @id @default(autoincrement())
+  judulUjian  String   @map("judul_ujian")
+  durasiMenit Int      @map("durasi_menit")
+  
+  guruId      Int      @map("guru_id")
+  guru        User     @relation(fields: [guruId], references: [id])
+
+  detailSoal  DetailUjian[]
+  jadwalUjian JadwalUjian[]
+
+  @@map("ujian")
+}
+
+model DetailUjian {
+  ujianId Int       @map("ujian_id")
+  soalId  Int       @map("soal_id")
+
+  ujian   Ujian     @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  soal    BankSoal  @relation(fields: [soalId], references: [id], onDelete: Cascade)
+
+  @@id([ujianId, soalId]) // Composite Primary Key
+  @@map("detail_ujian")
+}
+
+model JadwalUjian {
+  id                 Int         @id @default(autoincrement())
+  waktuMulaiAktif    DateTime?   @map("waktu_mulai_aktif")
+  waktuSelesaiAktif  DateTime?   @map("waktu_selesai_aktif")
+  status             StatusUjian @default(DRAFT)
+
+  ujianId            Int         @map("ujian_id")
+  kelasId            Int         @map("kelas_id")
+  tipeUjianId        Int         @map("tipe_ujian_id")
+
+  ujian              Ujian       @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  kelas              Kelas       @relation(fields: [kelasId], references: [id], onDelete: Cascade)
+  tipeUjian          TipeUjian   @relation(fields: [tipeUjianId], references: [id])
+
+  sesiSiswa          SesiUjianSiswa[]
+
+  @@map("jadwal_ujian")
+}
+
+// ==========================================
+// STUDENT INTERACTION & AI LOGS
+// ==========================================
+
+model SesiUjianSiswa {
+  id            Int       @id @default(autoincrement())
+  waktuMulai    DateTime  @default(now()) @map("waktu_mulai")
+  waktuSelesai  DateTime? @map("waktu_selesai")
+  nilaiAkhir    Float?    @map("nilai_akhir")
+
+  jadwalUjianId Int       @map("jadwal_ujian_id")
+  siswaId       Int       @map("siswa_id")
+
+  jadwalUjian   JadwalUjian @relation(fields: [jadwalUjianId], references: [id], onDelete: Cascade)
+  siswa         User        @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+
+  jawabanSiswa  JawabanSiswa[]
+  aiLogs        SavedResponses[]
+
+  @@map("sesi_ujian_siswa")
+}
+
+model JawabanSiswa {
+  id             Int            @id @default(autoincrement())
+  jawabanSiswa   String?        @map("jawaban_siswa") @db.Text
+  isCorrect      Boolean?       @map("is_correct")
+  nilaiPoin      Float?         @map("nilai_poin")
+  catatanKoreksi String?        @map("catatan_koreksi") @db.Text
+
+  attemptId      Int            @map("attempt_id")
+  soalId         Int            @map("soal_id")
+
+  attempt        SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  soal           BankSoal       @relation(fields: [soalId], references: [id], onDelete: Cascade)
+
+  @@map("jawaban_siswa")
+}
+
+model SavedResponses {
+  id                 Int            @id @default(autoincrement())
+  aiStatementSummary String         @map("ai_statement_summary") @db.Text
+  createdAt          DateTime       @default(now()) @map("created_at")
+
+  attemptId          Int            @map("attempt_id")
+  attempt            SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+
+  @@map("saved_responses")
+}

@@ -1,0 +1,106 @@
+@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light Theme */
+    --background: #FAF8F3;
+    --foreground: #39434D;
+
+    --card: #FFFFFF;
+    --card-foreground: #39434D;
+
+    --primary: #7FA88F;
+    --primary-foreground: #FFFFFF;
+
+    --secondary: #8CA8C3;
+    --secondary-foreground: #FFFFFF;
+
+    --accent: #D79A82;
+    --accent-foreground: #FFFFFF;
+
+    --muted: #F2EEE8;
+    --muted-foreground: #7A7F87;
+
+    --border: #E7E3DC;
+    --input: #E7E3DC;
+    --ring: #7FA88F;
+
+    --success: #74A97F;
+    --warning: #E5B567;
+    --error: #D97070;
+    --info: #7BA4D9;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      /* Dark Theme */
+      --background: #1B1F23;
+      --foreground: #ECEAE4;
+
+      --card: #242A30;
+      --card-foreground: #ECEAE4;
+
+      --primary: #93B49D;
+      --primary-foreground: #1B1F23;
+
+      --secondary: #9FB8D3;
+      --secondary-foreground: #1B1F23;
+
+      --accent: #E3A48D;
+      --accent-foreground: #1B1F23;
+
+      --muted: #2D333B;
+      --muted-foreground: #A6ABB2;
+
+      --border: #343A42;
+      --input: #343A42;
+      --ring: #93B49D;
+
+      --success: #8CBF96;
+      --warning: #F0C97D;
+      --error: #E78A8A;
+      --info: #96B8E4;
+    }
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: Arial, Helvetica, sans-serif;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
