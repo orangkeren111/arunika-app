@@ -112,7 +112,6 @@ export const guruRepository = {
   getSoalList: async (babId: string) => {
     const rawSoal = await guruDB.getSoalList(parseInt(babId));
     if (!rawSoal.length) return { bab: null, soalList: [] };
-
     return {
       bab: {
         id: rawSoal[0].bab.id.toString(),
@@ -125,9 +124,10 @@ export const guruRepository = {
         id: s.id.toString(),
         babId: s.babId.toString(),
         text: s.teksSoal,
-        teksSoal: s.teksSoal, // Kompatibilitas
+        teksSoal: s.teksSoal,
         type: s.type,
         options: s.opsiJawaban,
+        correctAnswer: s.jawabanBenarMcq,
         jawabanBenarMcq: s.jawabanBenarMcq,
       })),
     };

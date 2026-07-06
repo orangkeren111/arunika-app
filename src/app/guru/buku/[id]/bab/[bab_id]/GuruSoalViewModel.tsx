@@ -12,6 +12,8 @@ export function useSoalViewModel(babId: string) {
     guruRepository.getSoalList(babId).then((res) => {
       setBab(res.bab);
       setSoalList(res.soalList);
+      console.log(res.soalList);
+
       setLoading(false);
     });
   };
@@ -30,5 +32,6 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   };
 
-  return { bab, soalList, loading, handleAddSoal };
+  const handleEditSoal = async () => {};
+  return { bab, soalList, loading, handleAddSoal, handleEditSoal };
 }
