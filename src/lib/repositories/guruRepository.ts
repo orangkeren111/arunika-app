@@ -1,5 +1,6 @@
 import { StatusUjian, TipeSoal } from "@prisma/client/index-browser";
 import * as guruDB from "../services/db/guru/guruDB";
+import { Bab, Kelas, Soal } from "@/src/app/types/guru";
 
 /**
  * File ini bertugas sebagai penghubung (Middle-man).
@@ -165,6 +166,66 @@ export const guruRepository = {
     }));
   },
 
+  // template
+  getTemplateById: async (templateId: number) => {
+    const template = await guruDB.getUjianTemplateById(templateId);
+
+    // Handle case where template doesn't exist
+    if (!template) {
+      return null;
+    }
+
+    return {
+      id: template.id.toString(),
+      title: template.judulUjian,
+      judulUjian: template.judulUjian,
+      durasiMenit: template.durasiMenit,
+      isLocked: template.isLocked, // Use this in UI to disable edits if true
+      questionCount: template.detailSoal.length,
+
+      // Map the snapshot questions
+      questions: template.detailSoal.map((soal: any) => ({
+        id: soal.id.toString(),
+        babId: soal.babId.toString(),
+        soalAsliId: soal.soalAsliId?.toString() || null,
+        text: soal.teksSoal,
+        opsiJawaban: soal.opsiJawaban,
+        jawabanBenarMcq: soal.jawabanBenarMcq,
+        type: soal.type,
+      })),
+    };
+  },
+
+  updateTemplateQuestions: async (
+    templateId: number,
+    bankSoalIds: number[],
+  ) => {
+    // Langsung delegasikan semua proses (termasuk validasi) ke DB layer
+    await guruDB.upsertTemplateQuestionsSafe(templateId, bankSoalIds);
+
+    return { success: true, message: "Soal ujian berhasil diperbarui." };
+  },
+
+  getKelas: async (sekolah_id: number, guru_id: number): Promise<Kelas[]> => {
+    const kelasList = await guruDB.getKelas(sekolah_id, guru_id);
+    return kelasList.map((k) => ({
+      id: k.id,
+      name: k.namaKelas,
+      sekolahId: k.sekolahId,
+      teacherId: k.teacherId,
+      teacherName: k.teacher.name,
+      studentCount: k._count.members,
+    })) as unknown as Kelas[];
+  },
+
+  getTipeUjian: async () => {
+    const tipeUjian = await guruDB.getTipeUjian();
+    return tipeUjian.map((t) => ({
+      id: t.id.toString(),
+      namaTipeUjian: t.namaTipeUjian,
+    }));
+  },
+
   // --- JADWAL ---
   getJadwal: async (guruId: number = 2) => {
     const rawJadwal = await guruDB.getJadwal(guruId);
@@ -182,6 +243,30 @@ export const guruRepository = {
               ? "Completed"
               : "Draft",
       type: j.tipeUjian?.namaTipeUjian || "Ujian",
+    }));
+  },
+
+  getSoalByBab: async (selectedBab: string) => {
+    const listSoal = await guruDB.getSoalByBab(Number(selectedBab));
+    return (
+      listSoal.map((s: any) => ({
+        id: s.id.toString(),
+        babId: s.babId.toString(),
+        type: s.type,
+        text: s.teksSoal,
+        options: s.opsiJawaban ?? [],
+        correctAnswer: s.jawabanBenarMcq,
+      })) ?? []
+    );
+  },
+
+  getBabByBuku: async (selectedBuku: string) => {
+    const listBab = await guruDB.getBabByBuku(Number(selectedBuku));
+    return listBab.map((b: any) => ({
+      id: b.id.toString(),
+      bookId: b.bukuId.toString(),
+      title: b.judulBab,
+      questionCount: 0,
     }));
   },
 

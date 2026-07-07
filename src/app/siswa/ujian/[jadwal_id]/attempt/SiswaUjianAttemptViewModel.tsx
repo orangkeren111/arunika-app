@@ -1,5 +1,6 @@
 import { ExamQuestion } from "@/src/app/types/siswa";
 import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
+import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
 export function useExamAttempt(jadwalId: string) {
@@ -8,13 +9,18 @@ export function useExamAttempt(jadwalId: string) {
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeLeft, setTimeLeft] = useState(90 * 60); // 90 Menit
   const [loading, setLoading] = useState(true);
+  const [currentQ, setCurrentQ] = useState<ExamQuestion | null>(null);
+  const { data: session, status } = useSession();
 
   useEffect(() => {
     siswaRepository.getExamQuestions(jadwalId).then((res) => {
+      console.log(res);
+
       setQuestions(res);
+      setCurrentQ(questions[currentIndex]);
       setLoading(false);
     });
-  }, [jadwalId]);
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -30,14 +36,20 @@ export function useExamAttempt(jadwalId: string) {
   const nextQuestion = () => {
     if (currentIndex < questions.length - 1)
       setCurrentIndex((prev) => prev + 1);
+    setCurrentQ(questions[currentIndex]);
   };
 
   const prevQuestion = () => {
     if (currentIndex > 0) setCurrentIndex((prev) => prev - 1);
+    setCurrentQ(questions[currentIndex]);
   };
 
   const handleSubmitExam = async () => {
-    return siswaRepository.submitExamAttempt(jadwalId, answers);
+    return siswaRepository.submitExamAttempt(
+      jadwalId,
+      answers,
+      Number(session?.user.id ?? 0),
+    );
   };
 
   const formatTime = (seconds: number) => {
@@ -49,6 +61,7 @@ export function useExamAttempt(jadwalId: string) {
   };
 
   return {
+    currentQ,
     questions,
     currentIndex,
     setCurrentIndex,

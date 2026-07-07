@@ -1,4 +1,5 @@
 import * as siswaDB from "../services/db/siswa/siswaDB";
+import { mockSoal } from "./mockDb";
 
 export const siswaRepository = {
   // --- DASHBOARD ---

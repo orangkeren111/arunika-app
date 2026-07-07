@@ -1,4 +1,4 @@
-import { PrismaClient, Role, TipeSoal } from "@prisma/client";
+import { BankSoal, Prisma, PrismaClient, Role, TipeSoal } from "@prisma/client";
 
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
@@ -120,7 +120,7 @@ async function main() {
     { judul: "Desain Database Relasional", guruId: gurus[1].id },
   ];
 
-  const semuaSoalIds: number[] = [];
+  const semuaSoal: BankSoal[] = [];
 
   for (const infoBuku of dataBuku) {
     const buku = await prisma.buku.create({ data: infoBuku });
@@ -149,7 +149,7 @@ async function main() {
             babId: bab.id,
           },
         });
-        semuaSoalIds.push(soal.id);
+        semuaSoal.push(soal);
       }
     }
   }
@@ -160,9 +160,18 @@ async function main() {
       judulUjian: "Ujian Tengah Semester - Pemrograman Mobile",
       durasiMenit: 90,
       guruId: gurus[0].id,
+      isLocked: false,
       detailSoal: {
-        // Mengambil 25 soal pertama untuk template ujian 1
-        create: semuaSoalIds.slice(0, 25).map((id) => ({ soalId: id })),
+        create: semuaSoal.slice(0, 25).map((soal) => ({
+          soalAsliId: soal.id,
+          teksSoal: soal.teksSoal,
+          // Gunakan Prisma.DbNull untuk menangani null di field JSON
+          opsiJawaban: soal.opsiJawaban
+            ? (soal.opsiJawaban as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+          jawabanBenarMcq: soal.jawabanBenarMcq,
+          type: soal.type,
+        })),
       },
     },
   });
@@ -172,9 +181,18 @@ async function main() {
       judulUjian: "Evaluasi Akhir - Basis Data",
       durasiMenit: 120,
       guruId: gurus[1].id,
+      isLocked: false,
       detailSoal: {
-        // Mengambil 25 soal dari kumpulan soal buku kedua untuk template ujian 2
-        create: semuaSoalIds.slice(50, 75).map((id) => ({ soalId: id })),
+        create: semuaSoal.slice(50, 75).map((soal) => ({
+          soalAsliId: soal.id,
+          teksSoal: soal.teksSoal,
+          // Berlaku sama di sini
+          opsiJawaban: soal.opsiJawaban
+            ? (soal.opsiJawaban as Prisma.InputJsonValue)
+            : Prisma.DbNull,
+          jawabanBenarMcq: soal.jawabanBenarMcq,
+          type: soal.type,
+        })),
       },
     },
   });

@@ -20,6 +20,7 @@ export default function ExamAttemptPage({
   const resolvedParams = use(params);
 
   const {
+    currentQ,
     questions,
     currentIndex,
     setCurrentIndex,
@@ -30,8 +31,6 @@ export default function ExamAttemptPage({
     timeLeft,
     progress,
   } = useExamAttempt(resolvedParams.jadwal_id);
-
-  const currentQ = questions[currentIndex];
 
   const handleSubmit = () => {
     if (
@@ -133,16 +132,16 @@ export default function ExamAttemptPage({
                 Soal No. {currentIndex + 1}
               </h2>
               <span className="bg-[var(--accent)] text-white text-xs px-2 py-1 rounded font-bold">
-                {currentQ.type}
+                {currentQ?.type}
               </span>
             </div>
 
             <p className="text-lg text-[var(--foreground)] leading-relaxed mb-8">
-              {currentQ.text}
+              {currentQ?.text}
             </p>
 
             <div className="flex-1">
-              {currentQ.type === "MCQ" && currentQ.options && (
+              {currentQ?.type === "MCQ" && currentQ.options && (
                 <div className="space-y-3">
                   {currentQ.options.map((opt, idx) => (
                     <label
@@ -170,7 +169,7 @@ export default function ExamAttemptPage({
                 </div>
               )}
 
-              {currentQ.type === "ESSAY" && (
+              {currentQ?.type === "ESSAY" && (
                 <textarea
                   value={answers[currentQ.id] || ""}
                   onChange={(e) => handleAnswer(currentQ.id, e.target.value)}

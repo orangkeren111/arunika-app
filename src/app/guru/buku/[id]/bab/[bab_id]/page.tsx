@@ -5,7 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, Plus, X, Trash2 } from "lucide-react";
 import { useSoalViewModel } from "./GuruSoalViewModel";
 // Tipe data frontend yang disesuaikan dengan skema Prisma
-type TipeSoal = "MCQ" | "Essay";
+type TipeSoal = "MCQ" | "ESSAY";
 
 export default function BankSoalPage({
   params,
@@ -121,7 +121,7 @@ export default function BankSoalPage({
         </div>
         <div className="flex gap-2">
           <button
-            onClick={() => openModal("Essay")}
+            onClick={() => openModal("ESSAY")}
             className="bg-[var(--secondary)] text-[var(--secondary-foreground)] px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2"
           >
             <Plus size={16} /> Essay
@@ -207,8 +207,8 @@ export default function BankSoalPage({
                     Pilihan Ganda (MCQ)
                   </button>
                   <button
-                    onClick={() => setFormType("Essay")}
-                    className={`px-4 py-2 text-sm font-medium rounded-md transition ${formType === "Essay" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
+                    onClick={() => setFormType("ESSAY")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition ${formType === "ESSAY" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
                   >
                     Essay
                   </button>

@@ -12,8 +12,6 @@ export function useSoalViewModel(babId: string) {
     guruRepository.getSoalList(babId).then((res) => {
       setBab(res.bab);
       setSoalList(res.soalList);
-      console.log(res.soalList);
-
       setLoading(false);
     });
   };
@@ -23,7 +21,7 @@ export function useSoalViewModel(babId: string) {
   }, [babId]);
 
   const handleAddSoal = async (
-    type: "MCQ" | "Essay",
+    type: "MCQ" | "ESSAY",
     text: string,
     options?: string[],
     correctAnswer?: string,

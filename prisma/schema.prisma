@@ -157,6 +157,8 @@ model Ujian {
   id          Int      @id @default(autoincrement())
   judulUjian  String   @map("judul_ujian")
   durasiMenit Int      @map("durasi_menit")
+
+  isLocked    Boolean  @default(false) @map("is_locked") 
   
   guruId      Int      @map("guru_id")
   guru        User     @relation(fields: [guruId], references: [id])
@@ -168,13 +170,19 @@ model Ujian {
 }
 
 model DetailUjian {
-  ujianId Int       @map("ujian_id")
-  soalId  Int       @map("soal_id")
+  // Diubah pakai ID sendiri agar JawabanSiswa nanti bisa langsung menunjuk ke baris ini
+  id              Int      @id @default(autoincrement()) 
+  ujianId         Int      @map("ujian_id")
+  soalAsliId      Int?     @map("soal_asli_id") 
 
-  ujian   Ujian     @relation(fields: [ujianId], references: [id], onDelete: Cascade)
-  soal    BankSoal  @relation(fields: [soalId], references: [id], onDelete: Cascade)
+  teksSoal        String   @map("teks_soal") @db.Text
+  opsiJawaban     Json?    @map("opsi_jawaban")
+  jawabanBenarMcq String?  @map("jawaban_benar_mcq")
+  type            TipeSoal 
 
-  @@id([ujianId, soalId]) // Composite Primary Key
+  ujian           Ujian     @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  soalAsli        BankSoal? @relation(fields: [soalAsliId], references: [id], onDelete: SetNull)
+
   @@map("detail_ujian")
 }
 

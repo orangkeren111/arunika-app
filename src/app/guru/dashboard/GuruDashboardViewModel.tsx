@@ -15,7 +15,7 @@ export function useGuruDashboard() {
 
   useEffect(() => {
     guruRepository
-      .getDashboardStats(Number(session?.user.id) ?? 0)
+      .getDashboardStats(Number(session?.user.id ?? 0))
       .then((res) => {
         setStats(res);
         setLoading(false);

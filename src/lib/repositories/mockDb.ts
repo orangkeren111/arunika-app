@@ -38,7 +38,7 @@ export let mockUsers: User[] = [
 export let mockKelas: Kelas[] = [
   { id: 1, name: "10 MIPA 1", teacherId: 1, studentCount: 2 },
   { id: 2, name: "10 IPS 2", teacherId: 2, studentCount: 0 },
-  { id: 3, name: "11 MIPA 1", teacherId: null, studentCount: 0 },
+  { id: 3, name: "11 MIPA 1", teacherId: 1, studentCount: 0 },
 ];
 
 export let mockBuku: Buku[] = [
@@ -91,7 +91,7 @@ export let mockSoal: Soal[] = [
   {
     id: "s3",
     babId: "101",
-    type: "Essay",
+    type: "ESSAY",
     text: "Jelaskan perbedaan antara sel tumbuhan dan sel hewan beserta fungsi masing-masing organel yang membedakannya!",
   },
 ];

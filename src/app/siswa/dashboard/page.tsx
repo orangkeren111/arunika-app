@@ -5,13 +5,15 @@ import { CalendarClock, Play, Trophy, Clock } from "lucide-react";
 import { useSiswaDashboard } from "./SiswaDashboardViewModel";
 
 export default function SiswaDashboardPage() {
-  const { stats, upcoming, recentHistory } = useSiswaDashboard();
+  const { stats, upcoming, recentHistory, currentUser } = useSiswaDashboard();
 
   return (
     <div className="space-y-8">
       <div className="bg-[var(--primary)] text-[var(--primary-foreground)] p-8 rounded-2xl shadow-sm relative overflow-hidden">
         <div className="relative z-10">
-          <h1 className="text-3xl font-bold mb-2">Selamat Pagi, Andi! 🌅</h1>
+          <h1 className="text-3xl font-bold mb-2">
+            Selamat Pagi, {currentUser?.name ?? ""}! 🌅
+          </h1>
           <p className="opacity-90 max-w-lg">
             Tetap fokus dan semangat belajar. Kamu memiliki {stats?.upcoming}{" "}
             jadwal ujian yang akan datang. Persiapkan dirimu dengan baik!
