@@ -10,7 +10,7 @@ export function useUjianViewModel() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    guruRepository.getTemplates().then((res) => {
+    guruRepository.getTemplates(Number(session?.user.id ?? 0)).then((res) => {
       setTemplates(res);
       setLoading(false);
     });

@@ -186,7 +186,7 @@ export const guruRepository = {
       // Map the snapshot questions
       questions: template.detailSoal.map((soal: any) => ({
         id: soal.id.toString(),
-        babId: soal.babId.toString(),
+        babId: (soal.babId ?? 0).toString(),
         soalAsliId: soal.soalAsliId?.toString() || null,
         text: soal.teksSoal,
         opsiJawaban: soal.opsiJawaban,

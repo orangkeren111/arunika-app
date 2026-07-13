@@ -1,14 +1,16 @@
 import { guruRepository } from "@/src/lib/repositories/guruRepository";
 import { Buku } from "@/src/app/types/guru";
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 
 export function useBukuViewModel() {
   const [bukuList, setBukuList] = useState<Buku[]>([]);
   const [loading, setLoading] = useState(true);
+  const { data: session, status } = useSession();
 
   const fetchBuku = () => {
     setLoading(true);
-    guruRepository.getBukuList().then((res) => {
+    guruRepository.getBukuList(Number(session?.user.id ?? 0)).then((res) => {
       setBukuList(res);
       setLoading(false);
     });
