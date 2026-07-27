@@ -1,6 +1,8 @@
-import { StatusUjian, TipeSoal } from "@prisma/client/index-browser";
+import { StatusUjian, TipeSoal } from "@prisma/client";
 import * as guruDB from "../services/db/guru/guruDB";
-import { Bab, Kelas, Soal } from "@/src/app/types/guru";
+import { initiatePdfExtraction } from "../services/process-book/initiate-extractor";
+import { Bab, Kelas, Soal, UjianTemplate } from "@/src/app/types/guru";
+import { generateQuestionsWithGroq } from "../services/process-book/generate-questions";
 
 /**
  * File ini bertugas sebagai penghubung (Middle-man).
@@ -30,7 +32,7 @@ export const guruRepository = {
   },
 
   // --- BUKU ---
-  getBukuList: async (guruId: number = 2) => {
+  getBukuList: async (guruId: number = 1) => {
     const rawBuku = await guruDB.getBukuList(guruId);
 
     return rawBuku.map((b: any) => ({
@@ -110,27 +112,32 @@ export const guruRepository = {
   },
 
   // --- SOAL ---
-  getSoalList: async (babId: string) => {
+  getSoalList: async (
+    babId: string,
+  ): Promise<{ bab: Bab | null; soalList: Soal[] }> => {
     const rawSoal = await guruDB.getSoalList(parseInt(babId));
-    if (!rawSoal.length) return { bab: null, soalList: [] };
+    const rawBab = await guruDB.getBabDetail(parseInt(babId));
+    if (!rawBab) return { bab: null, soalList: [] };
     return {
       bab: {
-        id: rawSoal[0].bab.id.toString(),
-        judulBab: rawSoal[0].bab.judulBab,
-        title: rawSoal[0].bab.judulBab,
-        bookId: rawSoal[0].bab.bukuId.toString(),
+        id: rawBab.id.toString(),
+        title: rawBab.judulBab,
+        bookId: rawBab.bukuId.toString(),
         questionCount: rawSoal.length,
       },
-      soalList: rawSoal.map((s: any) => ({
-        id: s.id.toString(),
-        babId: s.babId.toString(),
-        text: s.teksSoal,
-        teksSoal: s.teksSoal,
-        type: s.type,
-        options: s.opsiJawaban,
-        correctAnswer: s.jawabanBenarMcq,
-        jawabanBenarMcq: s.jawabanBenarMcq,
-      })),
+      soalList:
+        rawSoal.map((s: any) => ({
+          id: s.id.toString(),
+          babId: s.babId.toString(),
+          text: s.teksSoal,
+          teksSoal: s.teksSoal,
+          type: s.type,
+          options: s.opsiJawaban,
+          correctAnswer: s.jawabanBenarMcq,
+          jawabanBenarMcq: s.jawabanBenarMcq,
+          difficulty: s.difficulty,
+          bloomLevel: s.bloomLevel,
+        })) ?? [],
     };
   },
 
@@ -141,7 +148,9 @@ export const guruRepository = {
       teksSoal: soal.text || soal.teksSoal || "",
       type,
       opsiJawaban: soal.options || soal.opsiJawaban || null,
-      jawabanBenarMcq: soal.answer || soal.jawabanBenarMcq || null,
+      jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq || null,
+      difficulty: soal.difficulty || null,
+      bloomLevel: soal.bloomLevel || null,
     });
 
     return {
@@ -154,16 +163,43 @@ export const guruRepository = {
     };
   },
 
+  editSoal: async (idSoal: string, soal: any) => {
+    const type = soal.type === "MCQ" ? TipeSoal.MCQ : TipeSoal.ESSAY;
+
+    const updatedSoal = await guruDB.updateSoal(parseInt(idSoal), {
+      bab: {
+        connect: {
+          id: parseInt(soal.babId ?? 0),
+        },
+      },
+      teksSoal: soal.text || soal.teksSoal,
+      type,
+      opsiJawaban: soal.options || soal.opsiJawaban,
+      jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq,
+    });
+
+    return {
+      id: updatedSoal.id.toString(),
+      babId: updatedSoal.babId.toString(),
+      type: updatedSoal.type,
+      text: updatedSoal.teksSoal,
+      options: updatedSoal.opsiJawaban,
+      jawabanBenarMcq: updatedSoal.jawabanBenarMcq,
+    };
+  },
+
   // --- TEMPLATES UJIAN ---
   getTemplates: async (guruId: number = 2) => {
     const templates = await guruDB.getUjianTemplates(guruId);
-    return templates.map((t: any) => ({
-      id: t.id.toString(),
-      title: t.judulUjian,
-      judulUjian: t.judulUjian,
-      durasiMenit: t.durasiMenit,
-      questionCount: t._count?.detailSoal || 0,
-    }));
+    return (
+      templates.map((t: any) => ({
+        id: t.id.toString(),
+        title: t.judulUjian,
+        judulUjian: t.judulUjian,
+        durasiMenit: t.durasiMenit,
+        questionCount: t.totalSoal || 0,
+      })) ?? []
+    );
   },
 
   // template
@@ -180,30 +216,84 @@ export const guruRepository = {
       title: template.judulUjian,
       judulUjian: template.judulUjian,
       durasiMenit: template.durasiMenit,
-      isLocked: template.isLocked, // Use this in UI to disable edits if true
-      questionCount: template.detailSoal.length,
+      isLocked: template.isLocked,
 
-      // Map the snapshot questions
-      questions: template.detailSoal.map((soal: any) => ({
-        id: soal.id.toString(),
-        babId: (soal.babId ?? 0).toString(),
-        soalAsliId: soal.soalAsliId?.toString() || null,
-        text: soal.teksSoal,
-        opsiJawaban: soal.opsiJawaban,
-        jawabanBenarMcq: soal.jawabanBenarMcq,
-        type: soal.type,
+      questionCount: template.ujianBab.reduce(
+        (count, ub) => count + ub.bab.soal.length,
+        0,
+      ),
+
+      babs: template.ujianBab.map((ub) => ({
+        id: ub.bab.id.toString(),
+        title: ub.bab.judulBab,
+
+        questions: ub.bab.soal.map((soal: any) => ({
+          id: soal.id.toString(),
+          text: soal.teksSoal,
+          opsiJawaban: soal.opsiJawaban,
+          jawabanBenarMcq: soal.jawabanBenarMcq,
+          type: soal.type,
+          difficulty: soal.difficulty,
+          bloomLevel: soal.bloomLevel,
+        })),
       })),
     };
   },
 
-  updateTemplateQuestions: async (
-    templateId: number,
-    bankSoalIds: number[],
+  createTemplate: async (
+    ujian: UjianTemplate,
+    guruId: number,
+    babIds: number[],
   ) => {
     // Langsung delegasikan semua proses (termasuk validasi) ke DB layer
-    await guruDB.upsertTemplateQuestionsSafe(templateId, bankSoalIds);
+    await guruDB.createTemplate(
+      {
+        judulUjian: ujian.title,
+        jumlahSoal: ujian.questionCount,
+        durasiMenit: ujian.durasiMenit,
+        guru: {
+          connect: {
+            id: guruId,
+          },
+        },
+      },
+      babIds,
+    );
 
     return { success: true, message: "Soal ujian berhasil diperbarui." };
+  },
+
+  updateTemplateQuestions: async (
+    templateId: number,
+    ujian: UjianTemplate,
+    guruId: number,
+
+    babIds: number[],
+  ) => {
+    // Langsung delegasikan semua proses (termasuk validasi) ke DB layer
+    await guruDB.upsertTemplateBabSafe(
+      templateId,
+      {
+        judulUjian: ujian.title,
+        jumlahSoal: ujian.questionCount,
+        durasiMenit: ujian.durasiMenit,
+        guru: {
+          connect: {
+            id: guruId,
+          },
+        },
+      },
+      babIds,
+    );
+
+    return { success: true, message: "Soal ujian berhasil diperbarui." };
+  },
+
+  uploadAndGenerateBookPdf: async (formData: FormData) => {
+    return await initiatePdfExtraction(formData);
+  },
+  retryGenerateSoal: async (babId: number) => {
+    return await generateQuestionsWithGroq(babId);
   },
 
   getKelas: async (sekolah_id: number, guru_id: number): Promise<Kelas[]> => {
@@ -246,7 +336,7 @@ export const guruRepository = {
     }));
   },
 
-  getSoalByBab: async (selectedBab: string) => {
+  getSoalByBab: async (selectedBab: string): Promise<Soal[]> => {
     const listSoal = await guruDB.getSoalByBab(Number(selectedBab));
     return (
       listSoal.map((s: any) => ({
@@ -256,6 +346,8 @@ export const guruRepository = {
         text: s.teksSoal,
         options: s.opsiJawaban ?? [],
         correctAnswer: s.jawabanBenarMcq,
+        difficulty: s.difficulty,
+        bloomLevel: s.bloomLevel,
       })) ?? []
     );
   },
@@ -337,22 +429,59 @@ export const guruRepository = {
       studentName: a.siswa.name,
       score: a.nilaiAkhir,
       status: a.nilaiAkhir !== null ? "Graded" : "Pending Essay",
-      feedback: a.jawabanSiswa[0]?.catatanKoreksi || "",
-      aiSummary: a.aiLogs[0]?.aiStatementSummary || "",
+      aiSummary: a.aiLogs[0]?.overview || "",
       answers: a.jawabanSiswa.map((ans: any) => ({
-        soalId: ans.soalId.toString(),
-        text: ans.soal.teksSoal,
-        type: ans.soal.type,
+        jawabanId: ans.id.toString(),
+        text: ans.teksSoal,
+        type: ans.type,
         studentAnswer: ans.jawabanSiswa,
         isCorrect: ans.isCorrect,
         point: ans.nilaiPoin,
+        feedback: ans.catatanKoreksi || "",
       })),
     };
   },
 
-  gradeAttempt: async (attemptId: string, score: number, feedback: string) => {
-    // Memperbarui skor final di tabel SesiUjianSiswa
-    const updated = await guruDB.updateAttemptScore(parseInt(attemptId), score);
+  gradeAttempt: async (
+    attemptId: string,
+    gradedAnswers: {
+      jawabanId: number;
+      nilaiPoin: number;
+      catatanKoreksi: string;
+    }[],
+  ) => {
+    const attemptIdNum = parseInt(attemptId);
+
+    // 1. Update each graded essay answer individually
+    // Note: If you have many answers, you could use a Prisma $transaction here,
+    // but a simple loop works perfectly for a handful of essays.
+    for (const answer of gradedAnswers) {
+      await guruDB.gradeJawabanSiswa(
+        answer.jawabanId,
+        answer.nilaiPoin,
+        answer.catatanKoreksi,
+      );
+    }
+
+    // 2. Fetch ALL answers for this attempt to calculate the accurate final score
+    // (Assuming you have access to prisma here, or a helper function to fetch them)
+    const allAnswers = await guruDB.getAttemptDetail(attemptIdNum);
+
+    const newTotalScore =
+      allAnswers?.jawabanSiswa.reduce(
+        (sum, ans) => sum + (ans.nilaiPoin || 0),
+        0,
+      ) ?? 0;
+
+    // 3. Update the final score on the attempt record
+    const updated = await guruDB.updateAttemptScore(
+      attemptIdNum,
+      newTotalScore,
+    );
+
+    // 4. Return the DTO expected by the frontend
+    // We grab the feedback from the first graded answer just like your initial DTO
+    const primaryFeedback = gradedAnswers[0]?.catatanKoreksi || "";
 
     return {
       id: updated.id.toString(),
@@ -360,7 +489,7 @@ export const guruRepository = {
       studentName: updated.siswa?.name || "Siswa",
       score: updated.nilaiAkhir,
       status: "Graded",
-      feedback: feedback,
+      feedback: primaryFeedback,
       aiSummary: "Koreksi manual berhasil disimpan oleh guru.",
     };
   },

@@ -21,7 +21,10 @@ export function useBukuViewModel() {
   }, []);
 
   const handleAddBuku = async (title: string, description: string) => {
-    await guruRepository.addBuku({ title, description });
+    await guruRepository.addBuku(
+      { title, description },
+      Number(session?.user.id ?? 0),
+    );
     fetchBuku();
   };
   const handleEditBuku = async (id: string, buku: any) => {

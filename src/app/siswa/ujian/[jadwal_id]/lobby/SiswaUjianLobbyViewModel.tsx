@@ -7,7 +7,7 @@ export function useExamLobby(jadwalId: string) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    siswaRepository.getExamLobby(jadwalId).then(res => {
+    siswaRepository.getExamLobby(jadwalId).then((res) => {
       setExam(res);
       setLoading(false);
     });

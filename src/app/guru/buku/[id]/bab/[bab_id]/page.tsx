@@ -13,9 +13,13 @@ export default function BankSoalPage({
   params: Promise<{ id: string; bab_id: string }>;
 }) {
   const resolvedParams = use(params);
-  const { bab, soalList, handleAddSoal, handleEditSoal } = useSoalViewModel(
-    resolvedParams.bab_id,
-  );
+  const {
+    bab,
+    soalList,
+    handleAddSoal,
+    handleEditSoal,
+    handleGenerateQuestion,
+  } = useSoalViewModel(resolvedParams.bab_id.toString());
 
   // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -24,6 +28,8 @@ export default function BankSoalPage({
   // --- FORM STATE ---
   const [formType, setFormType] = useState<TipeSoal>("MCQ");
   const [teksSoal, setTeksSoal] = useState("");
+  const [difficulty, setDifficulty] = useState(0);
+  const [bloomLevel, setBloomLevel] = useState("");
   const [opsiJawaban, setOpsiJawaban] = useState<string[]>(["", "", "", ""]); // Default 4 opsi
   const [jawabanBenarIndex, setJawabanBenarIndex] = useState<number>(0);
 
@@ -80,6 +86,8 @@ export default function BankSoalPage({
       jawabanBenarMcq:
         formType === "MCQ" ? opsiJawaban[jawabanBenarIndex] : null,
       babId: Number(resolvedParams.bab_id),
+      difficulty: difficulty ? difficulty : 1,
+      bloomLevel: bloomLevel ? bloomLevel : "C1",
     };
 
     console.log("Menyimpan Soal:", payload);
@@ -87,10 +95,22 @@ export default function BankSoalPage({
     handleAddSoal(
       payload.type,
       payload.teksSoal,
+      payload.difficulty,
+      payload.bloomLevel,
       payload.opsiJawaban ?? [],
       payload.jawabanBenarMcq ?? "",
     );
-    // if (editingId) updateSoal(editingId, payload);
+    if (editingId)
+      handleEditSoal(editingId.toString(), {
+        id: "",
+        babId: bab?.id ?? "",
+        type: payload.type,
+        difficulty: payload.difficulty,
+        bloomLevel: payload.bloomLevel,
+        text: payload.teksSoal,
+        options: payload.opsiJawaban ?? [],
+        correctAnswer: payload.jawabanBenarMcq ?? "",
+      });
     // else handleAddSoal(payload);
 
     closeModal();
@@ -131,6 +151,12 @@ export default function BankSoalPage({
             className="bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2"
           >
             <Plus size={16} /> Pilihan Ganda
+          </button>
+          <button
+            onClick={() => handleGenerateQuestion()}
+            className="bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2"
+          >
+            <Plus size={16} /> Generate Soal
           </button>
         </div>
       </div>

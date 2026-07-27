@@ -20,16 +20,40 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   }, [babId]);
 
+  const handleGenerateQuestion = async () => {
+    await guruRepository.retryGenerateSoal(Number(babId));
+    fetchSoal();
+  };
   const handleAddSoal = async (
     type: "MCQ" | "ESSAY",
     text: string,
+    difficulty: number,
+    bloomLevel: string,
     options?: string[],
     correctAnswer?: string,
   ) => {
-    await guruRepository.addSoal({ babId, type, text, options, correctAnswer });
+    await guruRepository.addSoal({
+      babId,
+      type,
+      text,
+      options,
+      correctAnswer,
+      difficulty,
+      bloomLevel,
+    });
     fetchSoal();
   };
 
-  const handleEditSoal = async () => {};
-  return { bab, soalList, loading, handleAddSoal, handleEditSoal };
+  const handleEditSoal = async (id: string, payload: Soal) => {
+    await guruRepository.editSoal(id, payload);
+    fetchSoal();
+  };
+  return {
+    bab,
+    soalList,
+    loading,
+    handleAddSoal,
+    handleEditSoal,
+    handleGenerateQuestion,
+  };
 }

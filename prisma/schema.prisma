@@ -34,6 +34,14 @@ enum StatusUjian {
   COMPLETED
 }
 
+enum JobStatus {
+  PENDING
+  PROCESSING_PDF
+  GENERATING_QUESTIONS
+  DONE
+  FAILED
+}
+
 // ==========================================
 // USERS & TENANCY
 // ==========================================
@@ -109,7 +117,25 @@ model Buku {
 
   bab     Bab[]
 
+  jobs     GenerationJob[]
+
   @@map("buku")
+}
+
+model GenerationJob {
+  id           Int       @id @default(autoincrement())
+  status       JobStatus @default(PENDING)
+  fileName     String    @map("file_name")
+  fileUrl      String?   @map("file_url") // Bisa diset null/dihapus kalau file lokal sudah di-unlink
+  errorMessage String?   @map("error_message") @db.Text
+
+  bukuId       Int       @map("buku_id")
+  buku         Buku      @relation(fields: [bukuId], references: [id], onDelete: Cascade)
+  
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  
+  @@map("generation_job")
 }
 
 model Bab {
@@ -119,7 +145,10 @@ model Bab {
   bukuId   Int    @map("buku_id")
   buku     Buku   @relation(fields: [bukuId], references: [id], onDelete: Cascade)
 
+  learningGoals String?   @map("learning_goals") @db.Text // Hasil ekstraksi Gemini disimpan di sini
+
   soal     BankSoal[]
+  ujianBab     UjianBab[]
 
   @@map("bab")
 }
@@ -127,15 +156,17 @@ model Bab {
 model BankSoal {
   id               Int      @id @default(autoincrement())
   teksSoal         String   @map("teks_soal") @db.Text
-  opsiJawaban      Json?    @map("opsi_jawaban") // Nullable for essays
-  jawabanBenarMcq  String?  @map("jawaban_benar_mcq") // Nullable for essays
-  type             TipeSoal 
-  
+  opsiJawaban      Json?    @map("opsi_jawaban")
+  jawabanBenarMcq  String?  @map("jawaban_benar_mcq")
+  type             TipeSoal
+
   babId            Int      @map("bab_id")
   bab              Bab      @relation(fields: [babId], references: [id], onDelete: Cascade)
 
-  detailUjian      DetailUjian[]
   jawabanSiswa     JawabanSiswa[]
+
+  difficulty Int
+  bloomLevel String?
 
   @@map("bank_soal")
 }
@@ -154,36 +185,33 @@ model TipeUjian {
 }
 
 model Ujian {
-  id          Int      @id @default(autoincrement())
-  judulUjian  String   @map("judul_ujian")
-  durasiMenit Int      @map("durasi_menit")
+  id              Int      @id @default(autoincrement())
 
-  isLocked    Boolean  @default(false) @map("is_locked") 
-  
-  guruId      Int      @map("guru_id")
-  guru        User     @relation(fields: [guruId], references: [id])
+  judulUjian      String   @map("judul_ujian")
+  durasiMenit     Int      @map("durasi_menit")
+  jumlahSoal      Int      @map("jumlah_soal")
 
-  detailSoal  DetailUjian[]
-  jadwalUjian JadwalUjian[]
+  isAdaptive      Boolean  @default(true)
+  isLocked        Boolean  @default(false)
+
+  guruId          Int      @map("guru_id")
+  guru            User     @relation(fields: [guruId], references: [id])
+
+  jadwalUjian     JadwalUjian[]
+  ujianBab        UjianBab[]
 
   @@map("ujian")
 }
 
-model DetailUjian {
-  // Diubah pakai ID sendiri agar JawabanSiswa nanti bisa langsung menunjuk ke baris ini
-  id              Int      @id @default(autoincrement()) 
-  ujianId         Int      @map("ujian_id")
-  soalAsliId      Int?     @map("soal_asli_id") 
+model UjianBab {
+  ujianId Int
+  babId   Int
 
-  teksSoal        String   @map("teks_soal") @db.Text
-  opsiJawaban     Json?    @map("opsi_jawaban")
-  jawabanBenarMcq String?  @map("jawaban_benar_mcq")
-  type            TipeSoal 
+  ujian Ujian @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  bab   Bab   @relation(fields: [babId], references: [id], onDelete: Cascade)
 
-  ujian           Ujian     @relation(fields: [ujianId], references: [id], onDelete: Cascade)
-  soalAsli        BankSoal? @relation(fields: [soalAsliId], references: [id], onDelete: SetNull)
-
-  @@map("detail_ujian")
+  @@id([ujianId, babId])
+  @@map("ujian_bab")
 }
 
 model JadwalUjian {
@@ -215,6 +243,8 @@ model SesiUjianSiswa {
   waktuSelesai  DateTime? @map("waktu_selesai")
   nilaiAkhir    Float?    @map("nilai_akhir")
 
+  currentElo    Float     @default(1000.0) @map("current_elo")
+
   jadwalUjianId Int       @map("jadwal_ujian_id")
   siswaId       Int       @map("siswa_id")
 
@@ -228,28 +258,72 @@ model SesiUjianSiswa {
 }
 
 model JawabanSiswa {
-  id             Int            @id @default(autoincrement())
-  jawabanSiswa   String?        @map("jawaban_siswa") @db.Text
-  isCorrect      Boolean?       @map("is_correct")
-  nilaiPoin      Float?         @map("nilai_poin")
-  catatanKoreksi String?        @map("catatan_koreksi") @db.Text
+  id               Int      @id @default(autoincrement())
 
-  attemptId      Int            @map("attempt_id")
-  soalId         Int            @map("soal_id")
+  // Snapshot
+  soalAsliId       Int?     @map("soal_asli_id")
 
-  attempt        SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-  soal           BankSoal       @relation(fields: [soalId], references: [id], onDelete: Cascade)
+  nomor            Int
 
+  teksSoal         String   @map("teks_soal") @db.Text
+  opsiJawaban      Json?    @map("opsi_jawaban")
+  jawabanBenarMcq  String?  @map("jawaban_benar_mcq")
+  type             TipeSoal
+
+  // Student answer
+  jawabanSiswa     String?  @map("jawaban_siswa") @db.Text
+  isCorrect        Boolean? @map("is_correct")
+
+  nilaiPoin        Float?   @map("nilai_poin")
+  catatanKoreksi   String?  @map("catatan_koreksi") @db.Text
+
+  answeredAt       DateTime? @map("answered_at")
+
+  eloBefore        Float?   @map("elo_before")
+  eloAfter         Float?   @map("elo_after")
+
+  attemptId        Int       @map("attempt_id")
+
+  attempt          SesiUjianSiswa @relation(fields: [attemptId],references: [id],onDelete: Cascade)
+
+  soalAsli         BankSoal? @relation(fields: [soalAsliId],references: [id],onDelete: SetNull)
+
+  difficulty Int
+  bloomLevel String?
   @@map("jawaban_siswa")
 }
 
-model SavedResponses {
-  id                 Int            @id @default(autoincrement())
-  aiStatementSummary String         @map("ai_statement_summary") @db.Text
-  createdAt          DateTime       @default(now()) @map("created_at")
+model TaskQueue {
+  id          Int      @id @default(autoincrement())
+  type        String   // "extract_pdf", "generate_report", etc.
+  status      String   @default("pending") // "pending", "processing", "completed", "failed"
+  payload     Json     // Stores context (e.g., attemptId, summarized history)
+  
+  provider    String?  // The LLM assigned (e.g., "claude", "gemini", "groq")
+  attempts    Int      @default(0)
+  errorLog    String?  @db.Text
+  
+  lockedAt    DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
-  attemptId          Int            @map("attempt_id")
-  attempt            SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  @@map("task_queue")
+}
+
+
+model SavedResponses {
+  id             Int            @id @default(autoincrement())
+  
+  // Replaced aiStatementSummary with specific sections
+  overview       String?        @db.Text
+  weakness       String?        @db.Text
+  recommendation String?        @db.Text
+  
+  status         String         @default("PENDING") // "PENDING", "COMPLETED", "FAILED"
+  createdAt      DateTime       @default(now()) @map("created_at")
+
+  attemptId      Int            @unique @map("attempt_id")
+  attempt        SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@map("saved_responses")
 }

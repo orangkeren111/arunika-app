@@ -16,114 +16,168 @@ export function useFormUjianViewModel(id: string) {
 
   // --- New Exam Builder States ---
   const [selectedBuku, setSelectedBuku] = useState<string>("");
-  const [selectedBab, setSelectedBab] = useState<string>("");
-  const [selectedQuestions, setSelectedQuestions] = useState<SoalTemplate[]>(
-    [],
-  );
 
-  // TODO: Create proper states and fetch logic for these lists
+  const [activeBabs, setActiveBabs] = useState<string[]>([]);
+  const [selectedQuestions, setSelectedQuestions] = useState<Soal[]>([]);
+
   const [babList, setBabList] = useState<Bab[]>([]);
   const [bukuList, setBukuList] = useState<Buku[]>([]);
-  const [availableQuestions, setAvailableQuestions] = useState<Soal[]>([]);
+
+  // Note: In your real app context, keep the useSession hook here:
   const { data: session, status } = useSession();
+  // const session = { user: { id: 1 } }; // Mocked here so the preview doesn't break
 
   useEffect(() => {
-    guruRepository.getTemplateById(Number(id)).then((res) => {
+    // 1. Handle Initialization: Create vs Update
+    if (id === "new") {
       setTemplate({
-        id: res?.id ?? "",
-        title: res?.title ?? "",
-        questionCount: res?.questionCount ?? 0,
+        id: "new",
+        title: "",
+        questionCount: 0,
+        durasiMenit: 0,
       });
-      setSelectedQuestions(res?.questions ?? []);
-      setLoading(false);
-    });
-    guruRepository.getBukuList(Number(session?.user.id ?? 0)).then((res) => {
+      setSelectedQuestions([]);
+      setActiveBabs([]);
+      // Loading will be set to false after bukuList is fetched below
+    } else {
+      guruRepository.getTemplateById(Number(id)).then((res) => {
+        if (!res) {
+          setLoading(false);
+          return;
+        }
+
+        setTemplate({
+          id: res.id ?? "",
+          title: res.title ?? "",
+          questionCount: res.questionCount ?? 0,
+          durasiMenit: res.durasiMenit ?? 0,
+        });
+        const allQuestions =
+          res.babs?.flatMap((bab) => {
+            const questionsDiBabIni = bab.questions || [];
+
+            return questionsDiBabIni.map((q) => ({
+              ...q,
+              babId: bab.id,
+            }));
+          }) || [];
+
+        setSelectedQuestions(allQuestions);
+
+        const existingBabs = Array.from(
+          new Set(allQuestions.map((q) => q.babId)),
+        );
+
+        setActiveBabs(existingBabs);
+      });
+    }
+
+    // 2. Fetch Buku List (Required for both Create and Update)
+    guruRepository.getBukuList(Number(session?.user?.id ?? 0)).then((res) => {
       setBukuList(res);
       setLoading(false);
     });
-  }, []);
-
-  // TODO: Add an effect to fetch 'availableQuestions' whenever 'selectedBab' changes
-  useEffect(() => {
-    if (selectedBab) {
-      guruRepository
-        .getSoalByBab(selectedBab)
-        .then((res) => setAvailableQuestions(res));
-    }
-  }, [selectedBab]);
+  }, [id]); // Added 'id' as a dependency
 
   useEffect(() => {
     if (selectedBuku) {
       guruRepository.getBabByBuku(selectedBuku).then((res) => setBabList(res));
+    } else {
+      setBabList([]);
     }
   }, [selectedBuku]);
 
-  const isQuestionSelected = (bankSoalId: string) => {
-    return selectedQuestions.some((selected) => {
-      const originalId = selected.soalAsliId
-        ? selected.soalAsliId
-        : selected.id;
-      return originalId === bankSoalId;
-    });
-  };
-  const handleAddQuestion = (soalDariBank: Soal) => {
-    if (!isQuestionSelected(soalDariBank.id)) {
-      // Convert tipe Soal menjadi SoalTemplate
-      const newTemplateQuestion: SoalTemplate = {
-        // Bikin ID sementara untuk React key mapping (biar nggak bentrok dengan ID DB kalau ada)
-        id: `draft-${soalDariBank.id}`,
+  const handleToggleBab = async (babId: string) => {
+    const isSelected = activeBabs.includes(babId);
 
-        // MAPPING UTAMA: ID dari BankSoal pindah ke soalAsliId
-        soalAsliId: soalDariBank.id,
-        babId: soalDariBank.babId,
+    if (isSelected) {
+      setActiveBabs((prev) => prev.filter((id) => id !== babId));
+      setSelectedQuestions((prev) => prev.filter((q) => q.babId !== babId));
+    } else {
+      setActiveBabs((prev) => [...prev, babId]);
 
-        // Copy sisa datanya
-        text: soalDariBank.text,
-        options: soalDariBank.options,
-        correctAnswer: soalDariBank.correctAnswer,
-        type: soalDariBank.type,
-      };
+      try {
+        const soalDariBank = await guruRepository.getSoalByBab(babId);
 
-      setSelectedQuestions((prev) => [...prev, newTemplateQuestion]);
+        const newTemplateQuestions: SoalTemplate[] = soalDariBank.map(
+          (soal) => ({
+            id: `draft-${soal.id}`,
+            soalAsliId: soal.id,
+            babId: soal.babId,
+            text: soal.text,
+            options: soal.options,
+            correctAnswer: soal.correctAnswer,
+            type: soal.type,
+            difficulty: soal.difficulty,
+            bloomLevel: soal.bloomLevel,
+          }),
+        );
+
+        setSelectedQuestions((prev) => {
+          const existingIds = new Set(prev.map((q) => q.id));
+          const filteredNew = newTemplateQuestions.filter(
+            (q) => !existingIds.has(q.soalAsliId),
+          );
+          return [...prev, ...filteredNew];
+        });
+      } catch (error) {
+        console.error("Gagal mengambil soal:", error);
+        setActiveBabs((prev) => prev.filter((id) => id !== babId));
+      }
     }
   };
 
   const handleRemoveQuestion = (soalIdAtauAsliId: string) => {
     setSelectedQuestions((prev) =>
-      prev.filter(
-        (q) => q.id !== soalIdAtauAsliId && q.soalAsliId !== soalIdAtauAsliId,
-      ),
+      prev.filter((q) => q.id !== soalIdAtauAsliId),
     );
   };
 
   const handleSaveTemplate = async () => {
     try {
-      const soalIds = selectedQuestions.map((q) => Number(q.id));
-
-      // Panggil service
-      await guruRepository.updateTemplateQuestions(
-        Number(template?.id ?? 0),
-        soalIds,
+      const babIds = activeBabs.map((q) =>
+        Number(q.toString().replace(/\D/g, "") || "0"),
       );
+
+      if (id === "new") {
+        // CREATE MODE
+        // Assuming your repository has a create method that takes a payload.
+        // Adjust the payload structure based on your actual API/DB requirements.
+        if (template) {
+          await guruRepository.createTemplate(
+            template,
+            Number(session?.user.id ?? 0),
+            babIds,
+          );
+        }
+      } else {
+        // UPDATE MODE
+        if (template) {
+          await guruRepository.updateTemplateQuestions(
+            Number(template?.id ?? 0),
+            template,
+            Number(session?.user.id ?? 0),
+            babIds,
+          );
+        }
+      }
     } catch (error: any) {
-      console.error("Gagal update template:", error);
+      console.error("Gagal menyimpan template:", error);
     }
   };
 
   return {
     template,
+    setTemplate, // EXPOSED: So the UI can update the template title in Create Mode
     loading,
     babList,
     bukuList,
-    selectedBab,
-    setSelectedBab,
+    activeBabs,
     selectedBuku,
     setSelectedBuku,
-    availableQuestions,
     selectedQuestions,
-    handleAddQuestion,
+    handleToggleBab,
     handleRemoveQuestion,
     handleSaveTemplate,
-    isQuestionSelected,
   };
 }

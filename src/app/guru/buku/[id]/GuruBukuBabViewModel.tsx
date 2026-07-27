@@ -31,7 +31,10 @@ export function useBabViewModel(bookId: string) {
     //TODO
   };
   const handleUploadBook = async (file: File) => {
-    //TODO
+    const formData = new FormData();
+    formData.append("bookId", bookId.toString()); // sesuaikan tipe bookId
+    formData.append("pdfFile", file);
+    await guruRepository.uploadAndGenerateBookPdf(formData);
   };
   const handleViewBook = async () => {
     //TODO

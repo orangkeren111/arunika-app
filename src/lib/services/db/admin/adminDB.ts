@@ -1,7 +1,7 @@
 "use server";
 
 import prisma from "../prisma";
-import { Prisma, Role } from "@prisma/client/index-browser";
+import { Prisma, Role } from "@prisma/client";
 
 export async function getStats() {
   const [totalUsers, totalKelas, totalSiswa, totalGuru] = await Promise.all([

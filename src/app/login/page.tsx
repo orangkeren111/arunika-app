@@ -60,20 +60,9 @@ function LoginForm() {
         setLoading(false);
       } else {
         // Tentukan rute dashboard tujuan berdasarkan email pengujian
-        let targetDashboard = "/siswa/dashboard";
-        let roleName = "Siswa";
+        let targetDashboard = "/login";
 
-        if (email.includes("admin")) {
-          targetDashboard = "/admin/dashboard";
-          roleName = "Administrator";
-        } else if (email.includes("budi") || email.includes("siti")) {
-          targetDashboard = "/guru/dashboard";
-          roleName = "Guru";
-        }
-
-        setSuccessMsg(
-          `Login berhasil! Mengarahkan Anda ke Dasbor ${roleName}...`,
-        );
+        setSuccessMsg(`Login berhasil! Mengarahkan Anda ke Dasbor...`);
         setLoading(false);
 
         // Beri jeda transisi visual agar user tidak bingung

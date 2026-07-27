@@ -1,5 +1,6 @@
+import { TipeSoal } from "@prisma/client";
 import * as siswaDB from "../services/db/siswa/siswaDB";
-import { mockSoal } from "./mockDb";
+import * as examService from "../services/exam-dda/examService";
 
 export const siswaRepository = {
   // --- DASHBOARD ---
@@ -114,71 +115,82 @@ export const siswaRepository = {
   },
 
   // --- MESIN UJIAN ---
-  getExamQuestions: async (jadwalId: string) => {
-    const data = await siswaDB.getQuestionsForExam(parseInt(jadwalId));
-    if (!data || !data.ujian) return [];
+  getExamQuestions: async (jadwalId: string, siswaId: number = 6) => {
+    const sessionState = await examService.startExamSession(jadwalId, siswaId);
 
-    return data.ujian.detailSoal.map((d: any) => ({
-      id: d.soal.id.toString(),
-      type: d.soal.type,
-      text: d.soal.teksSoal,
-      options: d.soal.opsiJawaban,
-    }));
+    // Return as array to maintain compatibility if frontend expects an array
+    if (!sessionState.nextQuestion) return [];
+    return [sessionState.nextQuestion];
   },
 
-  getNextQuestion: async (jadwalId: string, currentSoalId?: string) => {
-    const data = await siswaDB.getQuestionsForExam(parseInt(jadwalId));
-    if (!data || !data.ujian) return null;
-
-    const questions = data.ujian.detailSoal.map((d: any) => d.soal);
-
-    if (!currentSoalId) {
-      return questions[0]
-        ? {
-            id: questions[0].id.toString(),
-            type: questions[0].type,
-            text: questions[0].teksSoal,
-            options: questions[0].opsiJawaban,
-          }
-        : null;
-    }
-
-    const currentIndex = questions.findIndex(
-      (q: any) => q.id.toString() === currentSoalId,
-    );
-
-    if (currentIndex === -1 || currentIndex === questions.length - 1) {
-      return null;
-    }
-
-    const nextQuestion = questions[currentIndex + 1];
-
-    return {
-      id: nextQuestion.id.toString(),
-      type: nextQuestion.type,
-      text: nextQuestion.teksSoal,
-      options: nextQuestion.opsiJawaban,
-    };
+  /**
+   * ADAPTED FOR DDA:
+   * In a dynamic exam, the "Next" question is determined by submitting the previous answer.
+   * This function now acts as a safe resume/fetch for the current pending question.
+   */
+  getNextQuestion: async (
+    jadwalId: string,
+    currentSoalId?: string,
+    siswaId: number = 6,
+  ) => {
+    const sessionState = await examService.startExamSession(jadwalId, siswaId);
+    return sessionState.nextQuestion;
   },
 
-  // --- SUBMISSION ---
-  // Parameter siswaId ditambahkan di akhir dengan nilai default agar pemanggilan (jadwalId, answers) dari frontend tidak error
+  /**
+   * ADAPTED FOR REAL-TIME DDA:
+   * Frontend should call this every time the user clicks "Next" or submits an answer.
+   *
+   * @param answers e.g., { "15": "A" } - The latest answer from the student
+   * @param sesiId Optional, but highly recommended to pass from frontend state
+   */
   submitExamAttempt: async (
     jadwalId: string,
     answers: Record<string, string>,
     siswaId: number = 6,
+    sesiId?: number,
   ) => {
-    const sesi = await siswaDB.createSesiUjian(parseInt(jadwalId), siswaId);
+    // 1. Ensure we have the active Session ID
+    let currentSesiId = sesiId;
+    if (!currentSesiId) {
+      const activeSession = await siswaDB.getActiveSession(
+        parseInt(jadwalId),
+        siswaId,
+      );
+      if (!activeSession) throw new Error("No active exam session found.");
+      currentSesiId = activeSession.id;
+    }
 
-    const formattedAnswers = Object.entries(answers).map(
-      ([soalId, textJawaban]) => ({
-        soalId: parseInt(soalId),
-        jawabanSiswa: textJawaban,
-      }),
+    const soalIds = Object.keys(answers);
+
+    // 2. If frontend sends empty answers, treat as a forced "Finish Exam" command
+    if (soalIds.length === 0) {
+      await examService.finishExamSession(currentSesiId);
+      return { finished: true };
+    }
+
+    // 3. Extract the most recent answer (Real-Time processing)
+    const latestSoalId = parseInt(soalIds[soalIds.length - 1]);
+    const jawabanText = answers[latestSoalId.toString()];
+
+    // 4. Push to DDA Engine (Auto-grades, updates ELO, finds next question)
+    const result = await examService.submitSingleAnswer(
+      currentSesiId,
+      jadwalId,
+      latestSoalId,
+      jawabanText,
     );
 
-    await siswaDB.submitAnswers(sesi.id, formattedAnswers);
-    return true;
+    // 5. Return outcome to frontend
+    if (result.isFinished) {
+      return { finished: true, finalElo: result.newElo };
+    }
+
+    return {
+      finished: false,
+      newElo: result.newElo,
+      nextQuestion: result.nextQuestion,
+    };
   },
 
   // --- RIWAYAT ---
@@ -212,7 +224,7 @@ export const siswaRepository = {
       score: a.nilaiAkhir,
       status: a.nilaiAkhir !== null ? "Dinilai" : "Menunggu Koreksi",
       feedback: a.jawabanSiswa?.[0]?.catatanKoreksi || null,
-      aiSummary: a.aiLogs?.[0]?.aiStatementSummary || null,
+      aiSummary: a.aiLogs?.[0]?.overview || null,
     };
   },
 };

@@ -1,5 +1,5 @@
 "use server";
-import { Prisma, StatusUjian, TipeSoal } from "@prisma/client/index-browser";
+import { Prisma, StatusUjian, TipeSoal } from "@prisma/client";
 import prisma from "../prisma";
 
 // --- DASHBOARD ---
@@ -15,7 +15,7 @@ export async function getActiveExamsCount(guruId: number) {
 export async function getPendingEssaysCount(guruId: number) {
   return await prisma.jawabanSiswa.count({
     where: {
-      soal: { type: TipeSoal.ESSAY },
+      soalAsli: { type: TipeSoal.ESSAY },
       nilaiPoin: null, // Asumsi jika poin belum ada, berarti belum dinilai
       attempt: { jadwalUjian: { ujian: { guruId } } },
     },
@@ -80,6 +80,11 @@ export async function getSoalByBab(babId: number) {
     where: { babId: babId },
   });
 }
+export async function getBabDetail(babId: number) {
+  return await prisma.bab.findFirst({
+    where: { id: babId },
+  });
+}
 export async function getBabByBuku(bukuId: number) {
   return await prisma.bab.findMany({
     where: { bukuId: bukuId },
@@ -106,20 +111,50 @@ export async function createSoal(data: {
   teksSoal: string;
   opsiJawaban?: any;
   jawabanBenarMcq?: string;
+  difficulty: number;
+  bloomLevel?: string;
   type: TipeSoal;
 }) {
   return await prisma.bankSoal.create({
     data,
   });
 }
+export async function updateSoal(id: number, data: Prisma.BankSoalUpdateInput) {
+  return prisma.bankSoal.update({
+    where: { id },
+    data,
+  });
+}
 
 // --- TEMPLATES UJIAN ---
 export async function getUjianTemplates(guruId: number) {
-  return await prisma.ujian.findMany({
+  const templates = await prisma.ujian.findMany({
     where: { guruId },
     include: {
-      _count: { select: { detailSoal: true } },
+      ujianBab: {
+        include: {
+          bab: {
+            include: {
+              // Ganti 'bankSoal' dengan nama relasi yang sesuai di schema.prisma kamu (misal: 'soal' atau 'questions')
+              _count: { select: { soal: true } },
+            },
+          },
+        },
+      },
     },
+  });
+
+  // Mapping data untuk menambahkan properti totalSoal
+  return templates.map((template) => {
+    // Menjumlahkan count soal dari setiap bab yang terhubung
+    const totalSoal = template.ujianBab.reduce((sum, item) => {
+      return sum + (item.bab?._count?.soal || 0);
+    }, 0);
+
+    return {
+      ...template,
+      totalSoal, // Sekarang kamu punya total soal per template ujian di sini
+    };
   });
 }
 export async function getUjianTemplateById(templateId: number) {
@@ -128,21 +163,62 @@ export async function getUjianTemplateById(templateId: number) {
       id: templateId,
     },
     include: {
-      detailSoal: {
-        orderBy: { id: "asc" }, // Keeps question order consistent
+      ujianBab: {
+        include: {
+          bab: {
+            include: {
+              soal: {
+                orderBy: {
+                  id: "asc",
+                },
+              },
+            },
+          },
+        },
+        orderBy: {
+          babId: "asc",
+        },
       },
     },
   });
 }
+export async function createTemplate(
+  data: Prisma.UjianCreateWithoutUjianBabInput,
+  babIds: number[],
+) {
+  // 1. Create the Ujian template first
+  const newUjian = await prisma.ujian.create({
+    data,
+  });
 
-export async function upsertTemplateQuestionsSafe(
+  // 2. If there are babs to link, insert them into the junction table
+  if (babIds.length > 0) {
+    await prisma.ujianBab.createMany({
+      data: babIds.map((babId) => ({
+        ujianId: newUjian.id, // Use the ID from the newly created Ujian
+        babId: babId,
+      })),
+      skipDuplicates: true,
+    });
+  }
+
+  // Optional: return the newly created Ujian with its Babs included
+  return await prisma.ujian.findUnique({
+    where: { id: newUjian.id },
+  });
+}
+
+export async function upsertTemplateBabSafe(
   ujianId: number,
-  bankSoalIds: number[],
+  data: Prisma.UjianCreateWithoutUjianBabInput,
+  babIds: number[],
 ) {
   return await prisma.$transaction(async (tx) => {
-    const ujian = await tx.ujian.findUnique({
-      where: { id: ujianId },
-      select: { isLocked: true },
+    const ujian = await tx.ujian.update({
+      data,
+      where: {
+        id: ujianId,
+      },
     });
 
     if (!ujian) {
@@ -151,32 +227,21 @@ export async function upsertTemplateQuestionsSafe(
 
     if (ujian.isLocked) {
       throw new Error(
-        "Ditolak: Ujian ini sudah aktif/berlangsung. Soal sudah terkunci permanen.",
+        "Ditolak: Ujian ini sudah aktif/berlangsung. Bab sudah terkunci permanen.",
       );
     }
 
-    const soalAsliList = await tx.bankSoal.findMany({
-      where: {
-        id: { in: bankSoalIds },
-      },
+    await tx.ujianBab.deleteMany({
+      where: { ujianId },
     });
 
-    await tx.detailUjian.deleteMany({
-      where: { ujianId: ujianId },
-    });
-
-    if (soalAsliList.length > 0) {
-      await tx.detailUjian.createMany({
-        data: soalAsliList.map((soal) => ({
-          ujianId: ujianId,
-          soalAsliId: soal.id,
-          teksSoal: soal.teksSoal,
-          opsiJawaban: soal.opsiJawaban
-            ? (soal.opsiJawaban as Prisma.InputJsonValue)
-            : Prisma.DbNull,
-          jawabanBenarMcq: soal.jawabanBenarMcq,
-          type: soal.type,
+    if (babIds.length > 0) {
+      await tx.ujianBab.createMany({
+        data: babIds.map((babId) => ({
+          ujianId,
+          babId,
         })),
+        skipDuplicates: true,
       });
     }
 
@@ -252,9 +317,7 @@ export async function getAttemptDetail(attemptId: number) {
     where: { id: attemptId },
     include: {
       siswa: true,
-      jawabanSiswa: {
-        include: { soal: true },
-      },
+      jawabanSiswa: true,
       aiLogs: true,
     },
   });

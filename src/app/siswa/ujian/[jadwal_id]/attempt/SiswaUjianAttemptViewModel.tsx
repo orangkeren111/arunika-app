@@ -3,53 +3,124 @@ import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
-export function useExamAttempt(jadwalId: string) {
-  const [questions, setQuestions] = useState<ExamQuestion[]>([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
+export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
+  // State for the single active question
+  const [currentQ, setCurrentQ] = useState<ExamQuestion | null>(null);
+  const [currentIndex, setCurrentIndex] = useState(0); // Tracks Question 1, 2, 3...
+
+  // Stores answers, mapped by question ID
   const [answers, setAnswers] = useState<Record<string, string>>({});
+
   const [timeLeft, setTimeLeft] = useState(90 * 60); // 90 Menit
   const [loading, setLoading] = useState(true);
-  const [currentQ, setCurrentQ] = useState<ExamQuestion | null>(null);
+  const [isFinished, setIsFinished] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const { data: session, status } = useSession();
 
+  // 1. Initialize Exam / Resume Exam
   useEffect(() => {
-    siswaRepository.getExamQuestions(jadwalId).then((res) => {
-      console.log(res);
+    // Wait until session is loaded to ensure we have the siswaId
+    if (session?.user?.id) {
+      const initExam = async () => {
+        try {
+          const res = await siswaRepository.getExamQuestions(
+            jadwalId,
+            Number(session.user.id ?? 0),
+          );
 
-      setQuestions(res);
-      setCurrentQ(questions[currentIndex]);
-      setLoading(false);
-    });
-  }, []);
+          if (res && res.length > 0) {
+            setCurrentQ(res[0]);
+            // If resuming, you might want to fetch the actual count from the backend,
+            // but for now, we start at 0 or derive from a custom endpoint if needed.
+          } else {
+            // No questions returned usually means the exam is already finished
+            setIsFinished(true);
+          }
+        } catch (error) {
+          console.error("Failed to initialize exam:", error);
+        } finally {
+          setLoading(false);
+        }
+      };
 
+      initExam();
+    }
+  }, [jadwalId, session, status]);
+
+  // 2. Timer Management
   useEffect(() => {
+    if (isFinished || loading) return;
+
     const timer = setInterval(() => {
-      setTimeLeft((prev) => (prev > 0 ? prev - 1 : 0));
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleSubmitExam(); // Auto-submit when time runs out
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
-    return () => clearInterval(timer);
-  }, []);
 
+    return () => clearInterval(timer);
+  }, [isFinished, loading]);
+
+  // 3. Local Answer State
   const handleAnswer = (questionId: string, answer: string) => {
     setAnswers((prev) => ({ ...prev, [questionId]: answer }));
   };
 
-  const nextQuestion = () => {
-    if (currentIndex < questions.length - 1)
-      setCurrentIndex((prev) => prev + 1);
-    setCurrentQ(questions[currentIndex]);
+  // 4. Submit Answer & Fetch Next Question (Dynamic Progression)
+  const nextQuestion = async () => {
+    if (!currentQ || !session?.user?.id) return;
+
+    setIsSubmitting(true);
+
+    try {
+      const studentAnswer = answers[currentQ.id] || "";
+
+      // Submit the current answer. The backend calculates ELO and returns the next question.
+      const response = await siswaRepository.submitExamAttempt(
+        jadwalId,
+        { [currentQ.id]: studentAnswer },
+        Number(session.user.id),
+      );
+
+      if (response.finished) {
+        setIsFinished(true);
+        setCurrentQ(null);
+      } else if (response.nextQuestion) {
+        setCurrentQ(response.nextQuestion);
+        setCurrentIndex((prev) => prev + 1);
+      }
+    } catch (error) {
+      console.error("Failed to submit answer:", error);
+      alert("Terjadi kesalahan saat menyimpan jawaban. Silakan coba lagi.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const prevQuestion = () => {
-    if (currentIndex > 0) setCurrentIndex((prev) => prev - 1);
-    setCurrentQ(questions[currentIndex]);
-  };
-
+  // 5. Force Finish Exam Early
   const handleSubmitExam = async () => {
-    return siswaRepository.submitExamAttempt(
-      jadwalId,
-      answers,
-      Number(session?.user.id ?? 0),
-    );
+    if (!session?.user?.id) return;
+    setIsSubmitting(true);
+
+    try {
+      // Passing empty answers signals the backend to force finish the session
+      await siswaRepository.submitExamAttempt(
+        jadwalId,
+        {},
+        Number(session.user.id),
+      );
+      setIsFinished(true);
+      setCurrentQ(null);
+    } catch (error) {
+      console.error("Failed to finish exam:", error);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const formatTime = (seconds: number) => {
@@ -62,20 +133,15 @@ export function useExamAttempt(jadwalId: string) {
 
   return {
     currentQ,
-    questions,
     currentIndex,
-    setCurrentIndex,
     answers,
     handleAnswer,
     nextQuestion,
-    prevQuestion,
     handleSubmitExam,
     timeLeft: formatTime(timeLeft),
-    isFinished: timeLeft === 0,
-    loading,
-    progress:
-      questions.length > 0
-        ? Math.round((Object.keys(answers).length / questions.length) * 100)
-        : 0,
+    isFinished: isFinished || timeLeft === 0,
+    loading: loading || isSubmitting,
+    // Calculate progress based on a known max questions length
+    progress: Math.round((currentIndex / maxQuestions) * 100),
   };
 }

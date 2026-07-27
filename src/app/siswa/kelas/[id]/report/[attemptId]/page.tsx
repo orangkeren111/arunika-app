@@ -4,17 +4,17 @@ import React, { use, useRef } from "react";
 import { useReactToPrint } from "react-to-print";
 import { useRouter } from "next/navigation";
 import { ReportTemplate } from "@/src/components/ReportTemplate";
-import { useStudentReportViewModel } from "./SiswaHistoryDetailViewModel";
+import { useStudentReportViewModel } from "./StudentReportViewModel";
 
 export default function StudentReportPage({
   params,
 }: {
-  params: Promise<{ attempt_id: string }>;
+  params: Promise<{ attemptId: string }>;
 }) {
   const componentRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
   const resolvedParams = use(params);
-  const { reportData } = useStudentReportViewModel(resolvedParams.attempt_id);
+  const { reportData } = useStudentReportViewModel(resolvedParams.attemptId);
 
   const handlePrint = useReactToPrint({
     content: () => componentRef.current,

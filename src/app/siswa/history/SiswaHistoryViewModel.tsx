@@ -9,10 +9,12 @@ export function useSiswaHistory() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    siswaRepository.getHistoryList(Number(session?.user.id)).then((res) => {
-      setHistory(res);
-      setLoading(false);
-    });
+    siswaRepository
+      .getHistoryList(Number(session?.user.id ?? 0))
+      .then((res) => {
+        setHistory(res);
+        setLoading(false);
+      });
   }, []);
 
   return { history, loading };

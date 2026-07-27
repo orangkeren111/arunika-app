@@ -17,15 +17,20 @@ export interface Soal {
   babId: string;
   type: "MCQ" | "ESSAY";
   text: string;
+  difficulty: number;
+  bloomLevel?: string;
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
 }
+
 export interface SoalTemplate {
   id: string;
   babId: string;
   soalAsliId: string;
   type: "MCQ" | "ESSAY";
   text: string;
+  difficulty: number;
+  bloomLevel?: string;
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
 }
@@ -34,6 +39,7 @@ export interface UjianTemplate {
   id: string;
   title: string;
   questionCount: number;
+  durasiMenit: number;
   // createdAt: string;
 }
 
@@ -67,4 +73,5 @@ export interface AttemptReport {
   status: string;
   feedback?: string;
   aiSummary?: string;
+  answers?: any[];
 }

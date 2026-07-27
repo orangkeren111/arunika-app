@@ -1,8 +1,8 @@
 "use client";
 
-import React, { use } from "react";
+import { use } from "react";
 import Link from "next/link";
-import { ArrowLeft, MoveRight, MoveLeft } from "lucide-react";
+import { ArrowLeft, MoveLeft, CheckSquare, Square } from "lucide-react";
 import { useFormUjianViewModel } from "./GuruFormUjianViewModel"; // Adjust path as needed
 
 export default function ExamBuilderPage({
@@ -14,53 +14,107 @@ export default function ExamBuilderPage({
 
   const {
     template,
+    setTemplate, // Make sure to destructure this from the updated viewmodel
     babList,
     bukuList,
-    selectedBab,
-    setSelectedBab,
     selectedBuku,
     setSelectedBuku,
-    availableQuestions,
+    activeBabs,
+    handleToggleBab,
     selectedQuestions,
-    handleAddQuestion,
     handleRemoveQuestion,
     handleSaveTemplate,
-    isQuestionSelected,
   } = useFormUjianViewModel(resolvedParams.id);
 
   return (
-    <div className="space-y-6 flex flex-col h-[85vh]">
-      <Link
-        href="/guru/ujian"
-        className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition mb-2"
-      >
-        <ArrowLeft size={16} /> Kembali ke Template Ujian
-      </Link>
-
+    <div className="flex flex-col gap-6">
       <div>
-        {/* TODO: You can also replace the title with a dynamic template name from the ViewModel if needed */}
         <h1 className="text-2xl font-bold text-[var(--foreground)]">
-          Exam Builder: {template?.title}
+          Exam Builder: {template?.title || "Ujian Baru"}
         </h1>
         <p className="text-[var(--muted-foreground)] mt-1">
-          Pilih soal dari kiri dan masukkan ke dalam ujian di kanan.
+          Lengkapi detail ujian dan pilih bab dari kiri untuk menambahkan soal.
         </p>
       </div>
 
+      {/* --- FORM PENGATURAN UJIAN --- */}
+      <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div>
+          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+            Judul Ujian
+          </label>
+          <input
+            type="text"
+            value={template?.title || ""}
+            onChange={(e) =>
+              setTemplate((prev) =>
+                prev ? { ...prev, title: e.target.value } : undefined,
+              )
+            }
+            placeholder="Contoh: Ujian Tengah Semester"
+            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+            Durasi (Menit)
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={template?.durasiMenit || ""}
+            onChange={(e) =>
+              setTemplate((prev) =>
+                prev
+                  ? { ...prev, durasiMenit: Number(e.target.value) }
+                  : undefined,
+              )
+            }
+            placeholder="Contoh: 90"
+            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+            Jumlah Soal Target
+          </label>
+          <input
+            type="number"
+            min="1"
+            value={template?.questionCount || ""}
+            onChange={(e) =>
+              setTemplate((prev) =>
+                prev
+                  ? { ...prev, questionCount: Number(e.target.value) }
+                  : undefined,
+              )
+            }
+            placeholder="Contoh: 40"
+            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+          />
+          <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
+            Soal terpilih saat ini: {selectedQuestions?.length || 0}
+          </p>
+        </div>
+      </div>
+      {/* --- END FORM PENGATURAN UJIAN --- */}
+
       <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-        {/* Kiri: Bank Soal */}
+        {/* Kiri: Bank Soal (Daftar Bab) */}
         <div className="flex flex-col bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden">
           <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
             <h3 className="font-semibold text-[var(--foreground)]">
-              Bank Soal (Pilih Buku & Bab)
+              Sumber Soal (Pilih Buku & Bab)
             </h3>
             <select
               value={selectedBuku}
               onChange={(e) => setSelectedBuku(e.target.value)}
-              className="mt-2 w-full p-2 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--ring)]"
+              className="mt-4 w-full p-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
             >
               <option value="" disabled>
-                Pilih Buku
+                -- Pilih Buku --
               </option>
               {bukuList?.map((buku) => (
                 <option key={buku.id} value={buku.id}>
@@ -68,48 +122,53 @@ export default function ExamBuilderPage({
                 </option>
               ))}
             </select>
-            <select
-              value={selectedBab}
-              onChange={(e) => setSelectedBab(e.target.value)}
-              className="mt-2 w-full p-2 text-sm border border-[var(--border)] rounded bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--ring)]"
-            >
-              <option value="" disabled>
-                Pilih Bab
-              </option>
-              {babList?.map((bab) => (
-                <option key={bab.id} value={bab.id}>
-                  {bab.title}
-                </option>
-              ))}
-            </select>
           </div>
+
           <div className="p-4 overflow-y-auto flex-1 space-y-3">
-            {availableQuestions?.length === 0 ? (
-              <p className="text-sm text-center text-[var(--muted-foreground)]">
-                Tidak ada soal tersedia di bab ini.
+            {!selectedBuku ? (
+              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
+                Silakan pilih buku terlebih dahulu untuk melihat daftar bab.
+              </p>
+            ) : babList?.length === 0 ? (
+              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
+                Tidak ada bab tersedia di buku ini.
               </p>
             ) : (
-              availableQuestions.map((soal) => {
-                const isSelected = isQuestionSelected(soal.id);
+              babList?.map((bab) => {
+                const isSelected = activeBabs.includes(bab.id);
 
                 return (
                   <div
-                    key={soal.id}
-                    className={`p-4 border ${isSelected ? "bg-gray-100 opacity-75" : "bg-white"}`}
+                    key={bab.id}
+                    onClick={() => handleToggleBab(bab.id)}
+                    className={`p-4 border rounded-lg cursor-pointer flex items-center gap-3 transition-all duration-200 ${
+                      isSelected
+                        ? "bg-[var(--primary)]/10 border-[var(--primary)]"
+                        : "bg-[var(--background)] border-[var(--border)] hover:border-[var(--primary)]/50"
+                    }`}
                   >
-                    <p>{soal.text}</p>
-
-                    <button
-                      onClick={() => handleAddQuestion(soal)}
-                      disabled={isSelected} // Tombol mati kalau udah kepilih
+                    <div
                       className={
                         isSelected
-                          ? "bg-gray-400 cursor-not-allowed"
-                          : "bg-blue-500"
+                          ? "text-[var(--primary)]"
+                          : "text-[var(--muted-foreground)]"
                       }
                     >
-                      {isSelected ? "✓ Sudah Ditambahkan" : "+ Tambah ke Ujian"}
-                    </button>
+                      {isSelected ? (
+                        <CheckSquare size={20} />
+                      ) : (
+                        <Square size={20} />
+                      )}
+                    </div>
+                    <span
+                      className={`font-medium ${
+                        isSelected
+                          ? "text-[var(--primary)]"
+                          : "text-[var(--foreground)]"
+                      }`}
+                    >
+                      {bab.title}
+                    </span>
                   </div>
                 );
               })
@@ -119,43 +178,56 @@ export default function ExamBuilderPage({
 
         {/* Kanan: Komposisi Ujian */}
         <div className="flex flex-col bg-[var(--card)] rounded-xl border border-[var(--primary)] overflow-hidden">
-          <div className="p-4 border-b border-[var(--border)] bg-[#7FA88F10]">
+          <div className="p-4 border-b border-[var(--border)] bg-[#7FA88F10] flex justify-between items-center">
             <h3 className="font-semibold text-[var(--primary)]">
-              Soal Terpilih untuk Ujian ({selectedQuestions?.length || 0})
+              Soal Terpilih untuk Ujian
             </h3>
+            <span
+              className={`text-xs font-bold px-2 py-1 rounded-full ${
+                template?.questionCount &&
+                selectedQuestions?.length > template.questionCount
+                  ? "bg-red-500 text-white" // Warn if selected questions exceed the target
+                  : "bg-[var(--primary)] text-[var(--primary-foreground)]"
+              }`}
+            >
+              {selectedQuestions?.length || 0} /{" "}
+              {template?.questionCount || "?"} Soal
+            </span>
           </div>
           <div className="p-4 overflow-y-auto flex-1 space-y-3">
             {selectedQuestions?.length === 0 ? (
-              <p className="text-sm text-center text-[var(--muted-foreground)]">
-                Belum ada soal yang dipilih.
+              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
+                Belum ada soal yang dipilih. Centang bab di sebelah kiri untuk
+                menambahkan soal.
               </p>
             ) : (
-              selectedQuestions?.map((soal) => (
+              selectedQuestions?.map((soal, index) => (
                 <div
                   key={soal.id}
-                  className="p-3 border border-[var(--border)] rounded-lg flex justify-between items-center transition-colors hover:border-[var(--error)]"
+                  className="p-3 border border-[var(--border)] bg-[var(--background)] rounded-lg flex gap-3 items-start transition-colors group"
                 >
-                  <button
-                    onClick={() => handleRemoveQuestion(soal.id)}
-                    className="text-[var(--error)] p-1 rounded hover:bg-[var(--error)] hover:text-white transition flex-shrink-0"
-                    aria-label="Hapus soal dari ujian"
-                  >
-                    <MoveLeft size={18} />
-                  </button>
-                  <p className="text-sm text-[var(--card-foreground)] truncate pl-4 text-right flex-1">
-                    {soal.text}
-                  </p>
+                  <div className="flex-1">
+                    <p className="text-sm text-[var(--foreground)] line-clamp-2">
+                      <span className="font-semibold mr-1">{index + 1}.</span>
+                      {soal.text}
+                    </p>
+                  </div>
                 </div>
               ))
             )}
           </div>
-          <div className="p-4 border-t border-[var(--border)]">
+          <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]">
             <button
               onClick={handleSaveTemplate}
-              disabled={selectedQuestions?.length === 0}
-              className="w-full bg-[var(--primary)] text-[var(--primary-foreground)] py-2 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              disabled={
+                selectedQuestions?.length === 0 ||
+                !template?.title ||
+                !template?.durasiMenit ||
+                !template?.questionCount
+              }
+              className="w-full bg-[var(--primary)] text-[var(--primary-foreground)] py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
             >
-              Simpan Template
+              Simpan Template Ujian
             </button>
           </div>
         </div>

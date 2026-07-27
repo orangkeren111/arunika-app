@@ -19,9 +19,12 @@ export default function UjianListPage() {
             Buat template ujian dengan merakit soal dari Bank Soal.
           </p>
         </div>
-        <button className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition">
+        <Link
+          href={`/guru/ujian/new/builder`}
+          className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition"
+        >
           <Plus size={18} /> Buat Ujian Baru
-        </button>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
