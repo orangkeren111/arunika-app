@@ -69,7 +69,9 @@ export const reportRepository = {
         correct: correctCount,
         total: rawAnswers.length,
       },
-      overviewText: aiFeedback.overviewText,
+      overviewText: aiFeedback.overviewText ?? "",
+      weaknessText: aiFeedback.weaknessText ?? "",
+      recommendationText: aiFeedback.recommendationText ?? "",
       taxonomyScores: taxonomyScores,
       questions: questions,
     };

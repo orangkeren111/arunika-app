@@ -20,6 +20,8 @@ interface ReportProps {
   teacherName: string;
   overallScore: { correct: number; total: number };
   overviewText: string;
+  weaknessText: string;
+  recommendationText: string;
   taxonomyScores: TaxonomyScore[];
   questions: QuestionDetail[];
 }

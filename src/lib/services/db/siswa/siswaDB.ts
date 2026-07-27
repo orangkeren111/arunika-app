@@ -249,5 +249,7 @@ export async function getGeneratedAIFeedback(attemptId: number) {
     // For now, mapping aiStatementSummary to overviewText.
     // If you expand SavedResponses to have specific Weakness/Recommendation fields, map them here.
     overviewText: feedback.overview,
+    weaknessText: feedback.weakness,
+    recommendationText: feedback.recommendation,
   };
 }

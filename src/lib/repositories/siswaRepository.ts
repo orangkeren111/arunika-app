@@ -1,6 +1,7 @@
 import { TipeSoal } from "@prisma/client";
 import * as siswaDB from "../services/db/siswa/siswaDB";
 import * as examService from "../services/exam-dda/examService";
+import { enqueueStudentReport } from "../services/report/generator";
 
 export const siswaRepository = {
   // --- DASHBOARD ---
@@ -166,6 +167,7 @@ export const siswaRepository = {
     // 2. If frontend sends empty answers, treat as a forced "Finish Exam" command
     if (soalIds.length === 0) {
       await examService.finishExamSession(currentSesiId);
+      enqueueStudentReport(currentSesiId);
       return { finished: true };
     }
 

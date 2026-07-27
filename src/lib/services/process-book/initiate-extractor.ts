@@ -3,7 +3,6 @@
 import prisma from "../db/prisma";
 import fs from "fs/promises";
 import path from "path";
-import { runGenerationPipeline } from "./orchestrator"; // We will build this next
 
 export async function initiatePdfExtraction(formData: FormData) {
   try {
@@ -38,7 +37,9 @@ export async function initiatePdfExtraction(formData: FormData) {
     // 4. THE TRIGGER: Fire and Forget
     // We call the orchestrator but DO NOT put 'await' in front of it.
     // This allows Node to execute it in the background while instantly moving to step 5.
-    runGenerationPipeline(job.id, tempFilePath);
+    fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/worker/process-llm`, {
+      method: "POST",
+    }).catch(() => {});
 
     // 5. Return success instantly to the frontend UI
     return {
