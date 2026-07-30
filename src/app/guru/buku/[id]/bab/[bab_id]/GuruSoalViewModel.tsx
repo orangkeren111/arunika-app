@@ -48,12 +48,19 @@ export function useSoalViewModel(babId: string) {
     await guruRepository.editSoal(id, payload);
     fetchSoal();
   };
+
+  const handleDeleteSoal = async (id: string) => {
+    await guruRepository.deleteSoal(id);
+    fetchSoal();
+  };
+
   return {
     bab,
     soalList,
     loading,
     handleAddSoal,
     handleEditSoal,
+    handleDeleteSoal,
     handleGenerateQuestion,
   };
 }

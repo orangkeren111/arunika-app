@@ -2,10 +2,10 @@
 
 import Groq from "groq-sdk";
 import prisma from "../db/prisma";
-
+import { BOOK_PROMPTS } from "../llm/prompts";
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-export async function generateQuestionsWithGroq(babId: number) {
+export async function generateQuestionsWithGroq(babId: number, jumlahSoal: number = 10) {
   // 1. Fetch the specific learning goal from Prisma
   const objective = await prisma.bab.findUnique({
     where: { id: babId },
@@ -13,13 +13,7 @@ export async function generateQuestionsWithGroq(babId: number) {
 
   if (!objective) throw new Error("Objective not found");
 
-  const prompt = `
-    Based on the following chapter and goals, generate 10 multiple choice questions.
-    Chapter: ${objective.judulBab}
-    Goals: ${objective.learningGoals}
-    
-    Output exactly as a JSON object containing a "questions" array. Each question must have "soal", "options" (array of 4 strings), "correctIndex" (0-3), and "difficulty" (1-10).
-  `;
+  const prompt = BOOK_PROMPTS.generateQuestions(jumlahSoal, objective.judulBab, objective.learningGoals ?? "");
 
   // 2. Ask Groq to generate the specific questions enforcing strict JSON
   const completion = await groq.chat.completions.create({
@@ -32,6 +26,8 @@ export async function generateQuestionsWithGroq(babId: number) {
   const parsedResponse = JSON.parse(
     completion.choices[0].message.content || "{}",
   );
+
+  const tokens = completion.usage?.total_tokens ?? 0;
 
   // 3. Save the final questions to the database
   await prisma.bankSoal.createMany({
@@ -46,5 +42,5 @@ export async function generateQuestionsWithGroq(babId: number) {
     })),
   });
 
-  return parsedResponse.questions;
+  return { questions: parsedResponse.questions, tokens };
 }

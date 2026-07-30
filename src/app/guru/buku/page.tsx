@@ -15,13 +15,11 @@ export default function BukuPage() {
 
   const [formData, setFormData] = useState({
     title: "",
-    description: "",
-    mapel: "",
   });
 
   const openAddModal = () => {
     setModalMode("add");
-    setFormData({ title: "", description: "", mapel: "" });
+    setFormData({ title: "" });
     setIsModalOpen(true);
   };
 
@@ -30,8 +28,6 @@ export default function BukuPage() {
     setSelectedBukuId(buku.id);
     setFormData({
       title: buku.title || "",
-      description: buku.description || "",
-      mapel: buku.mapel || "",
     });
     setIsModalOpen(true);
   };
@@ -39,15 +35,15 @@ export default function BukuPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedBukuId(null);
-    setFormData({ title: "", description: "", mapel: "" });
+    setFormData({ title: "" });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalMode === "add") {
-      handleAddBuku(formData.title, formData.description);
+      handleAddBuku(formData.title, "");
     } else if (modalMode === "edit" && selectedBukuId) {
-      handleEditBuku(selectedBukuId, formData);
+      handleEditBuku(selectedBukuId, { judul: formData.title, title: formData.title });
     }
     closeModal();
   };
@@ -72,26 +68,47 @@ export default function BukuPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {bukuList.map((buku) => (
-          <div
-            key={buku.id}
-            className="bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] hover:border-[var(--primary)] transition shadow-sm flex flex-col h-full group relative"
-          >
-            {/* Header Item & Action Buttons */}
-            <div className="flex justify-between items-start mb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-[var(--muted)] text-[var(--primary)] rounded-lg">
-                  <BookOpen size={24} />
+        {bukuList.map((buku) => {
+          const isProcessing = buku.jobStatus ? ["PENDING", "PROCESSING_PDF", "GENERATING_QUESTIONS"].includes(buku.jobStatus) : false;
+          return (
+            <div
+              key={buku.id}
+              className={`bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] transition shadow-sm flex flex-col h-full group relative ${
+                isProcessing ? "opacity-60 pointer-events-none select-none border-dashed" : "hover:border-[var(--primary)]"
+              }`}
+            >
+              {/* Header Item & Action Buttons */}
+              <div className="flex justify-between items-start mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-[var(--muted)] text-[var(--primary)] rounded-lg relative">
+                    <BookOpen size={24} />
+                    {isProcessing && (
+                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                      </span>
+                    )}
+                  </div>
+                  {isProcessing ? (
+                    <div>
+                      <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
+                        {buku.title}
+                      </h3>
+                      <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
+                        Sedang Diproses AI...
+                      </span>
+                    </div>
+                  ) : (
+                    <Link
+                      href={`/guru/buku/${buku.id}`}
+                      className="hover:underline"
+                    >
+                      <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
+                        {buku.title}
+                      </h3>
+                    </Link>
+                  )}
                 </div>
-                <Link
-                  href={`/guru/buku/${buku.id}`}
-                  className="hover:underline"
-                >
-                  <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
-                    {buku.title}
-                  </h3>
-                </Link>
-              </div>
 
               <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                 <button
@@ -134,8 +151,9 @@ export default function BukuPage() {
               )} */}
             </div>
           </div>
-        ))}
-      </div>
+        );
+      })}
+    </div>
 
       {/* Modal Tambah/Edit Buku */}
       {isModalOpen && (
@@ -166,36 +184,6 @@ export default function BukuPage() {
                   placeholder="Masukkan judul buku..."
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"
                   required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Mata Pelajaran
-                </label>
-                <input
-                  type="text"
-                  value={formData.mapel}
-                  onChange={(e) =>
-                    setFormData({ ...formData, mapel: e.target.value })
-                  }
-                  placeholder="Contoh: Matematika, Pemrograman..."
-                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Deskripsi
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  placeholder="Deskripsi singkat mengenai isi buku..."
-                  rows={4}
-                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base resize-none"
                 />
               </div>
 

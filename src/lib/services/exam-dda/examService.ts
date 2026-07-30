@@ -38,6 +38,7 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
     answeredIds,
     session.currentElo,
     session.jawabanSiswa.length,
+    examData.ujian.criteria || undefined,
   );
 
   return {
@@ -64,7 +65,18 @@ export async function submitSingleAnswer(
   // 1. Get current state
   const session = await prisma.sesiUjianSiswa.findUnique({
     where: { id: sesiId },
-    include: { jawabanSiswa: true },
+    include: {
+      jawabanSiswa: true,
+      jadwalUjian: {
+        include: {
+          ujian: {
+            include: {
+              criteria: true,
+            },
+          },
+        },
+      },
+    },
   });
   if (!session) throw new Error("Session not found");
 
@@ -111,9 +123,10 @@ export async function submitSingleAnswer(
   // 6. Update Session ELO
   await siswaDB.updateSessionElo(sesiId, eloAfter);
 
-  // 7. Check if exam is over (e.g., 40 questions total)
+  // 7. Check if exam is over based on the exam template config
+  const totalQuestionsLimit = session.jadwalUjian?.ujian?.jumlahSoal ?? 40;
   const newAnsweredCount = attemptNumber;
-  if (newAnsweredCount >= 40) {
+  if (newAnsweredCount >= totalQuestionsLimit) {
     await finishExamSession(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
@@ -128,6 +141,7 @@ export async function submitSingleAnswer(
     answeredIds,
     eloAfter,
     newAnsweredCount,
+    session.jadwalUjian?.ujian?.criteria || undefined,
   );
 
   return {
@@ -170,6 +184,7 @@ async function _findNextQuestion(
   answeredIds: (number | null)[],
   currentElo: number,
   questionsAnswered: number,
+  criteria?: any,
 ) {
   // 1. Filter out questions already answered
   const availableQuestions = allQuestions.filter(
@@ -178,7 +193,7 @@ async function _findNextQuestion(
   if (availableQuestions.length === 0) return null;
 
   // 2. Determine target Bloom's Level (C1, C2, etc.)
-  const targetBloom = DDAHelper.determineTargetBloomLevel(questionsAnswered);
+  const targetBloom = DDAHelper.determineTargetBloomLevel(questionsAnswered, criteria);
 
   // 3. Filter by Bloom's Level
   let bloomFiltered = availableQuestions.filter(

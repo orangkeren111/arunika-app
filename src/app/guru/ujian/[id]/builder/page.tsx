@@ -38,65 +38,139 @@ export default function ExamBuilderPage({
       </div>
 
       {/* --- FORM PENGATURAN UJIAN --- */}
-      <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-5 grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div>
-          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-            Judul Ujian
-          </label>
-          <input
-            type="text"
-            value={template?.title || ""}
-            onChange={(e) =>
-              setTemplate((prev) =>
-                prev ? { ...prev, title: e.target.value } : undefined,
-              )
-            }
-            placeholder="Contoh: Ujian Tengah Semester"
-            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
-          />
+      <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-5 space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              Judul Ujian
+            </label>
+            <input
+              type="text"
+              value={template?.title || ""}
+              onChange={(e) =>
+                setTemplate((prev) =>
+                  prev ? { ...prev, title: e.target.value } : undefined,
+                )
+              }
+              placeholder="Contoh: Ujian Tengah Semester"
+              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              Durasi (Menit)
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={template?.durasiMenit || ""}
+              onChange={(e) =>
+                setTemplate((prev) =>
+                  prev
+                    ? { ...prev, durasiMenit: Number(e.target.value) }
+                    : undefined,
+                )
+              }
+              placeholder="Contoh: 90"
+              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              Jumlah Soal Target
+            </label>
+            <input
+              type="number"
+              min="1"
+              value={template?.questionCount || ""}
+              onChange={(e) =>
+                setTemplate((prev) =>
+                  prev
+                    ? { ...prev, questionCount: Number(e.target.value) }
+                    : undefined,
+                )
+              }
+              placeholder="Contoh: 40"
+              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+            />
+            <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
+              Soal terpilih saat ini: {selectedQuestions?.length || 0}
+            </p>
+          </div>
         </div>
 
-        <div>
-          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-            Durasi (Menit)
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={template?.durasiMenit || ""}
-            onChange={(e) =>
-              setTemplate((prev) =>
-                prev
-                  ? { ...prev, durasiMenit: Number(e.target.value) }
-                  : undefined,
-              )
-            }
-            placeholder="Contoh: 90"
-            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-            Jumlah Soal Target
-          </label>
-          <input
-            type="number"
-            min="1"
-            value={template?.questionCount || ""}
-            onChange={(e) =>
-              setTemplate((prev) =>
-                prev
-                  ? { ...prev, questionCount: Number(e.target.value) }
-                  : undefined,
-              )
-            }
-            placeholder="Contoh: 40"
-            className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
-          />
-          <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
-            Soal terpilih saat ini: {selectedQuestions?.length || 0}
-          </p>
+        <div className="border-t border-[var(--border)] pt-4">
+          <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">
+            Kriteria Jumlah Soal Kognitif (DDA) - Harus Lebih dari 10 Soal per Level
+          </h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                Kriteria C1 (Mengingat)
+              </label>
+              <input
+                type="number"
+                min="11"
+                value={template?.reqC1 || ""}
+                onChange={(e) =>
+                  setTemplate((prev) =>
+                    prev ? { ...prev, reqC1: Number(e.target.value) } : undefined,
+                  )
+                }
+                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                Kriteria C2 (Memahami)
+              </label>
+              <input
+                type="number"
+                min="11"
+                value={template?.reqC2 || ""}
+                onChange={(e) =>
+                  setTemplate((prev) =>
+                    prev ? { ...prev, reqC2: Number(e.target.value) } : undefined,
+                  )
+                }
+                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                Kriteria C3 (Menerapkan)
+              </label>
+              <input
+                type="number"
+                min="11"
+                value={template?.reqC3 || ""}
+                onChange={(e) =>
+                  setTemplate((prev) =>
+                    prev ? { ...prev, reqC3: Number(e.target.value) } : undefined,
+                  )
+                }
+                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
+                Kriteria C4 (Menganalisis)
+              </label>
+              <input
+                type="number"
+                min="11"
+                value={template?.reqC4 || ""}
+                onChange={(e) =>
+                  setTemplate((prev) =>
+                    prev ? { ...prev, reqC4: Number(e.target.value) } : undefined,
+                  )
+                }
+                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
+              />
+            </div>
+          </div>
         </div>
       </div>
       {/* --- END FORM PENGATURAN UJIAN --- */}

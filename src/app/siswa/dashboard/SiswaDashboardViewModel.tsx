@@ -16,14 +16,16 @@ export function useSiswaDashboard() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    siswaRepository.getDashboardData().then((res) => {
+    if (status !== "authenticated" || !session?.user?.id) return;
+
+    siswaRepository.getDashboardData(Number(session.user.id)).then((res) => {
       setStats(res.stats);
       setUpcoming(res.upcoming);
       setRecentHistory(res.recentHistory);
       setLoading(false);
-      setCurrentUser(session?.user);
+      setCurrentUser(session.user);
     });
-  }, []);
+  }, [session, status]);
 
   return { stats, upcoming, recentHistory, loading, currentUser };
 }

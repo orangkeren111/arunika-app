@@ -1,19 +1,18 @@
-// Interfaces remain the same
-interface TaxonomyScore {
+export interface TaxonomyScore {
   level: "C1" | "C2" | "C3" | "C4";
   name: string;
   correct: number;
   total: number;
 }
 
-interface QuestionDetail {
+export interface QuestionDetail {
   id: string;
   prompt: string;
   studentAnswer: string;
   isCorrect: boolean;
 }
 
-interface ReportProps {
+export interface ReportProps {
   schoolName: string;
   studentName: string;
   className: string;
@@ -24,4 +23,5 @@ interface ReportProps {
   recommendationText: string;
   taxonomyScores: TaxonomyScore[];
   questions: QuestionDetail[];
+  status?: string;
 }

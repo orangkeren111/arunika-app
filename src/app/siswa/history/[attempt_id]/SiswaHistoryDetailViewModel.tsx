@@ -1,4 +1,5 @@
 import { reportRepository } from "@/src/lib/repositories/reportRepository";
+import { ReportProps } from "@/src/app/types/report";
 import { useEffect, useState } from "react";
 
 export function useStudentReportViewModel(attemptId: string) {

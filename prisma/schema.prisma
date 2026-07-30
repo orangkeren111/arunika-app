@@ -128,6 +128,8 @@ model GenerationJob {
   fileName     String    @map("file_name")
   fileUrl      String?   @map("file_url") // Bisa diset null/dihapus kalau file lokal sudah di-unlink
   errorMessage String?   @map("error_message") @db.Text
+  jumlahSoal   Int       @default(10) @map("jumlah_soal")
+  tokensSpent  Int       @default(0) @map("tokens_spent")
 
   bukuId       Int       @map("buku_id")
   buku         Buku      @relation(fields: [bukuId], references: [id], onDelete: Cascade)
@@ -199,6 +201,7 @@ model Ujian {
 
   jadwalUjian     JadwalUjian[]
   ujianBab        UjianBab[]
+  criteria        UjianCriteria?
 
   @@map("ujian")
 }
@@ -302,6 +305,7 @@ model TaskQueue {
   provider    String?  // The LLM assigned (e.g., "claude", "gemini", "groq")
   attempts    Int      @default(0)
   errorLog    String?  @db.Text
+  tokensSpent Int      @default(0) @map("tokens_spent")
   
   lockedAt    DateTime?
   createdAt   DateTime @default(now())
@@ -326,4 +330,16 @@ model SavedResponses {
   attempt        SesiUjianSiswa @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 
   @@map("saved_responses")
+}
+
+model UjianCriteria {
+  id       Int   @id @default(autoincrement())
+  ujianId  Int   @unique @map("ujian_id")
+  ujian    Ujian @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  reqC1    Int   @default(10) @map("req_c1")
+  reqC2    Int   @default(10) @map("req_c2")
+  reqC3    Int   @default(10) @map("req_c3")
+  reqC4    Int   @default(10) @map("req_c4")
+
+  @@map("ujian_criteria")
 }

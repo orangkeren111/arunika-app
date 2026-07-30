@@ -3,6 +3,7 @@
 import React, { use, useState, useEffect } from "react";
 import { ArrowLeft } from "lucide-react";
 import { useAttemptViewModel } from "./GuruReportsAttemptViewModel";
+import { ReportTemplate } from "@/src/components/ReportTemplate";
 
 export default function AttemptReviewPage({
   params,
@@ -10,7 +11,7 @@ export default function AttemptReviewPage({
   params: Promise<{ attempt_id: string }>;
 }) {
   const resolvedParams = use(params);
-  const { attempt, handleGradeAttempt } = useAttemptViewModel(
+  const { attempt, reportData, handleGradeAttempt } = useAttemptViewModel(
     resolvedParams.attempt_id,
   );
 
@@ -190,6 +191,15 @@ export default function AttemptReviewPage({
           {isSubmitting ? "Menyimpan..." : "Simpan Nilai"}
         </button>
       </div>
+
+      {reportData && (
+        <div className="mt-12 border-t border-[var(--border)] pt-8">
+          <h2 className="text-xl font-bold mb-6 text-[var(--foreground)]">
+            Laporan Analisis Hasil Belajar AI Siswa
+          </h2>
+          <ReportTemplate {...reportData} />
+        </div>
+      )}
     </div>
   );
 }

@@ -9,7 +9,7 @@ export async function executeLLMStrategy(
   provider: LLMProvider,
   prompt: string,
   system?: string,
-): Promise<string> {
+): Promise<{ text: string; tokens: number }> {
   switch (provider) {
     case "gemini":
       return await callGemini(prompt, system);

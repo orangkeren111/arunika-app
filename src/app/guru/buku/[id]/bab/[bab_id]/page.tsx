@@ -13,11 +13,14 @@ export default function BankSoalPage({
   params: Promise<{ id: string; bab_id: string }>;
 }) {
   const resolvedParams = use(params);
+  console.log(resolvedParams);
+
   const {
     bab,
     soalList,
     handleAddSoal,
     handleEditSoal,
+    handleDeleteSoal,
     handleGenerateQuestion,
   } = useSoalViewModel(resolvedParams.bab_id.toString());
 
@@ -39,6 +42,8 @@ export default function BankSoalPage({
       setEditingId(soalToEdit.id);
       setFormType(soalToEdit.type as TipeSoal);
       setTeksSoal(soalToEdit.text);
+      setDifficulty(soalToEdit.difficulty || 1);
+      setBloomLevel(soalToEdit.bloomLevel || "C1");
       if (soalToEdit.type === "MCQ") {
         setOpsiJawaban(soalToEdit.options || ["", "", "", ""]);
         // Mencari index jawaban benar dari array opsi
@@ -54,6 +59,8 @@ export default function BankSoalPage({
       setTeksSoal("");
       setOpsiJawaban(["", "", "", ""]);
       setJawabanBenarIndex(0);
+      setDifficulty(1);
+      setBloomLevel("C1");
     }
     setIsModalOpen(true);
   };
@@ -90,19 +97,9 @@ export default function BankSoalPage({
       bloomLevel: bloomLevel ? bloomLevel : "C1",
     };
 
-    console.log("Menyimpan Soal:", payload);
-    // TODO: Panggil fungsi dari ViewModel di sini
-    handleAddSoal(
-      payload.type,
-      payload.teksSoal,
-      payload.difficulty,
-      payload.bloomLevel,
-      payload.opsiJawaban ?? [],
-      payload.jawabanBenarMcq ?? "",
-    );
-    if (editingId)
+    if (editingId) {
       handleEditSoal(editingId.toString(), {
-        id: "",
+        id: editingId.toString(),
         babId: bab?.id ?? "",
         type: payload.type,
         difficulty: payload.difficulty,
@@ -111,7 +108,16 @@ export default function BankSoalPage({
         options: payload.opsiJawaban ?? [],
         correctAnswer: payload.jawabanBenarMcq ?? "",
       });
-    // else handleAddSoal(payload);
+    } else {
+      handleAddSoal(
+        payload.type,
+        payload.teksSoal,
+        payload.difficulty,
+        payload.bloomLevel,
+        payload.opsiJawaban ?? [],
+        payload.jawabanBenarMcq ?? "",
+      );
+    }
 
     closeModal();
   };
@@ -169,17 +175,46 @@ export default function BankSoalPage({
             className="bg-[var(--card)] p-5 rounded-xl border border-[var(--border)] shadow-sm"
           >
             <div className="flex justify-between items-start mb-3">
-              <span
-                className={`text-xs font-bold px-2 py-1 rounded ${soal.type === "MCQ" ? "bg-[var(--info)] text-white" : "bg-[var(--accent)] text-white"}`}
-              >
-                {soal.type}
-              </span>
-              <button
-                onClick={() => openModal(soal.type as TipeSoal, soal)}
-                className="text-[var(--muted-foreground)] hover:text-[var(--primary)] text-sm font-medium"
-              >
-                Edit
-              </button>
+              <div className="flex items-center gap-2">
+                <span
+                  className={`text-xs font-bold px-2 py-1 rounded ${soal.type === "MCQ" ? "bg-[var(--info)] text-white" : "bg-[var(--accent)] text-white"}`}
+                >
+                  {soal.type}
+                </span>
+                {soal.difficulty !== undefined && (
+                  <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded font-semibold">
+                    Bobot: {soal.difficulty}
+                  </span>
+                )}
+                {soal.bloomLevel && (
+                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-semibold">
+                    Taksonomi: {soal.bloomLevel}
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openModal(soal.type as TipeSoal, soal)}
+                  className="text-[var(--muted-foreground)] hover:text-[var(--primary)] text-sm font-medium"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Apakah Anda yakin ingin menghapus soal ini?",
+                      )
+                    ) {
+                      handleDeleteSoal(soal.id);
+                    }
+                  }}
+                  className="text-[var(--muted-foreground)] hover:text-red-500 text-sm font-medium flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  Hapus
+                </button>
+              </div>
             </div>
             <p className="text-[var(--card-foreground)] mb-4">
               {i + 1}. {soal.text}
@@ -253,6 +288,42 @@ export default function BankSoalPage({
                   placeholder="Ketikkan teks pertanyaan di sini..."
                   className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition resize-y"
                 />
+              </div>
+
+              {/* Bobot Soal (Difficulty) & Tingkat Taksonomi Bloom */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Bobot Soal (Kesulitan 1 - 10)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(Number(e.target.value))}
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Tingkat Taksonomi Bloom
+                  </label>
+                  <select
+                    value={bloomLevel}
+                    onChange={(e) => setBloomLevel(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition"
+                  >
+                    <option value="C1">C1 - Mengingat (Remembering)</option>
+                    <option value="C2">C2 - Memahami (Understanding)</option>
+                    <option value="C3">C3 - Menerapkan (Applying)</option>
+                    <option value="C4">C4 - Menganalisis (Analyzing)</option>
+                    <option value="C5">C5 - Evaluasi (Evaluating)</option>
+                    <option value="C6">C6 - Mencipta (Creating)</option>
+                  </select>
+                </div>
               </div>
 
               {/* MCQ Options Dynamic Input */}

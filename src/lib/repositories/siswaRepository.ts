@@ -101,9 +101,18 @@ export const siswaRepository = {
   },
 
   // --- UJIAN LOBBY ---
-  getExamLobby: async (jadwalId: string) => {
+  getExamLobby: async (jadwalId: string, siswaId?: number) => {
     const j = await siswaDB.getJadwalDetail(parseInt(jadwalId));
     if (!j) return null;
+
+    let isFinishedByUser = false;
+    if (siswaId) {
+      isFinishedByUser = await siswaDB.checkStudentFinishedExam(j.id, siswaId);
+    }
+
+    const now = new Date();
+    const isOngoing = j.status === "ONGOING";
+    const isEnded = j.waktuSelesaiAktif ? now > new Date(j.waktuSelesaiAktif) : false;
 
     return {
       jadwalId: j.id.toString(),
@@ -112,6 +121,10 @@ export const siswaRepository = {
       startTime: j.waktuMulaiAktif?.toISOString() || "Unknown",
       durationMinutes: j.ujian.durasiMenit,
       type: j.tipeUjian.namaTipeUjian,
+      isOngoing,
+      isEnded,
+      isFinishedByUser,
+      status: j.status,
     };
   },
 

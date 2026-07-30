@@ -5,17 +5,15 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  Users,
-  Clock,
   LogOut,
   Sun,
-  GraduationCap,
   Menu,
   X,
+  School,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
-export default function SiswaLayout({
+export default function SuperadminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -25,25 +23,14 @@ export default function SiswaLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const menuItems = [
-    { href: "/siswa/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { href: "/siswa/kelas", label: "Ruang Kelas", icon: Users },
-    { href: "/siswa/history", label: "Riwayat Ujian", icon: Clock },
+    { href: "/superadmin/dashboard", label: "Dashboard Sekolah", icon: School },
   ];
+
+  const isMenuSelected = (href: string) => pathname?.startsWith(href);
 
   const handleLogout = async () => {
     await signOut({ callbackUrl: "/login" });
   };
-  
-  const isMenuSelected = (href: string) => pathname?.startsWith(href);
-  const isExamMode = pathname?.includes("/attempt");
-
-  if (isExamMode) {
-    return (
-      <div className="min-h-screen bg-[var(--background)] transition-colors duration-200">
-        {children}
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex bg-[var(--background)] transition-colors duration-200 relative">
@@ -69,7 +56,7 @@ export default function SiswaLayout({
               </span>
             </div>
             <p className="text-xs text-[var(--muted-foreground)] mt-1 ml-9">
-              Portal Siswa
+              Morning Serenity LMS
             </p>
           </div>
           {/* Close button for mobile */}
@@ -116,6 +103,7 @@ export default function SiswaLayout({
 
       {/* Main Content Area */}
       <div className="flex-1 md:ml-64 flex flex-col min-h-screen w-full overflow-hidden">
+        {/* Topbar */}
         <header className="h-16 bg-[var(--card)] border-b border-[var(--border)] flex items-center justify-between px-4 md:px-8 sticky top-0 z-10 transition-colors duration-200">
           <div className="flex items-center gap-3">
             {/* Hamburger button */}
@@ -126,24 +114,28 @@ export default function SiswaLayout({
               <Menu size={24} />
             </button>
             <h2 className="font-semibold text-[var(--foreground)] text-sm md:text-base">
-              Arunika Learning
+              Superadmin Panel
             </h2>
           </div>
-          
+
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">
-                  {session?.user?.name ?? ""}
+                  Superadmin Utama
+                </p>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {session?.user?.name}
                 </p>
               </div>
-              <div className="w-9 h-9 md:w-10 md:h-10 bg-[var(--secondary)] text-[var(--secondary-foreground)] rounded-full flex items-center justify-center font-bold">
-                <GraduationCap size={20} />
+              <div className="w-9 h-9 md:w-10 md:h-10 bg-[var(--primary)] text-[var(--primary-foreground)] rounded-full flex items-center justify-center font-bold">
+                SA
               </div>
             </div>
           </div>
         </header>
 
+        {/* Page Content */}
         <main className="p-4 md:p-8 flex-1 overflow-y-auto w-full">
           {children}
         </main>

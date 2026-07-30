@@ -15,8 +15,33 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
   const [loading, setLoading] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [warnings, setWarnings] = useState(0);
 
   const { data: session, status } = useSession();
+
+  // Handle tab-out (blur) warning and auto-submission
+  useEffect(() => {
+    if (isFinished || loading) return;
+
+    const handleBlur = () => {
+      setWarnings((prev) => {
+        const nextWarnings = prev + 1;
+        if (nextWarnings >= 3) {
+          alert("Anda telah keluar dari halaman ujian sebanyak 3 kali. Ujian Anda otomatis selesai dan dikumpulkan.");
+          handleSubmitExam();
+          return 3;
+        } else {
+          alert(`Peringatan! Dilarang membuka tab lain atau keluar dari halaman ujian. Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`);
+          return nextWarnings;
+        }
+      });
+    };
+
+    window.addEventListener("blur", handleBlur);
+    return () => {
+      window.removeEventListener("blur", handleBlur);
+    };
+  }, [isFinished, loading, session]);
 
   // 1. Initialize Exam / Resume Exam
   useEffect(() => {
@@ -138,6 +163,7 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
     handleAnswer,
     nextQuestion,
     handleSubmitExam,
+    warnings,
     timeLeft: formatTime(timeLeft),
     isFinished: isFinished || timeLeft === 0,
     loading: loading || isSubmitting,

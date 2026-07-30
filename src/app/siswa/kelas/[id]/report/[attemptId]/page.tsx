@@ -17,7 +17,7 @@ export default function StudentReportPage({
   const { reportData } = useStudentReportViewModel(resolvedParams.attemptId);
 
   const handlePrint = useReactToPrint({
-    content: () => componentRef.current,
+    contentRef: componentRef,
     documentTitle: `${reportData?.studentName}_Quiz_Report`,
   });
 

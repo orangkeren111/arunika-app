@@ -22,13 +22,18 @@ export default auth(
       !isLoggedIn &&
       (pathname.startsWith("/admin") ||
         pathname.startsWith("/guru") ||
-        pathname.startsWith("/siswa"))
+        pathname.startsWith("/siswa") ||
+        pathname.startsWith("/superadmin"))
     ) {
       return NextResponse.redirect(new URL("/login", req.nextUrl));
     }
 
     // 2. Proteksi rute berdasarkan peran (Role-based Authorization)
     if (isLoggedIn) {
+      if (pathname.startsWith("/superadmin") && role !== "SUPERADMIN") {
+        return NextResponse.redirect(new URL("/unauthorized", req.nextUrl));
+      }
+
       if (pathname.startsWith("/admin") && role !== "ADMIN") {
         return NextResponse.redirect(new URL("/unauthorized", req.nextUrl));
       }
@@ -43,6 +48,10 @@ export default auth(
 
       // Mencegah user yang sudah login mengakses halaman login kembali
       if (pathname === "/login") {
+        if (role === "SUPERADMIN")
+          return NextResponse.redirect(
+            new URL("/superadmin/dashboard", req.nextUrl),
+          );
         if (role === "ADMIN")
           return NextResponse.redirect(
             new URL("/admin/dashboard", req.nextUrl),
@@ -61,5 +70,5 @@ export default auth(
 );
 
 export const config = {
-  matcher: ["/admin/:path*", "/guru/:path*", "/siswa/:path*", "/login"],
+  matcher: ["/admin/:path*", "/guru/:path*", "/siswa/:path*", "/superadmin/:path*", "/login"],
 };

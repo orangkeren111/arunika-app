@@ -2,6 +2,7 @@
 
 import React, { use, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   Plus,
@@ -20,6 +21,7 @@ export default function BabPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const router = useRouter();
   const resolvedParams = use(params);
   const {
     buku,
@@ -39,6 +41,7 @@ export default function BabPage({
   // State untuk modal Upload PDF
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [jumlahSoal, setJumlahSoal] = useState<number>(10);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -79,6 +82,7 @@ export default function BabPage({
   const closeUploadModal = () => {
     setIsUploadModalOpen(false);
     setSelectedFile(null);
+    setJumlahSoal(10);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,11 +91,12 @@ export default function BabPage({
     }
   };
 
-  const submitUpload = (e: React.FormEvent) => {
+  const submitUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedFile) {
-      handleUploadBook(selectedFile);
+      await handleUploadBook(selectedFile, jumlahSoal);
       closeUploadModal();
+      router.push("/guru/buku");
     }
   };
 
@@ -293,6 +298,21 @@ export default function BabPage({
                     </span>
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Jumlah Soal per Bab
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={jumlahSoal}
+                  onChange={(e) => setJumlahSoal(Number(e.target.value))}
+                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"
+                  required
+                />
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6 pt-4">

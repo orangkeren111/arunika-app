@@ -3,6 +3,7 @@ export interface Buku {
   title: string;
   description: string;
   chapterCount: number;
+  jobStatus?: string | null;
 }
 
 export interface Bab {
@@ -40,7 +41,10 @@ export interface UjianTemplate {
   title: string;
   questionCount: number;
   durasiMenit: number;
-  // createdAt: string;
+  reqC1?: number;
+  reqC2?: number;
+  reqC3?: number;
+  reqC4?: number;
 }
 
 export interface TipeUjian {

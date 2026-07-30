@@ -80,7 +80,6 @@ export async function processPdfWithGemini(
 
     const extractedData = JSON.parse(response.text ?? "[]");
 
-    // 4. Store the structured objectives in the database
     const savedObjectives = await Promise.all(
       extractedData.map((chapter: any) =>
         prisma.bab.create({
@@ -93,7 +92,9 @@ export async function processPdfWithGemini(
       ),
     );
 
-    return savedObjectives;
+    const totalTokens = response.usageMetadata?.totalTokenCount ?? 0;
+
+    return { objectives: savedObjectives, tokens: totalTokens };
   } catch (error) {
     await prisma.generationJob.update({
       where: { id: jobId },

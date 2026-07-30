@@ -25,19 +25,30 @@ export function useBabViewModel(bookId: string) {
     fetchBab();
   };
   const handleEditBab = async (id: string, title: string) => {
-    //TODO
+    await guruRepository.updateBab(id, title);
+    fetchBab();
   };
+
   const handleDeleteBab = async (id: string) => {
-    //TODO
+    await guruRepository.deleteBab(id);
+    fetchBab();
   };
-  const handleUploadBook = async (file: File) => {
+
+  const handleUploadBook = async (file: File, jumlahSoal: number = 10) => {
     const formData = new FormData();
-    formData.append("bookId", bookId.toString()); // sesuaikan tipe bookId
+    formData.append("bookId", bookId.toString());
     formData.append("pdfFile", file);
+    formData.append("jumlahSoal", jumlahSoal.toString());
     await guruRepository.uploadAndGenerateBookPdf(formData);
   };
+
   const handleViewBook = async () => {
-    //TODO
+    const url = await guruRepository.getBukuPdfUrl(bookId);
+    if (url) {
+      window.open(url, "_blank");
+    } else {
+      alert("PDF file not found. Please upload a PDF first.");
+    }
   };
 
   return {

@@ -24,6 +24,8 @@ export async function initiatePdfExtraction(formData: FormData) {
     await fs.mkdir(path.dirname(tempFilePath), { recursive: true });
     await fs.writeFile(tempFilePath, buffer);
 
+    const jumlahSoal = formData.get("jumlahSoal") as string;
+
     // 3. Create the Job Queue record in Prisma
     const job = await prisma.generationJob.create({
       data: {
@@ -31,13 +33,14 @@ export async function initiatePdfExtraction(formData: FormData) {
         fileUrl: tempFilePath, // Storing local path for the worker to find
         status: "PENDING",
         bukuId: Number(bukuId),
+        jumlahSoal: jumlahSoal ? Number(jumlahSoal) : 10,
       },
     });
 
     // 4. THE TRIGGER: Fire and Forget
     // We call the orchestrator but DO NOT put 'await' in front of it.
     // This allows Node to execute it in the background while instantly moving to step 5.
-    fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/worker/process-llm`, {
+    fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/llm/worker`, {
       method: "POST",
     }).catch(() => {});
 

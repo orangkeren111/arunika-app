@@ -9,13 +9,15 @@ export function useSiswaHistory() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
+    if (status !== "authenticated" || !session?.user?.id) return;
+
     siswaRepository
-      .getHistoryList(Number(session?.user.id ?? 0))
+      .getHistoryList(Number(session.user.id))
       .then((res) => {
         setHistory(res);
         setLoading(false);
       });
-  }, []);
+  }, [session, status]);
 
   return { history, loading };
 }

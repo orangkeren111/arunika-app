@@ -36,7 +36,11 @@ export async function getBukuList(guruId: number) {
   return await prisma.buku.findMany({
     where: { guruId },
     include: {
-      _count: { select: { bab: true } }, // Menghitung jumlah bab otomatis
+      _count: { select: { bab: true } },
+      jobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
     },
     orderBy: { id: "desc" },
   });
@@ -179,6 +183,7 @@ export async function getUjianTemplateById(templateId: number) {
           babId: "asc",
         },
       },
+      criteria: true,
     },
   });
 }
@@ -210,7 +215,7 @@ export async function createTemplate(
 
 export async function upsertTemplateBabSafe(
   ujianId: number,
-  data: Prisma.UjianCreateWithoutUjianBabInput,
+  data: Prisma.UjianUpdateInput,
   babIds: number[],
 ) {
   return await prisma.$transaction(async (tx) => {
@@ -342,5 +347,100 @@ export async function gradeJawabanSiswa(
   return await prisma.jawabanSiswa.update({
     where: { id: jawabanId },
     data: { nilaiPoin, catatanKoreksi, isCorrect: nilaiPoin > 0 },
+  });
+}
+
+export async function updateBab(id: number, judulBab: string) {
+  return await prisma.bab.update({
+    where: { id },
+    data: { judulBab },
+  });
+}
+
+export async function deleteBab(id: number) {
+  return await prisma.bab.delete({
+    where: { id },
+  });
+}
+
+export async function deleteSoal(id: number) {
+  return await prisma.bankSoal.delete({
+    where: { id },
+  });
+}
+
+export async function getBukuPdf(bukuId: number) {
+  return await prisma.generationJob.findFirst({
+    where: { bukuId, status: "DONE" },
+    orderBy: { createdAt: "desc" },
+  });
+}
+
+export async function getKelasDetail(kelasId: number) {
+  return await prisma.kelas.findUnique({
+    where: { id: kelasId },
+    include: {
+      teacher: true,
+      members: {
+        include: {
+          user: true,
+        },
+      },
+      _count: {
+        select: { members: true },
+      },
+    },
+  });
+}
+
+export async function getExamsByKelas(kelasId: number) {
+  return await prisma.jadwalUjian.findMany({
+    where: { kelasId },
+    include: {
+      ujian: true,
+      tipeUjian: true,
+    },
+    orderBy: { id: "desc" },
+  });
+}
+
+export async function updateJadwalStatus(jadwalId: number, status: StatusUjian) {
+  return await prisma.jadwalUjian.update({
+    where: { id: jadwalId },
+    data: { status },
+  });
+}
+
+export async function getStudentHistoryInClass(siswaId: number, kelasId: number) {
+  return await prisma.sesiUjianSiswa.findMany({
+    where: {
+      siswaId,
+      jadwalUjian: {
+        kelasId,
+      },
+    },
+    include: {
+      jadwalUjian: {
+        include: {
+          ujian: true,
+        },
+      },
+    },
+    orderBy: { waktuMulai: "desc" },
+  });
+}
+
+export async function getClassGradesReport(kelasId: number) {
+  return await prisma.jadwalUjian.findMany({
+    where: { kelasId },
+    include: {
+      ujian: true,
+      sesiSiswa: {
+        include: {
+          siswa: true,
+        },
+      },
+    },
+    orderBy: { id: "asc" },
   });
 }

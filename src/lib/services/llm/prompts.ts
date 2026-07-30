@@ -9,19 +9,21 @@ Chapter Content:
 ${chapterContent}
 `,
 
-  generateQuestions: (summary: string) => `
-Based on the following chapter summary, generate 10 questions for EACH Bloom's Taxonomy level category (Q1 to Q4). 
+  generateQuestions: (jumlahSoal: number, judulBab: string, summary: string) => `
+Based on the following chapter summary and chapter title, generate ${(jumlahSoal) / 4} questions for EACH Bloom's Taxonomy level category (C1 to C4), total ${jumlahSoal} questions. 
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex).
 
-You MUST return the output purely as a JSON array matching this structure:
+You MUST return the output purely as a JSON array matching this structure (e.g):
 [{
-  "taxonomyLevel": "Q1",
-  "complexity": 5,
-  "question": "What is the primary function of...",
+  "bloomLevel": "C1",
+  "difficulty": 5,
+  "soal": "What is the primary function of...",
   "options": ["A", "B", "C", "D"],
-  "correctAnswer": "A",
+  "correctIndex": 0,
   "explanation": "Because..."
 }]
+Chapter Title:
+${judulBab}
 
 Chapter Summary:
 ${summary}

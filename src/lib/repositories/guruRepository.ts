@@ -4,12 +4,6 @@ import { initiatePdfExtraction } from "../services/process-book/initiate-extract
 import { Bab, Kelas, Soal, UjianTemplate } from "@/src/app/types/guru";
 import { generateQuestionsWithGroq } from "../services/process-book/generate-questions";
 
-/**
- * File ini bertugas sebagai penghubung (Middle-man).
- * ViewModel di frontend memanggil fungsi di sini, BUKAN memanggil db secara langsung.
- * Semua nama fungsi disamakan persis dengan mock data agar tidak merusak frontend.
- */
-
 export const guruRepository = {
   // --- DASHBOARD ---
   getDashboardStats: async (guruId: number = 2) => {
@@ -41,6 +35,7 @@ export const guruRepository = {
       title: b.judul, // Kompatibilitas properti mock frontend
       description: "",
       chapterCount: b._count?.bab || 0,
+      jobStatus: b.jobs?.[0]?.status || null,
     }));
   },
 
@@ -176,6 +171,8 @@ export const guruRepository = {
       type,
       opsiJawaban: soal.options || soal.opsiJawaban,
       jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq,
+      difficulty: soal.difficulty !== undefined ? Number(soal.difficulty) : undefined,
+      bloomLevel: soal.bloomLevel !== undefined ? soal.bloomLevel : undefined,
     });
 
     return {
@@ -185,6 +182,8 @@ export const guruRepository = {
       text: updatedSoal.teksSoal,
       options: updatedSoal.opsiJawaban,
       jawabanBenarMcq: updatedSoal.jawabanBenarMcq,
+      difficulty: updatedSoal.difficulty,
+      bloomLevel: updatedSoal.bloomLevel,
     };
   },
 
@@ -217,6 +216,10 @@ export const guruRepository = {
       judulUjian: template.judulUjian,
       durasiMenit: template.durasiMenit,
       isLocked: template.isLocked,
+      reqC1: template.criteria?.reqC1 ?? 10,
+      reqC2: template.criteria?.reqC2 ?? 10,
+      reqC3: template.criteria?.reqC3 ?? 10,
+      reqC4: template.criteria?.reqC4 ?? 10,
 
       questionCount: template.ujianBab.reduce(
         (count, ub) => count + ub.bab.soal.length,
@@ -256,6 +259,14 @@ export const guruRepository = {
             id: guruId,
           },
         },
+        criteria: {
+          create: {
+            reqC1: ujian.reqC1 ?? 10,
+            reqC2: ujian.reqC2 ?? 10,
+            reqC3: ujian.reqC3 ?? 10,
+            reqC4: ujian.reqC4 ?? 10,
+          },
+        },
       },
       babIds,
     );
@@ -280,6 +291,22 @@ export const guruRepository = {
         guru: {
           connect: {
             id: guruId,
+          },
+        },
+        criteria: {
+          upsert: {
+            create: {
+              reqC1: ujian.reqC1 ?? 10,
+              reqC2: ujian.reqC2 ?? 10,
+              reqC3: ujian.reqC3 ?? 10,
+              reqC4: ujian.reqC4 ?? 10,
+            },
+            update: {
+              reqC1: ujian.reqC1 ?? 10,
+              reqC2: ujian.reqC2 ?? 10,
+              reqC3: ujian.reqC3 ?? 10,
+              reqC4: ujian.reqC4 ?? 10,
+            },
           },
         },
       },
@@ -492,5 +519,90 @@ export const guruRepository = {
       feedback: primaryFeedback,
       aiSummary: "Koreksi manual berhasil disimpan oleh guru.",
     };
+  },
+
+  updateBab: async (id: string, title: string) => {
+    const updated = await guruDB.updateBab(parseInt(id), title);
+    return {
+      id: updated.id.toString(),
+      bookId: updated.bukuId.toString(),
+      judulBab: updated.judulBab,
+      title: updated.judulBab,
+    };
+  },
+
+  deleteBab: async (id: string) => {
+    await guruDB.deleteBab(parseInt(id));
+    return true;
+  },
+
+  deleteSoal: async (id: string) => {
+    await guruDB.deleteSoal(parseInt(id));
+    return true;
+  },
+
+  getBukuPdfUrl: async (bukuId: string) => {
+    const job = await guruDB.getBukuPdf(parseInt(bukuId));
+    return job?.fileUrl || null;
+  },
+
+  getKelasDetail: async (kelasId: string) => {
+    const data = await guruDB.getKelasDetail(parseInt(kelasId));
+    if (!data) return null;
+    return {
+      id: data.id,
+      name: data.namaKelas,
+      studentCount: data._count.members,
+      teacherName: data.teacher.name,
+      students: data.members
+        .map((m) => m.user)
+        .filter((u) => u.role === "SISWA")
+        .map((u) => ({
+          id: u.id.toString(),
+          name: u.name,
+          email: u.email,
+        })),
+    };
+  },
+
+  getExamsByKelas: async (kelasId: string) => {
+    const raw = await guruDB.getExamsByKelas(parseInt(kelasId));
+    return raw.map((j) => ({
+      id: j.id.toString(),
+      templateId: j.ujianId.toString(),
+      title: j.ujian.judulUjian,
+      startTime: j.waktuMulaiAktif?.toISOString() || "",
+      endTime: j.waktuSelesaiAktif?.toISOString() || "",
+      durationMinutes: j.ujian.durasiMenit,
+      status: j.status,
+      type: j.tipeUjian.namaTipeUjian,
+    }));
+  },
+
+  updateJadwalStatus: async (jadwalId: string, status: StatusUjian) => {
+    return await guruDB.updateJadwalStatus(parseInt(jadwalId), status);
+  },
+
+  getStudentHistoryInClass: async (siswaId: string, kelasId: string) => {
+    const raw = await guruDB.getStudentHistoryInClass(parseInt(siswaId), parseInt(kelasId));
+    return raw.map((s) => ({
+      attemptId: s.id.toString(),
+      title: s.jadwalUjian.ujian.judulUjian,
+      score: s.nilaiAkhir,
+      submittedAt: s.waktuSelesai?.toISOString() || "Belum Selesai",
+    }));
+  },
+
+  getClassGradesReport: async (kelasId: string) => {
+    const raw = await guruDB.getClassGradesReport(parseInt(kelasId));
+    return raw.map((j) => ({
+      jadwalId: j.id.toString(),
+      examTitle: j.ujian.judulUjian,
+      grades: j.sesiSiswa.map((s) => ({
+        siswaId: s.siswaId.toString(),
+        siswaName: s.siswa.name,
+        score: s.nilaiAkhir,
+      })),
+    }));
   },
 };

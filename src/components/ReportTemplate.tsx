@@ -1,4 +1,5 @@
 import React from "react";
+import { ReportProps, TaxonomyScore, QuestionDetail } from "@/src/app/types/report";
 
 // Pastikan tipe data props sudah sesuai dengan interface kamu
 export function ReportTemplate({
@@ -12,7 +13,34 @@ export function ReportTemplate({
   weaknessText,
   taxonomyScores,
   questions,
+  status,
 }: ReportProps) {
+  if (status === "PENDING" || status === "PROCESSING") {
+    return (
+      <div className="w-full max-w-2xl bg-white p-8 md:p-12 text-center rounded-3xl border border-[#7FA88F]/20 shadow-xl mx-auto space-y-6 my-8 font-sans">
+        <div className="flex justify-center items-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#7FA88F]"></div>
+        </div>
+        <h2 className="text-2xl font-extrabold text-[#39434D]">Menganalisis Hasil Ujian...</h2>
+        <p className="text-gray-500 text-sm leading-relaxed">
+          Kecerdasan Buatan (AI) Arunika sedang menganalisis detail jawaban Anda untuk merumuskan rekomendasi belajar personal. Sesi analisis biasanya memakan waktu sekitar 1-2 menit. Silakan tunggu atau refresh halaman ini nanti.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "FAILED") {
+    return (
+      <div className="w-full max-w-2xl bg-white p-8 md:p-12 text-center rounded-3xl border border-red-200 shadow-xl mx-auto space-y-6 my-8 font-sans">
+        <div className="text-red-500 text-5xl flex justify-center">⚠️</div>
+        <h2 className="text-2xl font-extrabold text-red-700">Analisis Gagal</h2>
+        <p className="text-gray-500 text-sm leading-relaxed">
+          Maaf, terjadi kesalahan saat kecerdasan buatan menganalisis hasil pengerjaan ujian. Silakan laporkan kepada guru atau administrator sistem untuk memicu kembali proses analisis.
+        </p>
+      </div>
+    );
+  }
+
   const percentage =
     Math.round((overallScore.correct / overallScore.total) * 100) || 0;
 
@@ -182,7 +210,7 @@ export function ReportTemplate({
           </h2>
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {taxonomyScores.map((tax) => (
+          {taxonomyScores.map((tax: TaxonomyScore) => (
             <div
               key={tax.level}
               className="bg-white rounded-2xl p-5 border border-[#7FA88F]/20 text-center shadow-sm hover:shadow-md transition-shadow"
@@ -222,7 +250,7 @@ export function ReportTemplate({
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#7FA88F]/10">
-                {questions.map((q, idx) => (
+                {questions.map((q: QuestionDetail, idx: number) => (
                   <tr
                     key={q.id}
                     className="hover:bg-[#FAF8F3]/50 transition-colors"

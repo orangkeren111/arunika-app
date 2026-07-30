@@ -35,6 +35,10 @@ export function useFormUjianViewModel(id: string) {
         title: "",
         questionCount: 0,
         durasiMenit: 0,
+        reqC1: 10,
+        reqC2: 10,
+        reqC3: 10,
+        reqC4: 10,
       });
       setSelectedQuestions([]);
       setActiveBabs([]);
@@ -51,6 +55,10 @@ export function useFormUjianViewModel(id: string) {
           title: res.title ?? "",
           questionCount: res.questionCount ?? 0,
           durasiMenit: res.durasiMenit ?? 0,
+          reqC1: res.reqC1 ?? 10,
+          reqC2: res.reqC2 ?? 10,
+          reqC3: res.reqC3 ?? 10,
+          reqC4: res.reqC4 ?? 10,
         });
         const allQuestions =
           res.babs?.flatMap((bab) => {
@@ -134,6 +142,16 @@ export function useFormUjianViewModel(id: string) {
   };
 
   const handleSaveTemplate = async () => {
+    if (
+      (template?.reqC1 ?? 0) <= 10 ||
+      (template?.reqC2 ?? 0) <= 10 ||
+      (template?.reqC3 ?? 0) <= 10 ||
+      (template?.reqC4 ?? 0) <= 10
+    ) {
+      alert("DDA Error: Kriteria jumlah soal untuk setiap tingkat taksonomi Bloom (C1, C2, C3, C4) harus lebih dari 10 soal agar mesin ujian adaptif (DDA) dapat bekerja!");
+      return;
+    }
+
     try {
       const babIds = activeBabs.map((q) =>
         Number(q.toString().replace(/\D/g, "") || "0"),

@@ -79,6 +79,7 @@ export let mockSoal: Soal[] = [
     text: "Cabang ilmu biologi yang mempelajari tentang sel adalah...",
     options: ["Sitologi", "Histologi", "Morfologi", "Fisiologi"],
     correctAnswer: "Sitologi",
+    difficulty: 1,
   },
   {
     id: "s2",
@@ -87,17 +88,19 @@ export let mockSoal: Soal[] = [
     text: "Organel sel yang berfungsi sebagai tempat respirasi seluler adalah...",
     options: ["Nukleus", "Mitokondria", "Ribosom", "Lisosom"],
     correctAnswer: "Mitokondria",
+    difficulty: 1,
   },
   {
     id: "s3",
     babId: "101",
     type: "ESSAY",
     text: "Jelaskan perbedaan antara sel tumbuhan dan sel hewan beserta fungsi masing-masing organel yang membedakannya!",
+    difficulty: 1,
   },
 ];
 
 export let mockTemplates: UjianTemplate[] = [
-  { id: "u1", title: "UH 1 Biologi Kls X", questionCount: 3 },
+  { id: "u1", title: "UH 1 Biologi Kls X", questionCount: 3, durasiMenit: 60 },
 ];
 
 export let mockJadwal: JadwalUjian[] = [

@@ -9,11 +9,9 @@ import { NextResponse } from "next/server";
 
 export async function GET() {
   try {
-    //    // Run both sweepers concurrently. They manage completely different
-    // tables/domains so they won't block each other.
     await Promise.allSettled([
-      processGenerationStateMachine(), // For the Book/PDF
-      processTaskQueueBatch(), // For the Reports/Responses
+      processGenerationStateMachine(),
+      processTaskQueueBatch(),
     ]);
 
     return NextResponse.json({ message: "Sweep completed successfully" });
@@ -21,6 +19,10 @@ export async function GET() {
     console.error("Sweeper crash:", error);
     return NextResponse.json({ error: "Sweeper failed" }, { status: 500 });
   }
+}
+
+export async function POST() {
+  return GET();
 }
 
 /**
@@ -64,13 +66,17 @@ async function processGenerationStateMachine() {
   try {
     //    // PHASE 1: Extract PDF
     if (job.status === "PENDING" || job.status === "PROCESSING_PDF") {
-      await processPdfWithGemini(job.id, job.fileUrl ?? "");
+      const result = await processPdfWithGemini(job.id, job.fileUrl ?? "");
 
       // Advance to next state and STOP.
       // Next cron ping will pick it up for Phase 2, avoiding Vercel timeouts!
       await prisma.generationJob.update({
         where: { id: job.id },
-        data: { status: "GENERATING_QUESTIONS", updatedAt: new Date() },
+        data: {
+          status: "GENERATING_QUESTIONS",
+          tokensSpent: { increment: result.tokens },
+          updatedAt: new Date()
+        },
       });
       return;
     }
@@ -102,14 +108,20 @@ async function processGenerationStateMachine() {
       });
 
       // Execute Groq concurrently for massive speed
-      await Promise.all(
-        babs.map((bab: any) => generateQuestionsWithGroq(bab.id)),
+      const results = await Promise.all(
+        babs.map((bab: any) => generateQuestionsWithGroq(bab.id, job.jumlahSoal)),
       );
+
+      const additionalTokens = results.reduce((sum, r) => sum + r.tokens, 0);
 
       // Entire book is finished!
       await prisma.generationJob.update({
         where: { id: job.id },
-        data: { status: "DONE", updatedAt: new Date() },
+        data: {
+          status: "DONE",
+          tokensSpent: { increment: additionalTokens },
+          updatedAt: new Date()
+        },
       });
       return;
     }
@@ -141,7 +153,7 @@ async function processGenerationStateMachine() {
     // Hard Error
     await prisma.generationJob.update({
       where: { id: job.id },
-      data: { status: "ERROR", errorMessage: error.message },
+      data: { status: "FAILED", errorMessage: error.message },
     });
   }
 }
@@ -207,12 +219,14 @@ async function processTaskQueueBatch() {
           data: { provider: assignedProvider },
         });
 
+        let tokensSpent = 0;
         if (task.type === "generate_report") {
-          const rawResult = await executeLLMStrategy(
+          const result = await executeLLMStrategy(
             assignedProvider,
             payload.prompt,
           );
-          const parsedResult = JSON.parse(rawResult);
+          tokensSpent = result.tokens;
+          const parsedResult = JSON.parse(result.text);
 
           // Update the SavedResponse table based on the payload's attemptId
           await prisma.savedResponses.update({
@@ -229,7 +243,7 @@ async function processTaskQueueBatch() {
         // Mark task as completed
         await prisma.taskQueue.update({
           where: { id: task.id },
-          data: { status: "completed" },
+          data: { status: "completed", tokensSpent },
         });
       } catch (error: any) {
         //        console.error(`Task ${task.id} failed:`, error);

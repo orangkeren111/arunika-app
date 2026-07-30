@@ -22,7 +22,6 @@ export default function ExamAttemptPage({
   const router = useRouter();
   const resolvedParams = use(params);
 
-  /* STREAMING_CHUNK:Initializing Viewmodel and UI State... */
   const {
     currentQ,
     currentIndex,
@@ -34,6 +33,7 @@ export default function ExamAttemptPage({
     progress,
     loading,
     isFinished,
+    warnings,
   } = useExamAttempt(resolvedParams.jadwal_id, MAX_QUESTIONS);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -64,15 +64,22 @@ export default function ExamAttemptPage({
 
   return (
     <>
-      <header>
-        <div className="flex items-center gap-5">
-          <div className="flex items-center gap-2 text-[var(--error)] font-bold font-mono text-lg bg-red-500/10 px-4 py-1.5 rounded-lg border border-red-500/20">
-            <Timer size={20} />
-            {timeLeft}
+      <header className="p-4 md:p-6 bg-[var(--card)] border-b border-[var(--border)]">
+        <div className="max-w-5xl mx-auto flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 text-[var(--error)] font-bold font-mono text-base md:text-lg bg-red-500/10 px-4 py-1.5 rounded-lg border border-red-500/20">
+              <Timer size={20} />
+              {timeLeft}
+            </div>
+            {warnings > 0 && (
+              <div className="flex items-center gap-1.5 text-xs md:text-sm font-bold bg-amber-50 text-amber-800 border border-amber-200 px-3 py-1.5 rounded-lg">
+                ⚠️ Pelanggaran Tab: {warnings}/3
+              </div>
+            )}
           </div>
           <button
             onClick={() => setShowConfirmModal(true)}
-            className="bg-red-600 text-white px-5 py-2 rounded-lg font-medium hover:bg-red-700 transition flex items-center gap-2 text-sm shadow-sm"
+            className="w-full sm:w-auto bg-red-600 text-white px-5 py-2.5 rounded-lg font-medium hover:bg-red-700 transition flex items-center justify-center gap-2 text-sm shadow-sm"
           >
             <CheckCircle size={16} /> Selesai & Kumpulkan
           </button>
@@ -86,70 +93,17 @@ export default function ExamAttemptPage({
         ></div>
       </div>
 
-      <div className="flex-1 flex overflow-hidden">
-        <div className="w-72 bg-[var(--card)] border-r border-[var(--border)] p-5 flex flex-col gap-4 overflow-y-auto shrink-0 shadow-[2px_0_10px_-4px_rgba(0,0,0,0.05)]">
-          <h3 className="font-semibold text-sm text-[var(--muted-foreground)] uppercase tracking-wider mb-2">
-            Status Perjalanan
-          </h3>
-
-          <div className="grid grid-cols-5 gap-2">
-            {Array.from({ length: MAX_QUESTIONS }).map((_, idx) => {
-              const isPast = idx < currentIndex;
-              const isActive = idx === currentIndex;
-              const isFuture = idx > currentIndex;
-
-              let boxClass =
-                "h-10 rounded-md font-medium text-sm flex items-center justify-center transition-all ";
-
-              if (isActive) {
-                boxClass +=
-                  "bg-blue-600 text-white ring-4 ring-blue-600/20 shadow-md scale-105 z-10";
-              } else if (isPast) {
-                boxClass += "bg-emerald-500 text-white opacity-80";
-              } else if (isFuture) {
-                boxClass +=
-                  "bg-[var(--muted)] text-[var(--muted-foreground)] opacity-50 cursor-not-allowed";
-              }
-
-              return (
-                <div key={idx} className={boxClass}>
-                  {idx + 1}
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="mt-auto pt-6 border-t border-[var(--border)] space-y-3 text-xs text-[var(--muted-foreground)]">
-            <p className="leading-relaxed">
-              * Ujian ini menggunakan sistem adaptif. Anda tidak dapat kembali
-              ke soal sebelumnya.
-            </p>
-            <div className="flex items-center gap-2 mt-4">
-              <span className="w-3 h-3 rounded-full bg-emerald-500 block"></span>{" "}
-              Selesai
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-blue-600 block"></span>{" "}
-              Saat Ini
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-[var(--muted)] block"></span>{" "}
-              Terkunci
-            </div>
-          </div>
-        </div>
-
-        {/* STREAMING_CHUNK:Rendering the Active Question Area... */}
-        <div className="flex-1 overflow-y-auto p-6 lg:p-10 bg-[#FAFAFA] dark:bg-[#121212]">
+      <div className="flex-1 flex flex-col overflow-y-auto bg-[#FAFAFA] dark:bg-[#121212] p-4 md:p-8">
+        <div className="w-full max-w-3xl mx-auto">
           {loading && !currentQ ? (
-            <div className="flex flex-col items-center justify-center h-full text-[var(--muted-foreground)] gap-4">
+            <div className="flex flex-col items-center justify-center py-20 text-[var(--muted-foreground)] gap-4">
               <Loader2 size={40} className="animate-spin text-blue-600" />
               <p className="font-medium animate-pulse">
                 Menyiapkan soal adaptif Anda...
               </p>
             </div>
           ) : (
-            <div className="max-w-3xl mx-auto bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm p-8 min-h-[550px] flex flex-col relative overflow-hidden">
+            <div className="w-full bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm p-5 md:p-8 min-h-[500px] flex flex-col relative overflow-hidden">
               {/* Optional Loading Overlay for between-questions */}
               {loading && currentQ && (
                 <div className="absolute inset-0 bg-[var(--card)]/80 backdrop-blur-sm z-20 flex flex-col items-center justify-center">

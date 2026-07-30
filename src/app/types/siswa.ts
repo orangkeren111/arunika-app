@@ -12,6 +12,10 @@ export interface UpcomingExam {
   startTime: string;
   durationMinutes: number;
   type: string;
+  isOngoing?: boolean;
+  isEnded?: boolean;
+  isFinishedByUser?: boolean;
+  status?: string;
 }
 
 export interface ExamQuestion {

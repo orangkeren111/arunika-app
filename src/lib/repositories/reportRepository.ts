@@ -1,4 +1,5 @@
 import * as siswaDB from "../services/db/siswa/siswaDB";
+import { ReportProps } from "@/src/app/types/report";
 
 export const reportRepository = {
   fetchReportDataForStudent: async (
@@ -57,14 +58,17 @@ export const reportRepository = {
       }));
 
     // Extract relations safely
-    const student = rawAnswers[0].attempt.siswa;
-    // Note: Adjust the class/teacher mapping based on how your JadwalUjian is structured
+    const attempt = rawAnswers[0].attempt;
+    const student = attempt.siswa;
+    const schoolName = student.sekolah?.namaSekolah || "Arunika Academy";
+    const className = attempt.jadwalUjian?.kelas?.namaKelas || "Umum";
+    const teacherName = attempt.jadwalUjian?.kelas?.teacher?.name || "Guru Arunika";
 
     return {
-      schoolName: "Institut Sains dan Teknologi Terpadu Surabaya",
+      schoolName,
       studentName: student.name || "Unknown Student",
-      className: "SIB", // Placeholder: Map from jadwalUjian/Class relation
-      teacherName: "Prof. Budi", // Placeholder: Map from jadwalUjian/Teacher relation
+      className,
+      teacherName,
       overallScore: {
         correct: correctCount,
         total: rawAnswers.length,
@@ -74,6 +78,7 @@ export const reportRepository = {
       recommendationText: aiFeedback.recommendationText ?? "",
       taxonomyScores: taxonomyScores,
       questions: questions,
+      status: aiFeedback.status,
     };
   },
 };

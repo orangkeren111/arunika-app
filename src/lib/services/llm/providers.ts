@@ -21,35 +21,35 @@ export type LLMProvider = "gemini" | "claude" | "groq";
 export async function callGemini(
   prompt: string,
   system?: string,
-): Promise<string> {
-  const { text } = await generateText({
+): Promise<{ text: string; tokens: number }> {
+  const { text, usage } = await generateText({
     model: google("models/gemini-1.5-flash"),
     system,
     prompt,
   });
-  return text;
+  return { text, tokens: usage.totalTokens ?? 0 };
 }
 
 export async function callClaude(
   prompt: string,
   system?: string,
-): Promise<string> {
-  const { text } = await generateText({
+): Promise<{ text: string; tokens: number }> {
+  const { text, usage } = await generateText({
     model: anthropic("claude-3-5-sonnet-20240620"),
     system,
     prompt,
   });
-  return text;
+  return { text, tokens: usage.totalTokens ?? 0 };
 }
 
 export async function callGroq(
   prompt: string,
   system?: string,
-): Promise<string> {
-  const { text } = await generateText({
+): Promise<{ text: string; tokens: number }> {
+  const { text, usage } = await generateText({
     model: groq("llama-3.3-70b-versatile"),
     system,
     prompt,
   });
-  return text;
+  return { text, tokens: usage.totalTokens ?? 0 };
 }

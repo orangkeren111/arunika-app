@@ -9,11 +9,13 @@ export function useSiswaKelas() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    siswaRepository.getSiswaKelas(Number(session?.user.id ?? 0)).then((res) => {
+    if (status !== "authenticated" || !session?.user?.id) return;
+
+    siswaRepository.getSiswaKelas(Number(session.user.id)).then((res) => {
       setKelasList(res);
       setLoading(false);
     });
-  }, []);
+  }, [session, status]);
 
   return { kelasList, loading };
 }

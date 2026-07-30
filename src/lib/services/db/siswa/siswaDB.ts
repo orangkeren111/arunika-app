@@ -138,11 +138,12 @@ export async function getQuestionsForExam(jadwalId: number) {
     include: {
       ujian: {
         include: {
+          criteria: true,
           ujianBab: {
             include: {
               bab: {
                 include: {
-                  soal: true, // Fetching all questions available for this exam
+                  soal: true,
                 },
               },
             },
@@ -211,13 +212,25 @@ export async function getListJawaban(attemptId: number) {
       // Pull in the attempt to access the nested User (Siswa) data
       attempt: {
         include: {
-          siswa: true,
-          jadwalUjian: true,
+          siswa: {
+            include: {
+              sekolah: true,
+            },
+          },
+          jadwalUjian: {
+            include: {
+              kelas: {
+                include: {
+                  teacher: true,
+                },
+              },
+            },
+          },
         },
       },
     },
     orderBy: {
-      nomor: "asc", // Order by question number as defined in the schema
+      nomor: "asc",
     },
   });
 
@@ -228,28 +241,39 @@ export async function getListJawaban(attemptId: number) {
  * Retrieves the stored AI feedback for a specific exam attempt.
  */
 export async function getGeneratedAIFeedback(attemptId: number) {
-  // Querying the SavedResponses table based on the attemptId
   const feedback = await prisma.savedResponses.findFirst({
     where: {
       attemptId: attemptId,
     },
     orderBy: {
-      createdAt: "desc", // Get the latest feedback if there are multiple
+      createdAt: "desc",
     },
   });
 
   if (!feedback) {
     return {
-      overviewText:
-        "Feedback is currently being generated. Please check back later.",
+      status: "PENDING",
+      overviewText: "Laporan hasil belajar sedang diproses oleh AI. Mohon tunggu...",
+      weaknessText: "",
+      recommendationText: "",
     };
   }
 
   return {
-    // For now, mapping aiStatementSummary to overviewText.
-    // If you expand SavedResponses to have specific Weakness/Recommendation fields, map them here.
-    overviewText: feedback.overview,
-    weaknessText: feedback.weakness,
-    recommendationText: feedback.recommendation,
+    status: feedback.status,
+    overviewText: feedback.overview || "",
+    weaknessText: feedback.weakness || "",
+    recommendationText: feedback.recommendation || "",
   };
+}
+
+export async function checkStudentFinishedExam(jadwalId: number, siswaId: number) {
+  const session = await prisma.sesiUjianSiswa.findFirst({
+    where: {
+      jadwalUjianId: jadwalId,
+      siswaId: siswaId,
+      waktuSelesai: { not: null },
+    },
+  });
+  return !!session;
 }
