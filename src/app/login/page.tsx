@@ -15,6 +15,8 @@ import {
   Loader2,
   CheckCircle2,
 } from "lucide-react";
+import ThemeToggle from "@/src/components/ThemeToggle";
+
 /* STREAMING_CHUNK: Creating the Inner Login Form with Suspense context for searchParams */
 function LoginForm() {
   const router = useRouter();
@@ -216,11 +218,12 @@ function LoginForm() {
   );
 }
 
+
 /* STREAMING_CHUNK: Main LoginPage layout wrapper containing theme toggle */
 export default function LoginPage() {
   return (
     <div
-      className={`min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[var(--background)] transition-colors duration-200`}
+      className={`min-h-screen grid grid-cols-1 lg:grid-cols-12 bg-[var(--background)] transition-colors duration-200 relative`}
     >
       {/* Bagian Kiri: Filosofi Desain Morning Serenity (Hanya terlihat di Desktop) */}
       <div className="hidden lg:flex lg:col-span-7 bg-[var(--muted)] p-12 flex-col justify-between relative overflow-hidden">
@@ -260,6 +263,9 @@ export default function LoginPage() {
 
       {/* Bagian Kanan: Formulir Login */}
       <div className="lg:col-span-5 flex flex-col items-center justify-center p-6 sm:p-12 relative">
+        <div className="absolute top-6 right-6 z-20">
+          <ThemeToggle />
+        </div>
         {/* Suspense Wrapper untuk penanganan query string searchParams */}
         <Suspense
           fallback={

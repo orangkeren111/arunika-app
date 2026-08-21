@@ -11,8 +11,11 @@ import {
   Sun,
   Menu,
   X,
+  FileText,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
+
+import ThemeToggle from "@/src/components/ThemeToggle";
 
 export default function AdminLayout({
   children,
@@ -27,6 +30,7 @@ export default function AdminLayout({
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/users", label: "Pengguna", icon: Users },
     { href: "/admin/kelas", label: "Kelas", icon: BookOpen },
+    { href: "/admin/kurikulum", label: "Kurikulum", icon: FileText },
   ];
 
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
@@ -80,10 +84,9 @@ export default function AdminLayout({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium
-                  ${
-                    active
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                  ${active
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
+                    : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                   }`}
               >
                 <item.icon size={20} />
@@ -122,6 +125,7 @@ export default function AdminLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">

@@ -22,6 +22,10 @@ export interface Soal {
   bloomLevel?: string;
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
+  kompetensiBabId?: string | null;
+  linkGambarSoal?: string;
+  isAccepted?: boolean;
+  isRejected?: boolean;
 }
 
 export interface SoalTemplate {
@@ -41,6 +45,7 @@ export interface UjianTemplate {
   title: string;
   questionCount: number;
   durasiMenit: number;
+  isAdaptive?: boolean;
   reqC1?: number;
   reqC2?: number;
   reqC3?: number;

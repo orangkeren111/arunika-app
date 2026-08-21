@@ -15,29 +15,26 @@ export const reportRepository = {
     // 2. Fetch the AI feedback from SavedResponses
     const aiFeedback = await siswaDB.getGeneratedAIFeedback(attemptId);
 
-    // 3. Process data into the format expected by the UI
-    let correctCount = 0;
-    const taxonomyMap: Record<
-      string,
-      { correct: number; total: number; name: string }
-    > = {
-      C1: { correct: 0, total: 0, name: "Remembering" },
-      C2: { correct: 0, total: 0, name: "Understanding" },
-      C3: { correct: 0, total: 0, name: "Applying" },
-      C4: { correct: 0, total: 0, name: "Analyzing" },
-      C5: { correct: 0, total: 0, name: "Evaluating" },
-      C6: { correct: 0, total: 0, name: "Creating" },
-    };
+    // 3. Fetch attempt details including enabled competencies
+    const attemptDetail = await siswaDB.getAttemptDetailForReport(attemptId);
 
+    const activeCompetencies = attemptDetail?.jadwalUjian?.ujian?.templateKompetensi || [];
+
+    // Calculate competency scores (using criteria count for total to handle 0 answers properly)
+    const competencyScores = activeCompetencies.map((tk) => {
+      const answersForComp = rawAnswers.filter((ans) => ans.soalAsli?.kompetensiBabId === tk.kompetensiBabId);
+      const correct = answersForComp.filter((ans) => ans.isCorrect).length;
+      return {
+        code: tk.kompetensiBab.nomerKompetensi,
+        name: tk.kompetensiBab.isiKompetensi,
+        correct: correct,
+        total: tk.jumlahSoal,
+      };
+    });
+
+    let correctCount = 0;
     const questions = rawAnswers.map((ans) => {
       if (ans.isCorrect) correctCount++;
-
-      // Safely update taxonomy stats
-      const taxLevel = ans.bloomLevel as string;
-      if (taxLevel && taxonomyMap[taxLevel]) {
-        taxonomyMap[taxLevel].total++;
-        if (ans.isCorrect) taxonomyMap[taxLevel].correct++;
-      }
 
       return {
         id: ans.id.toString(),
@@ -46,16 +43,6 @@ export const reportRepository = {
         isCorrect: ans.isCorrect || false,
       };
     });
-
-    // Filter out taxonomy levels that weren't tested to keep the UI clean
-    const taxonomyScores = Object.entries(taxonomyMap)
-      .filter(([_, stats]) => stats.total > 0)
-      .map(([level, stats]) => ({
-        level: level as "C1" | "C2" | "C3" | "C4", // Typecast for UI props
-        name: stats.name,
-        correct: stats.correct,
-        total: stats.total,
-      }));
 
     // Extract relations safely
     const attempt = rawAnswers[0].attempt;
@@ -76,7 +63,7 @@ export const reportRepository = {
       overviewText: aiFeedback.overviewText ?? "",
       weaknessText: aiFeedback.weaknessText ?? "",
       recommendationText: aiFeedback.recommendationText ?? "",
-      taxonomyScores: taxonomyScores,
+      competencyScores: competencyScores,
       questions: questions,
       status: aiFeedback.status,
     };

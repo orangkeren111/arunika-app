@@ -2,8 +2,26 @@
 
 import { GoogleGenAI, Content, File as GeminiFile } from "@google/genai";
 import prisma from "../db/prisma";
+import fs from "fs/promises";
+import { fetch as undiciFetch } from "undici";
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+let aiInstance: GoogleGenAI | null = null;
+function getAiClient() {
+  if (!aiInstance) {
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error("GEMINI_API_KEY is not defined in environment variables");
+    }
+    // Ensure undici fetch is used in Node environments
+    if (typeof globalThis.fetch !== 'function') {
+      // @ts-ignore
+      globalThis.fetch = undiciFetch;
+    }
+    aiInstance = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY
+    });
+  }
+  return aiInstance;
+}
 
 // Poll until the uploaded file is ACTIVE (or FAILED / timeout)
 async function waitForFileActive(
@@ -11,6 +29,7 @@ async function waitForFileActive(
   { timeoutMs = 60_000, intervalMs = 1500 } = {},
 ): Promise<GeminiFile> {
   const start = Date.now();
+  const ai = getAiClient();
   let file = await ai.files.get({ name });
 
   while (file.state === "PROCESSING") {
@@ -33,16 +52,24 @@ export async function processPdfWithGemini(
   tempFilePath: string,
 ) {
   let uploadedName: string | undefined;
+  const ai = getAiClient();
 
   try {
     // 1. Update job status
     const job = await prisma.generationJob.update({
       where: { id: jobId },
       data: { status: "PROCESSING_PDF" },
-      select: { bukuId: true },
+      select: {
+        bukuId: true,
+        buku: { select: { judul: true } }
+      },
     });
+    const bookTitle = job.buku.judul;
+
+    console.log("[Gemini] API Key mask:", process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.slice(0, 6)}...${process.env.GEMINI_API_KEY.slice(-4)}` : "MISSING");
 
     // 2. Upload to Gemini File API
+    console.log("[Gemini] Uploading file to Gemini File API:", tempFilePath);
     const uploadedFile = await ai.files.upload({
       file: tempFilePath,
       config: { mimeType: "application/pdf" },
@@ -52,13 +79,16 @@ export async function processPdfWithGemini(
     if (!uploadedName) {
       throw new Error("Upload succeeded but returned no file name");
     }
+    console.log("[Gemini] File uploaded, waiting for active. Name:", uploadedName);
 
     // 2b. Wait until Gemini has finished processing the file
     const activeFile = await waitForFileActive(uploadedName);
+    console.log("[Gemini] File is active. URI:", activeFile.uri);
 
-    // 3. Extract Chapters and Goals via Gemini
+    // 3. Extract Chapters, Goals and Competencies via Gemini
+    console.log("[Gemini] Requesting content generation using gemini-3.6-flash...");
     const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite",
+      model: "gemini-3.6-flash",
       contents: [
         {
           role: "user",
@@ -70,7 +100,14 @@ export async function processPdfWithGemini(
               },
             },
             {
-              text: "Read this document. Return a JSON array of objects. Each object must have a 'chapterTitle' and an array of 'learningGoals' summarizing the key points.",
+              text: `Read this document. Return a JSON array of objects. Each object represents a chapter (bab) and must have:
+- 'chapterTitle': the title of the chapter/bab
+- 'startPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
+- 'endPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
+- 'learningGoals': an array of strings summarizing the key learning objectives/goals
+- 'kompetensi': an array of objects representing the competencies of this chapter. Each competency object must have:
+  - 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
+  - 'isiKompetensi': description of the competency`,
             },
           ],
         },
@@ -78,27 +115,72 @@ export async function processPdfWithGemini(
       config: { responseMimeType: "application/json" },
     });
 
+    console.log("[Gemini] Content generated successfully. Length:", response.text?.length);
     const extractedData = JSON.parse(response.text ?? "[]");
 
-    const savedObjectives = await Promise.all(
-      extractedData.map((chapter: any) =>
-        prisma.bab.create({
-          data: {
+    const savedObjectives = [];
+    for (const chapter of extractedData) {
+      const startPg = typeof chapter.startPage === "number" ? chapter.startPage : null;
+      const endPg = typeof chapter.endPage === "number" ? chapter.endPage : null;
+
+      const bab = await prisma.bab.create({
+        data: {
+          bukuId: job.bukuId,
+          judulBab: chapter.chapterTitle,
+          startPage: startPg,
+          endPage: endPg,
+          learningGoals: JSON.stringify(chapter.learningGoals || []),
+        },
+      });
+
+      // Automatically link extracted book images to this chapter if page numbers match
+      if (startPg !== null && endPg !== null) {
+        await prisma.bukuImage.updateMany({
+          where: {
             bukuId: job.bukuId,
-            judulBab: chapter.chapterTitle,
-            learningGoals: JSON.stringify(chapter.learningGoals),
+            pageNumber: { gte: startPg, lte: endPg },
           },
-        }),
-      ),
-    );
+          data: { babId: bab.id },
+        });
+      }
+
+      if (chapter.kompetensi && Array.isArray(chapter.kompetensi)) {
+        for (const komp of chapter.kompetensi) {
+          const kp = await prisma.kompetensiPelajaran.create({
+            data: {
+              nomerKompetensi: String(komp.nomerKompetensi || ""),
+              isiKompetensi: String(komp.isiKompetensi || ""),
+              namaBab: chapter.chapterTitle,
+              namaBuku: bookTitle,
+            },
+          });
+
+          await prisma.kompetensiBab.create({
+            data: {
+              babId: bab.id,
+              nomerKompetensi: String(komp.nomerKompetensi || ""),
+              isiKompetensi: String(komp.isiKompetensi || ""),
+              kompetensiPelajaranId: kp.id,
+            },
+          });
+        }
+      }
+      savedObjectives.push(bab);
+    }
 
     const totalTokens = response.usageMetadata?.totalTokenCount ?? 0;
 
     return { objectives: savedObjectives, tokens: totalTokens };
-  } catch (error) {
+  } catch (error: any) {
+    console.error("[Gemini Error] processPdfWithGemini failed!");
+    console.error("[Gemini Error] Message:", error.message || error);
+    if (error.status) console.error("[Gemini Error] Status:", error.status);
+    if (error.stack) console.error("[Gemini Error] Stack:", error.stack);
+    if (error.error) console.error("[Gemini Error] Inner Error Object:", JSON.stringify(error.error, null, 2));
+
     await prisma.generationJob.update({
       where: { id: jobId },
-      data: { status: "FAILED" },
+      data: { status: "FAILED", errorMessage: error.message || String(error) },
     });
     throw error;
   } finally {

@@ -14,7 +14,7 @@ export default function ExamBuilderPage({
 
   const {
     template,
-    setTemplate, // Make sure to destructure this from the updated viewmodel
+    setTemplate,
     babList,
     bukuList,
     selectedBuku,
@@ -24,8 +24,12 @@ export default function ExamBuilderPage({
     selectedQuestions,
     handleRemoveQuestion,
     handleSaveTemplate,
+    templateKompetensi,
+    setTemplateKompetensi,
+    availableSoalCounts,
   } = useFormUjianViewModel(resolvedParams.id);
 
+  const derivedTotalQuestions = templateKompetensi.reduce((sum, tk) => sum + (tk.isEnabled ? tk.jumlahSoal : 0), 0);
   return (
     <div className="flex flex-col gap-6">
       <div>
@@ -39,7 +43,7 @@ export default function ExamBuilderPage({
 
       {/* --- FORM PENGATURAN UJIAN --- */}
       <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
               Judul Ujian
@@ -79,21 +83,49 @@ export default function ExamBuilderPage({
 
           <div>
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              Jumlah Soal Target
+              Tipe Ujian (Metode)
+            </label>
+            <div className="flex items-center gap-2 p-1 border border-[var(--border)] rounded-lg bg-[var(--background)]">
+              <button
+                type="button"
+                onClick={() => setTemplate((prev) => prev ? { ...prev, isAdaptive: true } : undefined)}
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition ${
+                  template?.isAdaptive !== false
+                    ? "bg-[var(--primary)] text-white shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Adaptif (DDA)
+              </button>
+              <button
+                type="button"
+                onClick={() => setTemplate((prev) => prev ? { ...prev, isAdaptive: false } : undefined)}
+                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition ${
+                  template?.isAdaptive === false
+                    ? "bg-[var(--secondary)] text-white shadow-sm"
+                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+              >
+                Non-Adaptif (Acak)
+              </button>
+            </div>
+            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
+              {template?.isAdaptive !== false
+                ? "Adaptif: Membutuhkan N + 5 soal cadangan per kompetensi."
+                : "Non-Adaptif: Memilih N soal secara acak."}
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
+              Jumlah Soal Target (Otomatis)
             </label>
             <input
               type="number"
-              min="1"
-              value={template?.questionCount || ""}
-              onChange={(e) =>
-                setTemplate((prev) =>
-                  prev
-                    ? { ...prev, questionCount: Number(e.target.value) }
-                    : undefined,
-                )
-              }
-              placeholder="Contoh: 40"
-              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
+              readOnly
+              value={derivedTotalQuestions}
+              placeholder="0"
+              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--muted)] text-[var(--foreground)] outline-none cursor-not-allowed"
             />
             <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
               Soal terpilih saat ini: {selectedQuestions?.length || 0}
@@ -101,76 +133,96 @@ export default function ExamBuilderPage({
           </div>
         </div>
 
-        <div className="border-t border-[var(--border)] pt-4">
-          <h3 className="text-sm font-bold text-[var(--foreground)] mb-3">
-            Kriteria Jumlah Soal Kognitif (DDA) - Harus Lebih dari 10 Soal per Level
+        <div className="border-t border-[var(--border)] pt-4 space-y-3">
+          <h3 className="text-sm font-bold text-[var(--foreground)]">
+            Kriteria Jumlah Soal per Kompetensi Bab
           </h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                Kriteria C1 (Mengingat)
-              </label>
-              <input
-                type="number"
-                min="11"
-                value={template?.reqC1 || ""}
-                onChange={(e) =>
-                  setTemplate((prev) =>
-                    prev ? { ...prev, reqC1: Number(e.target.value) } : undefined,
-                  )
-                }
-                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
+          {templateKompetensi.length === 0 ? (
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Pilih bab terlebih dahulu untuk memuat kompetensi yang dapat diatur.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--border)] text-xs uppercase text-[var(--muted-foreground)]">
+                    <th className="pb-2 font-semibold w-12">Aktif</th>
+                    <th className="pb-2 font-semibold">Kode</th>
+                    <th className="pb-2 font-semibold">Isi Kompetensi</th>
+                    <th className="pb-2 font-semibold w-32">Jumlah Soal</th>
+                    <th className="pb-2 font-semibold w-32">Total Poin (Essay)</th>
+                    <th className="pb-2 font-semibold w-24">Tersedia</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--border)]">
+                  {templateKompetensi.map((tk, idx) => {
+                    const available = availableSoalCounts.find((x) => x.kompetensiBabId === tk.kompetensiBabId)?.count ?? 0;
+                    const isAdaptiveMode = template?.isAdaptive !== false;
+                    const required = isAdaptiveMode ? tk.jumlahSoal + 5 : tk.jumlahSoal;
+                    const isSufficient = available >= required;
+
+                    return (
+                      <tr key={tk.kompetensiBabId} className="hover:bg-[var(--muted)]/20">
+                        <td className="py-2.5">
+                          <input
+                            type="checkbox"
+                            checked={tk.isEnabled}
+                            onChange={(e) => {
+                              const newArr = [...templateKompetensi];
+                              newArr[idx].isEnabled = e.target.checked;
+                              setTemplateKompetensi(newArr);
+                            }}
+                            className="w-4 h-4 cursor-pointer"
+                          />
+                        </td>
+                        <td className="py-2.5 font-mono font-bold text-[var(--primary)]">{tk.nomerKompetensi}</td>
+                        <td className="py-2.5 text-[var(--muted-foreground)] truncate max-w-xs">{tk.isiKompetensi}</td>
+                        <td className="py-2.5">
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={!tk.isEnabled}
+                            value={tk.jumlahSoal}
+                            onChange={(e) => {
+                              const newArr = [...templateKompetensi];
+                              newArr[idx].jumlahSoal = Number(e.target.value);
+                              setTemplateKompetensi(newArr);
+                            }}
+                            className="w-20 p-1.5 text-xs border border-[var(--border)] rounded bg-[var(--background)] disabled:opacity-50"
+                          />
+                        </td>
+                        <td className="py-2.5">
+                          <input
+                            type="number"
+                            min="0"
+                            disabled={!tk.isEnabled}
+                            value={tk.totalPoint}
+                            onChange={(e) => {
+                              const newArr = [...templateKompetensi];
+                              newArr[idx].totalPoint = Number(e.target.value);
+                              setTemplateKompetensi(newArr);
+                            }}
+                            className="w-20 p-1.5 text-xs border border-[var(--border)] rounded bg-[var(--background)] disabled:opacity-50"
+                          />
+                        </td>
+                        <td className="py-2.5">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
+                            !tk.isEnabled
+                              ? "bg-[var(--muted)] text-[var(--muted-foreground)]"
+                              : isSufficient
+                              ? "bg-green-500/10 text-green-600"
+                              : "bg-red-500/10 text-red-500"
+                          }`}>
+                            {available} / {required} {isAdaptiveMode ? "(N+5)" : "(N)"}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                Kriteria C2 (Memahami)
-              </label>
-              <input
-                type="number"
-                min="11"
-                value={template?.reqC2 || ""}
-                onChange={(e) =>
-                  setTemplate((prev) =>
-                    prev ? { ...prev, reqC2: Number(e.target.value) } : undefined,
-                  )
-                }
-                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                Kriteria C3 (Menerapkan)
-              </label>
-              <input
-                type="number"
-                min="11"
-                value={template?.reqC3 || ""}
-                onChange={(e) =>
-                  setTemplate((prev) =>
-                    prev ? { ...prev, reqC3: Number(e.target.value) } : undefined,
-                  )
-                }
-                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-[var(--muted-foreground)] mb-1">
-                Kriteria C4 (Menganalisis)
-              </label>
-              <input
-                type="number"
-                min="11"
-                value={template?.reqC4 || ""}
-                onChange={(e) =>
-                  setTemplate((prev) =>
-                    prev ? { ...prev, reqC4: Number(e.target.value) } : undefined,
-                  )
-                }
-                className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
-              />
-            </div>
-          </div>
+          )}
         </div>
       </div>
       {/* --- END FORM PENGATURAN UJIAN --- */}
@@ -215,11 +267,10 @@ export default function ExamBuilderPage({
                   <div
                     key={bab.id}
                     onClick={() => handleToggleBab(bab.id)}
-                    className={`p-4 border rounded-lg cursor-pointer flex items-center gap-3 transition-all duration-200 ${
-                      isSelected
-                        ? "bg-[var(--primary)]/10 border-[var(--primary)]"
-                        : "bg-[var(--background)] border-[var(--border)] hover:border-[var(--primary)]/50"
-                    }`}
+                    className={`p-4 border rounded-lg cursor-pointer flex items-center gap-3 transition-all duration-200 ${isSelected
+                      ? "bg-[var(--primary)]/10 border-[var(--primary)]"
+                      : "bg-[var(--background)] border-[var(--border)] hover:border-[var(--primary)]/50"
+                      }`}
                   >
                     <div
                       className={
@@ -235,11 +286,10 @@ export default function ExamBuilderPage({
                       )}
                     </div>
                     <span
-                      className={`font-medium ${
-                        isSelected
-                          ? "text-[var(--primary)]"
-                          : "text-[var(--foreground)]"
-                      }`}
+                      className={`font-medium ${isSelected
+                        ? "text-[var(--primary)]"
+                        : "text-[var(--foreground)]"
+                        }`}
                     >
                       {bab.title}
                     </span>
@@ -257,15 +307,14 @@ export default function ExamBuilderPage({
               Soal Terpilih untuk Ujian
             </h3>
             <span
-              className={`text-xs font-bold px-2 py-1 rounded-full ${
-                template?.questionCount &&
+              className={`text-xs font-bold px-2 py-1 rounded-full ${template?.questionCount &&
                 selectedQuestions?.length > template.questionCount
-                  ? "bg-red-500 text-white" // Warn if selected questions exceed the target
-                  : "bg-[var(--primary)] text-[var(--primary-foreground)]"
-              }`}
+                ? "bg-red-500 text-white" // Warn if selected questions exceed the target
+                : "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                }`}
             >
               {selectedQuestions?.length || 0} /{" "}
-              {template?.questionCount || "?"} Soal
+              {derivedTotalQuestions || "?"} Soal
             </span>
           </div>
           <div className="p-4 overflow-y-auto flex-1 space-y-3">
@@ -297,7 +346,7 @@ export default function ExamBuilderPage({
                 selectedQuestions?.length === 0 ||
                 !template?.title ||
                 !template?.durasiMenit ||
-                !template?.questionCount
+                !derivedTotalQuestions
               }
               className="w-full bg-[var(--primary)] text-[var(--primary-foreground)] py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
             >

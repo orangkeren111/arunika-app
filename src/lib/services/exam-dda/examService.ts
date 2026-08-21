@@ -1,13 +1,10 @@
 "use server";
 
-// lib/examService.ts
 import prisma from "../db/prisma";
 import * as siswaDB from "../db/siswa/siswaDB";
 import { DDAHelper } from "./ddaHelper";
-import { TipeSoal } from "@prisma/client"; /**
- * Called when the student first clicks "Start Exam".
- * Resumes an existing session if they disconnected, or creates a new one.
- */
+import { TipeSoal } from "@prisma/client";
+
 export async function startExamSession(jadwalId: string, siswaId: number) {
   const jId = parseInt(jadwalId);
 
@@ -23,22 +20,42 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
   }
 
   // 3. Figure out the next question
-  const examData = await siswaDB.getQuestionsForExam(jId);
+  const examData = await prisma.jadwalUjian.findUnique({
+    where: { id: jId },
+    include: {
+      ujian: {
+        include: {
+          ujianBab: {
+            include: {
+              bab: {
+                include: {
+                  soal: {
+                    where: { isAccepted: true, isRejected: false },
+                  },
+                },
+              },
+            },
+          },
+          templateKompetensi: {
+            include: { kompetensiBab: true },
+          },
+        },
+      },
+    },
+  });
+
   if (!examData?.ujian) throw new Error("Exam data not found");
 
-  const allQuestions = examData.ujian.ujianBab.flatMap(
-    (ub: any) => ub.bab.soal,
-  );
-
+  const allQuestions = examData.ujian.ujianBab.flatMap((ub: any) => ub.bab.soal);
   const answeredIds = session.jawabanSiswa.map((j) => j.soalAsliId);
 
-  // 4. Find the best next question using ELO and Phase
+  // 4. Find the best next question using ELO and Competency mapping
   const nextQuestion = await _findNextQuestion(
     allQuestions,
     answeredIds,
     session.currentElo,
-    session.jawabanSiswa.length,
-    examData.ujian.criteria || undefined,
+    examData.ujian.templateKompetensi,
+    examData.ujian.isAdaptive !== false
   );
 
   return {
@@ -50,10 +67,6 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
   };
 }
 
-/**
- * Replaces your old batch submit.
- * Called every time the user clicks "Next" or submits a single answer.
- */
 export async function submitSingleAnswer(
   sesiId: number,
   jadwalId: string,
@@ -71,7 +84,9 @@ export async function submitSingleAnswer(
         include: {
           ujian: {
             include: {
-              criteria: true,
+              templateKompetensi: {
+                include: { kompetensiBab: true },
+              },
             },
           },
         },
@@ -81,40 +96,39 @@ export async function submitSingleAnswer(
   if (!session) throw new Error("Session not found");
 
   // 2. Find the original question to grade it
-  const examData = await siswaDB.getQuestionsForExam(jId);
-  const allQuestions =
-    examData?.ujian.ujianBab.flatMap((ub: any) => ub.bab.soal) || [];
-  const soal = allQuestions.find((q) => q.id === soalId);
-  if (!soal) throw new Error("Question not found");
+  const originalQuestion = await prisma.bankSoal.findUnique({
+    where: { id: soalId },
+  });
+  if (!originalQuestion) throw new Error("Question not found");
 
-  // 3. Auto-grade
+  // 3. Auto-grade for MCQ, manual for Essay
   const isCorrect =
-    soal.type === TipeSoal.MCQ
-      ? jawabanSiswaText === soal.jawabanBenarMcq
+    originalQuestion.type === TipeSoal.MCQ
+      ? jawabanSiswaText === originalQuestion.jawabanBenarMcq
       : null;
 
-  // 4. Calculate new ELO
+  // 4. Calculate new ELO (only for MCQs)
   const eloBefore = session.currentElo;
   const eloAfter =
     isCorrect !== null
-      ? DDAHelper.calculateNewElo(eloBefore, soal.difficulty, isCorrect)
-      : eloBefore; // Don't change ELO for manual grading questions yet
+      ? DDAHelper.calculateNewElo(eloBefore, originalQuestion.difficulty, isCorrect)
+      : eloBefore;
 
   // 5. Snapshot the answer to DB
   const attemptNumber = session.jawabanSiswa.length + 1;
   await siswaDB.saveSingleAnswer({
     attemptId: sesiId,
-    soalAsliId: soal.id,
+    soalAsliId: originalQuestion.id,
     nomor: attemptNumber,
-    teksSoal: soal.teksSoal,
-    opsiJawaban: Array.isArray(soal.opsiJawaban) ? soal.opsiJawaban : [],
-    jawabanBenarMcq: soal.jawabanBenarMcq ?? "",
-    type: soal.type,
-    difficulty: soal.difficulty,
-    bloomLevel: soal.bloomLevel ?? "C1",
+    teksSoal: originalQuestion.teksSoal,
+    opsiJawaban: Array.isArray(originalQuestion.opsiJawaban) ? originalQuestion.opsiJawaban : [],
+    jawabanBenarMcq: originalQuestion.jawabanBenarMcq ?? "",
+    type: originalQuestion.type,
+    difficulty: originalQuestion.difficulty,
+    bloomLevel: originalQuestion.bloomLevel ?? "C1",
     jawabanSiswa: jawabanSiswaText,
     isCorrect: isCorrect,
-    nilaiPoin: soal.type === TipeSoal.MCQ ? (isCorrect ? 100 : 0) : null,
+    nilaiPoin: originalQuestion.type === TipeSoal.MCQ ? (isCorrect ? 100 : 0) : null,
     answeredAt: new Date(),
     eloBefore: eloBefore,
     eloAfter: eloAfter,
@@ -123,8 +137,10 @@ export async function submitSingleAnswer(
   // 6. Update Session ELO
   await siswaDB.updateSessionElo(sesiId, eloAfter);
 
-  // 7. Check if exam is over based on the exam template config
-  const totalQuestionsLimit = session.jadwalUjian?.ujian?.jumlahSoal ?? 40;
+  // 7. Check if exam is over based on the enabled competencies
+  const enabledCompetencies = session.jadwalUjian?.ujian?.templateKompetensi?.filter((tk) => tk.isEnabled) || [];
+  const totalQuestionsLimit = enabledCompetencies.reduce((sum, tk) => sum + tk.jumlahSoal, 0);
+
   const newAnsweredCount = attemptNumber;
   if (newAnsweredCount >= totalQuestionsLimit) {
     await finishExamSession(sesiId);
@@ -132,16 +148,40 @@ export async function submitSingleAnswer(
   }
 
   // 8. Prepare next question
+  // Re-fetch all available questions for this exam
+  const examData = await prisma.jadwalUjian.findUnique({
+    where: { id: jId },
+    include: {
+      ujian: {
+        include: {
+          ujianBab: {
+            include: {
+              bab: {
+                include: {
+                  soal: {
+                    where: { isAccepted: true, isRejected: false },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  const allQuestions = examData?.ujian.ujianBab.flatMap((ub: any) => ub.bab.soal) || [];
   const answeredIds = [
     ...session.jawabanSiswa.map((j) => j.soalAsliId),
     soalId,
   ];
+
   const nextQuestion = await _findNextQuestion(
     allQuestions,
     answeredIds,
     eloAfter,
-    newAnsweredCount,
-    session.jadwalUjian?.ujian?.criteria || undefined,
+    session.jadwalUjian?.ujian?.templateKompetensi || [],
+    session.jadwalUjian?.ujian?.isAdaptive !== false
   );
 
   return {
@@ -151,9 +191,6 @@ export async function submitSingleAnswer(
   };
 }
 
-/**
- * Finalizes the exam session.
- */
 export async function finishExamSession(sesiId: number) {
   const session = await prisma.sesiUjianSiswa.findUnique({
     where: { id: sesiId },
@@ -162,7 +199,6 @@ export async function finishExamSession(sesiId: number) {
 
   if (!session) return;
 
-  // Optional: Calculate a final grade based on average points or final ELO
   let totalPoin = 0;
   session.jawabanSiswa.forEach((j) => {
     if (j.nilaiPoin) totalPoin += j.nilaiPoin;
@@ -175,16 +211,12 @@ export async function finishExamSession(sesiId: number) {
   await siswaDB.finishSession(sesiId, avgScore);
 }
 
-/**
- * INTERNAL: The selection algorithm.
- * Finds the question closest to the student's target ELO for the current Bloom's phase.
- */
 async function _findNextQuestion(
   allQuestions: any[],
   answeredIds: (number | null)[],
   currentElo: number,
-  questionsAnswered: number,
-  criteria?: any,
+  templateKompetensi: any[],
+  isAdaptive: boolean = true
 ) {
   // 1. Filter out questions already answered
   const availableQuestions = allQuestions.filter(
@@ -192,34 +224,75 @@ async function _findNextQuestion(
   );
   if (availableQuestions.length === 0) return null;
 
-  // 2. Determine target Bloom's Level (C1, C2, etc.)
-  const targetBloom = DDAHelper.determineTargetBloomLevel(questionsAnswered, criteria);
+  // 2. Fetch already answered questions details to count by competency
+  const answeredQuestions = await prisma.bankSoal.findMany({
+    where: { id: { in: answeredIds.filter((id): id is number => id !== null) } },
+  });
 
-  // 3. Filter by Bloom's Level
-  let bloomFiltered = availableQuestions.filter(
-    (q) => (q.bloomLevel || "C1") === targetBloom,
-  );
+  // 3. Find the first enabled competency that hasn't met its limit
+  const activeCompetencies = templateKompetensi.filter((tk) => tk.isEnabled);
+  let targetCompetency = null;
 
-  // Fallback if no questions of that Bloom level exist
-  if (bloomFiltered.length === 0) {
-    bloomFiltered = availableQuestions;
-  }
-
-  // 4. Find the question with difficulty (Bobot) closest to the student's ELO
-  let bestQuestion = bloomFiltered[0];
-  let smallestEloDifference = Infinity;
-
-  for (const q of bloomFiltered) {
-    const qElo = DDAHelper.mapDifficultyToElo(q.difficulty);
-    const diff = Math.abs(qElo - currentElo);
-
-    if (diff < smallestEloDifference) {
-      smallestEloDifference = diff;
-      bestQuestion = q;
+  for (const tk of activeCompetencies) {
+    const answeredCount = answeredQuestions.filter((q) => q.kompetensiBabId === tk.kompetensiBabId).length;
+    if (answeredCount < tk.jumlahSoal) {
+      targetCompetency = tk;
+      break;
     }
   }
 
-  // Return the sanitized question object (similar to your old getNextQuestion)
+  if (!targetCompetency) return null; // All competency target limits met!
+
+  // 4. Filter available questions to only those matching target competency
+  const competencyQuestions = availableQuestions.filter(
+    (q) => q.kompetensiBabId === targetCompetency.kompetensiBabId
+  );
+
+  if (competencyQuestions.length === 0) {
+    // Fallback: If no questions for this competency, search generally
+    return null;
+  }
+
+  // 5. Check if we have Essay questions. Essay questions must be statically served (same for all students)
+  const essayQuestions = competencyQuestions.filter((q) => q.type === TipeSoal.ESSAY);
+  if (essayQuestions.length > 0) {
+    // Sort statically by ID so every student gets exactly the same essay questions in the same order
+    essayQuestions.sort((a, b) => a.id - b.id);
+    const bestQuestion = essayQuestions[0];
+    return {
+      id: bestQuestion.id.toString(),
+      babId: bestQuestion.babId?.toString(),
+      type: bestQuestion.type,
+      text: bestQuestion.teksSoal,
+      options: bestQuestion.opsiJawaban,
+      difficulty: bestQuestion.difficulty,
+      bloomLevel: bestQuestion.bloomLevel,
+    };
+  }
+
+  // 6. Serve MCQ: Adaptively using ELO closest match (if isAdaptive = true), or Randomized (if isAdaptive = false)
+  const mcqQuestions = competencyQuestions.filter((q) => q.type === TipeSoal.MCQ);
+  if (mcqQuestions.length === 0) return null;
+
+  let bestQuestion = mcqQuestions[0];
+
+  if (isAdaptive) {
+    let smallestEloDifference = Infinity;
+    for (const q of mcqQuestions) {
+      const qElo = DDAHelper.mapDifficultyToElo(q.difficulty);
+      const diff = Math.abs(qElo - currentElo);
+
+      if (diff < smallestEloDifference) {
+        smallestEloDifference = diff;
+        bestQuestion = q;
+      }
+    }
+  } else {
+    // Non-adaptive mode: pick a random question from available MCQ candidates
+    const randomIndex = Math.floor(Math.random() * mcqQuestions.length);
+    bestQuestion = mcqQuestions[randomIndex];
+  }
+
   return {
     id: bestQuestion.id.toString(),
     babId: bestQuestion.babId?.toString(),

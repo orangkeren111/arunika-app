@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
+import ThemeToggle from "@/src/components/ThemeToggle";
+
 export default function GuruLayout({
   children,
 }: {
@@ -128,6 +130,7 @@ export default function GuruLayout({
           </div>
 
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">

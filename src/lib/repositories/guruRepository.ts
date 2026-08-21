@@ -2,9 +2,20 @@ import { StatusUjian, TipeSoal } from "@prisma/client";
 import * as guruDB from "../services/db/guru/guruDB";
 import { initiatePdfExtraction } from "../services/process-book/initiate-extractor";
 import { Bab, Kelas, Soal, UjianTemplate } from "@/src/app/types/guru";
-import { generateQuestionsWithGroq } from "../services/process-book/generate-questions";
+import { generateQuestionsWithGroq, enqueueGenerateQuestions } from "../services/process-book/generate-questions";
 
 export const guruRepository = {
+  uploadImage: async (file: File): Promise<string> => {
+    const formData = new FormData();
+    formData.append("file", file);
+    const res = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+    });
+    if (!res.ok) throw new Error("Gagal mengunggah gambar");
+    const data = await res.json();
+    return data.url;
+  },
   // --- DASHBOARD ---
   getDashboardStats: async (guruId: number = 2) => {
     try {
@@ -132,6 +143,10 @@ export const guruRepository = {
           jawabanBenarMcq: s.jawabanBenarMcq,
           difficulty: s.difficulty,
           bloomLevel: s.bloomLevel,
+          kompetensiBabId: s.kompetensiBabId?.toString() || null,
+          linkGambarSoal: s.linkGambarSoal || "",
+          isAccepted: s.isAccepted,
+          isRejected: s.isRejected,
         })) ?? [],
     };
   },
@@ -146,6 +161,10 @@ export const guruRepository = {
       jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq || null,
       difficulty: soal.difficulty || null,
       bloomLevel: soal.bloomLevel || null,
+      kompetensiBabId: soal.kompetensiBabId ? Number(soal.kompetensiBabId) : null,
+      linkGambarSoal: soal.linkGambarSoal || null,
+      isAccepted: soal.isAccepted !== undefined ? soal.isAccepted : true,
+      isRejected: soal.isRejected !== undefined ? soal.isRejected : false,
     });
 
     return {
@@ -159,20 +178,22 @@ export const guruRepository = {
   },
 
   editSoal: async (idSoal: string, soal: any) => {
-    const type = soal.type === "MCQ" ? TipeSoal.MCQ : TipeSoal.ESSAY;
+    const babIdNum = soal.babId ? parseInt(soal.babId) : 0;
 
     const updatedSoal = await guruDB.updateSoal(parseInt(idSoal), {
-      bab: {
-        connect: {
-          id: parseInt(soal.babId ?? 0),
-        },
-      },
-      teksSoal: soal.text || soal.teksSoal,
-      type,
-      opsiJawaban: soal.options || soal.opsiJawaban,
-      jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq,
+      ...(babIdNum > 0 ? { bab: { connect: { id: babIdNum } } } : {}),
+      teksSoal: soal.text || soal.teksSoal || undefined,
+      type: soal.type ? (soal.type === "MCQ" ? TipeSoal.MCQ : TipeSoal.ESSAY) : undefined,
+      opsiJawaban: soal.options !== undefined ? soal.options : (soal.opsiJawaban !== undefined ? soal.opsiJawaban : undefined),
+      jawabanBenarMcq: soal.correctAnswer !== undefined ? soal.correctAnswer : (soal.jawabanBenarMcq !== undefined ? soal.jawabanBenarMcq : undefined),
       difficulty: soal.difficulty !== undefined ? Number(soal.difficulty) : undefined,
       bloomLevel: soal.bloomLevel !== undefined ? soal.bloomLevel : undefined,
+      kompetensiBab: soal.kompetensiBabId !== undefined ? (
+        soal.kompetensiBabId ? { connect: { id: Number(soal.kompetensiBabId) } } : { disconnect: true }
+      ) : undefined,
+      linkGambarSoal: soal.linkGambarSoal !== undefined ? (soal.linkGambarSoal || null) : undefined,
+      isAccepted: soal.isAccepted !== undefined ? soal.isAccepted : undefined,
+      isRejected: soal.isRejected !== undefined ? soal.isRejected : undefined,
     });
 
     return {
@@ -205,7 +226,6 @@ export const guruRepository = {
   getTemplateById: async (templateId: number) => {
     const template = await guruDB.getUjianTemplateById(templateId);
 
-    // Handle case where template doesn't exist
     if (!template) {
       return null;
     }
@@ -215,11 +235,17 @@ export const guruRepository = {
       title: template.judulUjian,
       judulUjian: template.judulUjian,
       durasiMenit: template.durasiMenit,
+      isAdaptive: template.isAdaptive,
       isLocked: template.isLocked,
-      reqC1: template.criteria?.reqC1 ?? 10,
-      reqC2: template.criteria?.reqC2 ?? 10,
-      reqC3: template.criteria?.reqC3 ?? 10,
-      reqC4: template.criteria?.reqC4 ?? 10,
+      templateKompetensi: template.templateKompetensi?.map((tk: any) => ({
+        id: tk.id,
+        kompetensiBabId: tk.kompetensiBabId,
+        jumlahSoal: tk.jumlahSoal,
+        totalPoint: tk.totalPoint,
+        isEnabled: tk.isEnabled,
+        nomerKompetensi: tk.kompetensiBab?.nomerKompetensi,
+        isiKompetensi: tk.kompetensiBab?.isiKompetensi,
+      })) || [],
 
       questionCount: template.ujianBab.reduce(
         (count, ub) => count + ub.bab.soal.length,
@@ -244,31 +270,24 @@ export const guruRepository = {
   },
 
   createTemplate: async (
-    ujian: UjianTemplate,
+    ujian: any,
     guruId: number,
     babIds: number[],
   ) => {
-    // Langsung delegasikan semua proses (termasuk validasi) ke DB layer
     await guruDB.createTemplate(
       {
         judulUjian: ujian.title,
         jumlahSoal: ujian.questionCount,
         durasiMenit: ujian.durasiMenit,
+        isAdaptive: ujian.isAdaptive !== undefined ? ujian.isAdaptive : true,
         guru: {
           connect: {
             id: guruId,
           },
         },
-        criteria: {
-          create: {
-            reqC1: ujian.reqC1 ?? 10,
-            reqC2: ujian.reqC2 ?? 10,
-            reqC3: ujian.reqC3 ?? 10,
-            reqC4: ujian.reqC4 ?? 10,
-          },
-        },
       },
       babIds,
+      ujian.templateKompetensi || []
     );
 
     return { success: true, message: "Soal ujian berhasil diperbarui." };
@@ -276,41 +295,25 @@ export const guruRepository = {
 
   updateTemplateQuestions: async (
     templateId: number,
-    ujian: UjianTemplate,
+    ujian: any,
     guruId: number,
-
     babIds: number[],
   ) => {
-    // Langsung delegasikan semua proses (termasuk validasi) ke DB layer
     await guruDB.upsertTemplateBabSafe(
       templateId,
       {
         judulUjian: ujian.title,
         jumlahSoal: ujian.questionCount,
         durasiMenit: ujian.durasiMenit,
+        isAdaptive: ujian.isAdaptive !== undefined ? ujian.isAdaptive : true,
         guru: {
           connect: {
             id: guruId,
           },
         },
-        criteria: {
-          upsert: {
-            create: {
-              reqC1: ujian.reqC1 ?? 10,
-              reqC2: ujian.reqC2 ?? 10,
-              reqC3: ujian.reqC3 ?? 10,
-              reqC4: ujian.reqC4 ?? 10,
-            },
-            update: {
-              reqC1: ujian.reqC1 ?? 10,
-              reqC2: ujian.reqC2 ?? 10,
-              reqC3: ujian.reqC3 ?? 10,
-              reqC4: ujian.reqC4 ?? 10,
-            },
-          },
-        },
       },
       babIds,
+      ujian.templateKompetensi || []
     );
 
     return { success: true, message: "Soal ujian berhasil diperbarui." };
@@ -320,7 +323,7 @@ export const guruRepository = {
     return await initiatePdfExtraction(formData);
   },
   retryGenerateSoal: async (babId: number) => {
-    return await generateQuestionsWithGroq(babId);
+    return await enqueueGenerateQuestions(babId);
   },
 
   getKelas: async (sekolah_id: number, guru_id: number): Promise<Kelas[]> => {
@@ -552,6 +555,7 @@ export const guruRepository = {
     return {
       id: data.id,
       name: data.namaKelas,
+      classCode: data.classCode,
       studentCount: data._count.members,
       teacherName: data.teacher.name,
       students: data.members
@@ -604,5 +608,47 @@ export const guruRepository = {
         score: s.nilaiAkhir,
       })),
     }));
+  },
+
+  getKompetensiBab: async (babId: number) => {
+    return await guruDB.getKompetensiBab(babId);
+  },
+
+  upsertKompetensiBab: async (payload: {
+    id?: number;
+    babId: number;
+    nomerKompetensi: string;
+    isiKompetensi: string;
+    kompetensiPelajaranId?: number;
+  }) => {
+    return await guruDB.upsertKompetensiBab(payload);
+  },
+
+  deleteKompetensiBab: async (id: number) => {
+    return await guruDB.deleteKompetensiBab(id);
+  },
+
+  getAvailablePelajaranBooks: async () => {
+    return await guruDB.getAvailablePelajaranBooks();
+  },
+
+  getAvailablePelajaranChapters: async (bookName: string) => {
+    return await guruDB.getAvailablePelajaranChapters(bookName);
+  },
+
+  getKompetensiPelajaran: async (bookName: string, chapterName: string) => {
+    return await guruDB.getKompetensiPelajaran(bookName, chapterName);
+  },
+
+  linkKompetensiPelajaranToBab: async (babId: number, competencyPelajaranIds: number[]) => {
+    return await guruDB.linkKompetensiPelajaranToBab(babId, competencyPelajaranIds);
+  },
+
+  getKompetensiForBabs: async (babIds: number[]) => {
+    return await guruDB.getKompetensiForBabs(babIds);
+  },
+
+  getAvailableSoalCounts: async (babIds: number[]) => {
+    return await guruDB.getAvailableSoalCounts(babIds);
   },
 };

@@ -141,4 +141,13 @@ export const adminRepository = {
       siswaId: siswaId,
     });
   },
+  getKompetensiPelajaranList: async () => {
+    return await adminDB.getKompetensiPelajaranList();
+  },
+  initiateKurikulumExtraction: async (formData: FormData) => {
+    return await adminDB.initiateKurikulumExtraction(formData);
+  },
+  retireKelas: async (id: number) => {
+    return await adminDB.retireKelas(id);
+  },
 };

@@ -52,6 +52,8 @@ export default function GuruKelasDetailPage({
 
   const [activeTab, setActiveTab] = useState<"exams" | "students" | "report">("exams");
   const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   if (loadingClass || !classDetail) {
     return (
@@ -71,25 +73,37 @@ export default function GuruKelasDetailPage({
         <ArrowLeft size={16} /> Kembali ke Daftar Kelas
       </Link>
 
-      {/* Header Info */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-[var(--border)] pb-6">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--foreground)] tracking-tight">
             {classDetail.name}
           </h1>
-          <p className="text-sm text-[var(--muted-foreground)] mt-1">
-            Wali Kelas: {classDetail.teacherName} | {classDetail.studentCount} Siswa
+          <p className="text-sm text-[var(--muted-foreground)] mt-1 flex flex-wrap items-center gap-2">
+            <span>Wali Kelas: {classDetail.teacherName}</span>
+            <span>•</span>
+            <span>{classDetail.studentCount} Siswa</span>
           </p>
         </div>
 
-        {activeTab === "exams" && (
-          <button
-            onClick={() => setShowScheduleModal(true)}
-            className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition"
-          >
-            <Plus size={18} /> Jadwalkan Ujian Baru
-          </button>
-        )}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {classDetail.classCode && (
+            <button
+              onClick={() => setShowQRModal(true)}
+              className="flex items-center gap-2 border border-[var(--border)] bg-[var(--card)] hover:bg-[var(--muted)]/50 text-[var(--foreground)] px-4 py-2.5 rounded-lg text-sm font-bold shadow transition-all cursor-pointer"
+            >
+              Bagikan Kelas (QR)
+            </button>
+          )}
+
+          {activeTab === "exams" && (
+            <button
+              onClick={() => setShowScheduleModal(true)}
+              className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition"
+            >
+              <Plus size={18} /> Jadwalkan Ujian Baru
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Tabs */}
@@ -435,6 +449,49 @@ export default function GuruKelasDetailPage({
               >
                 Tutup
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* QR Code Modal */}
+      {showQRModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-in fade-in">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-2xl max-w-sm w-full p-6 shadow-xl relative animate-in zoom-in-95 duration-150">
+            <button
+              onClick={() => setShowQRModal(false)}
+              className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            >
+              <X size={20} />
+            </button>
+            <div className="text-center space-y-4 pt-2">
+              <h3 className="text-lg font-bold text-[var(--foreground)]">Bagikan Kelas</h3>
+              <p className="text-sm text-[var(--muted-foreground)]">
+                Scan QR Code di bawah atau gunakan kode kelas untuk bergabung ke kelas <b>{classDetail.name}</b>.
+              </p>
+              
+              <div className="bg-white p-4 rounded-xl inline-block border border-[var(--border)] mx-auto">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
+                    `${origin}/siswa/join-kelas?code=${classDetail.classCode}`
+                  )}`}
+                  alt="QR Code Kelas"
+                  width={200}
+                  height={200}
+                  className="mx-auto"
+                />
+              </div>
+
+              <div className="bg-[var(--primary)]/5 p-3 rounded-lg border border-[var(--primary)]/10">
+                <span className="text-xs text-[var(--muted-foreground)] block">Kode Kelas</span>
+                <span className="text-2xl font-black tracking-widest text-[var(--primary)] block uppercase select-all">
+                  {classDetail.classCode}
+                </span>
+              </div>
+
+              <p className="text-[10px] text-[var(--muted-foreground)] break-all">
+                Link: {origin}/siswa/join-kelas?code={classDetail.classCode}
+              </p>
             </div>
           </div>
         </div>

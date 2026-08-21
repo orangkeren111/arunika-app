@@ -1,0 +1,538 @@
+"use client";
+
+import React, { use, useState } from "react";
+import Link from "next/link";
+import { ArrowLeft, Plus, X, Trash2 } from "lucide-react";
+import { useSoalViewModel } from "./GuruSoalViewModel";
+import { MathRenderer } from "@/src/components/MathRenderer";
+import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
+
+type TipeSoal = "MCQ" | "ESSAY";
+
+export default function BankSoalClientPage({
+  id,
+  babId,
+}: {
+  id: string;
+  babId: string;
+}) {
+  console.log("abcd");
+
+  const {
+    bab,
+    soalList,
+    kompetensiList,
+    handleAddSoal,
+    handleEditSoal,
+    handleDeleteSoal,
+    handleGenerateQuestion,
+    handleAcceptSoal,
+    handleRejectSoal,
+    handleUploadImage,
+  } = useSoalViewModel(babId);
+
+  // --- MODAL STATE ---
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<number | null>(null);
+
+  // --- FORM STATE ---
+  const [formType, setFormType] = useState<TipeSoal>("MCQ");
+  const [teksSoal, setTeksSoal] = useState("");
+  const [difficulty, setDifficulty] = useState(0);
+  const [bloomLevel, setBloomLevel] = useState("");
+  const [opsiJawaban, setOpsiJawaban] = useState<string[]>(["", "", "", ""]); // Default 4 opsi
+  const [jawabanBenarIndex, setJawabanBenarIndex] = useState<number>(0);
+  const [kompetensiBabId, setKompetensiBabId] = useState<string>("");
+  const [linkGambarSoal, setLinkGambarSoal] = useState<string>("");
+
+  // --- HANDLERS ---
+  const openModal = (type: TipeSoal, soalToEdit?: any) => {
+    if (soalToEdit) {
+      setEditingId(soalToEdit.id);
+      setFormType(soalToEdit.type as TipeSoal);
+      setTeksSoal(soalToEdit.text);
+      setDifficulty(soalToEdit.difficulty || 1);
+      setBloomLevel(soalToEdit.bloomLevel || "C1");
+      setKompetensiBabId(soalToEdit.kompetensiBabId || "");
+      setLinkGambarSoal(soalToEdit.linkGambarSoal || "");
+      if (soalToEdit.type === "MCQ") {
+        setOpsiJawaban(soalToEdit.options || ["", "", "", ""]);
+        const correctIdx = soalToEdit.options?.findIndex(
+          (opt: string) => opt === soalToEdit.correctAnswer,
+        );
+        setJawabanBenarIndex(correctIdx !== -1 ? correctIdx : 0);
+      }
+    } else {
+      // Reset form untuk Soal Baru
+      setEditingId(null);
+      setFormType(type);
+      setTeksSoal("");
+      setOpsiJawaban(["", "", "", ""]);
+      setJawabanBenarIndex(0);
+      setDifficulty(1);
+      setBloomLevel("C1");
+      setKompetensiBabId("");
+      setLinkGambarSoal("");
+    }
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => setIsModalOpen(false);
+
+  const handleAddOption = () => setOpsiJawaban([...opsiJawaban, ""]);
+
+  const handleRemoveOption = (index: number) => {
+    const newOptions = opsiJawaban.filter((_, i) => i !== index);
+    setOpsiJawaban(newOptions);
+    if (jawabanBenarIndex === index) setJawabanBenarIndex(0);
+    else if (jawabanBenarIndex > index)
+      setJawabanBenarIndex(jawabanBenarIndex - 1);
+  };
+
+  const handleOptionChange = (index: number, value: string) => {
+    const newOptions = [...opsiJawaban];
+    newOptions[index] = value;
+    setOpsiJawaban(newOptions);
+  };
+
+  const handleSave = () => {
+    const payload = {
+      teksSoal,
+      type: formType,
+      opsiJawaban: formType === "MCQ" ? opsiJawaban : null,
+      jawabanBenarMcq:
+        formType === "MCQ" ? opsiJawaban[jawabanBenarIndex] : null,
+      babId: Number(babId),
+      difficulty: difficulty ? difficulty : 1,
+      bloomLevel: bloomLevel ? bloomLevel : "C1",
+    };
+
+    if (editingId) {
+      handleEditSoal(editingId.toString(), {
+        id: editingId.toString(),
+        babId: bab?.id ?? "",
+        type: payload.type,
+        difficulty: payload.difficulty,
+        bloomLevel: payload.bloomLevel,
+        text: payload.teksSoal,
+        options: payload.opsiJawaban ?? [],
+        correctAnswer: payload.jawabanBenarMcq ?? "",
+        kompetensiBabId: kompetensiBabId || null,
+        linkGambarSoal: linkGambarSoal || "",
+      });
+    } else {
+      handleAddSoal(
+        payload.type,
+        payload.teksSoal,
+        payload.difficulty,
+        payload.bloomLevel,
+        payload.opsiJawaban ?? [],
+        payload.jawabanBenarMcq ?? "",
+        kompetensiBabId || null,
+        linkGambarSoal || "",
+      );
+    }
+
+    closeModal();
+  };
+
+  if (!bab)
+    return (
+      <p className="text-[var(--muted-foreground)] p-6">Memuat bank soal...</p>
+    );
+
+  return (
+    <div className="space-y-6 relative">
+      <Link
+        href={`/guru/buku/${id}`}
+        className="inline-flex items-center gap-2 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition mb-2"
+      >
+        <ArrowLeft size={16} /> Kembali ke Daftar Bab
+      </Link>
+
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">
+            {bab.title}
+          </h1>
+          <p className="text-[var(--muted-foreground)] mt-1">
+            Kelola Soal Pilihan Ganda dan Essay.
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link
+            href={`/guru/buku/${id}/bab/${babId}/kompetensi`}
+            className="bg-purple-600/10 text-purple-600 border border-purple-500/20 px-4 py-2 rounded-lg text-sm hover:bg-purple-600/20 transition flex items-center gap-2 font-medium"
+          >
+            Kelola Kompetensi
+          </Link>
+          <button
+            onClick={() => openModal("ESSAY")}
+            className="bg-[var(--secondary)] text-[var(--secondary-foreground)] px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2"
+          >
+            <Plus size={16} /> Essay
+          </button>
+          <button
+            onClick={() => openModal("MCQ")}
+            className="bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2"
+          >
+            <Plus size={16} /> Pilihan Ganda
+          </button>
+          <button
+            onClick={() => handleGenerateQuestion()}
+            className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2 font-medium"
+          >
+            <Plus size={16} /> Generate Soal
+          </button>
+        </div>
+      </div>
+
+      {/* --- LIST SOAL --- */}
+      <div className="space-y-4">
+        {soalList.map((soal, i) => (
+          <div
+            key={soal.id}
+            className={`bg-[var(--card)] p-5 rounded-xl border border-[var(--border)] shadow-sm transition
+              ${soal.isRejected ? "opacity-60 border-red-500/30 bg-red-500/5" : ""}`}
+          >
+            <div className="flex justify-between items-start mb-3">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className={`text-xs font-bold px-2 py-1 rounded ${soal.type === "MCQ" ? "bg-[var(--info)] text-white" : "bg-[var(--accent)] text-white"}`}
+                >
+                  {soal.type}
+                </span>
+                {soal.difficulty !== undefined && (
+                  <span className="text-xs bg-gray-100 text-gray-800 px-2 py-1 rounded font-semibold">
+                    Bobot: {soal.difficulty}
+                  </span>
+                )}
+                {soal.bloomLevel && (
+                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded font-semibold">
+                    Taksonomi: {soal.bloomLevel}
+                  </span>
+                )}
+                {soal.kompetensiBabId && (
+                  <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded font-semibold">
+                    Kompetensi: {
+                      kompetensiList.find(k => k.id.toString() === soal.kompetensiBabId)?.nomerKompetensi || soal.kompetensiBabId
+                    }
+                  </span>
+                )}
+              </div>
+              <div className="flex gap-2 items-center">
+                <button
+                  onClick={() => handleAcceptSoal(soal.id)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition ${soal.isAccepted ? "bg-green-600 text-white border-green-600" : "bg-transparent text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"}`}
+                >
+                  Setuju
+                </button>
+                <button
+                  onClick={() => handleRejectSoal(soal.id)}
+                  className={`text-xs px-2.5 py-1 rounded-lg border font-medium transition ${soal.isRejected ? "bg-red-600 text-white border-red-600" : "bg-transparent text-[var(--muted-foreground)] border-[var(--border)] hover:bg-[var(--muted)]"}`}
+                >
+                  Tolak
+                </button>
+
+                <span className="w-px h-4 bg-gray-300 mx-1" />
+
+                <button
+                  onClick={() => openModal(soal.type as TipeSoal, { ...soal, text: soal.text || (soal as any).teksSoal })}
+                  className="text-[var(--muted-foreground)] hover:text-[var(--primary)] text-sm font-medium"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Apakah Anda yakin ingin menghapus soal ini?",
+                      )
+                    ) {
+                      handleDeleteSoal(soal.id);
+                    }
+                  }}
+                  className="text-[var(--muted-foreground)] hover:text-red-500 text-sm font-medium flex items-center gap-1"
+                >
+                  <Trash2 size={14} />
+                  Hapus
+                </button>
+              </div>
+            </div>
+
+            {soal.linkGambarSoal && (
+              <img
+                src={soal.linkGambarSoal}
+                alt="Gambar Soal"
+                className="max-h-48 rounded-lg mb-3 object-contain"
+              />
+            )}
+
+            <div className="text-[var(--card-foreground)] font-semibold text-base mb-4 leading-relaxed">
+              <MathRenderer text={soal.text || (soal as any).teksSoal} />
+            </div>
+
+            {/* Opsi Jawaban untuk MCQ */}
+            {soal.type === "MCQ" && soal.options && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                {soal.options.map((opt, idx) => {
+                  const isCorrect = opt === soal.correctAnswer;
+                  return (
+                    <div
+                      key={idx}
+                      className={`p-2.5 rounded-lg border font-medium flex items-center gap-2 ${isCorrect ? "bg-green-500/10 border-green-500/30 text-green-700 font-bold" : "bg-[var(--background)] border-[var(--border)] text-[var(--muted-foreground)]"}`}
+                    >
+                      <span className="font-mono text-xs w-5">
+                        {String.fromCharCode(65 + idx)}.
+                      </span>
+                      <MathRenderer text={opt} />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* --- MODAL TAMBAH/EDIT SOAL --- */}
+      {isModalOpen && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-[var(--card)] rounded-xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl border border-[var(--border)]">
+            {/* Modal Header */}
+            <div className="p-6 border-b border-[var(--border)] flex justify-between items-center">
+              <h2 className="text-xl font-bold text-[var(--foreground)]">
+                {editingId ? "Edit Soal" : `Tambah Soal ${formType}`}
+              </h2>
+              <button
+                onClick={closeModal}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] p-1 rounded-lg transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-6 flex-1 overflow-y-auto">
+              {/* Tipe Soal Toggle */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                  Tipe Soal
+                </label>
+                <div className="flex p-1 bg-[var(--muted)] rounded-lg w-fit">
+                  <button
+                    onClick={() => setFormType("MCQ")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition ${formType === "MCQ" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
+                  >
+                    Pilihan Ganda (MCQ)
+                  </button>
+                  <button
+                    onClick={() => setFormType("ESSAY")}
+                    className={`px-4 py-2 text-sm font-medium rounded-md transition ${formType === "ESSAY" ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm" : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"}`}
+                  >
+                    Essay
+                  </button>
+                </div>
+              </div>
+
+              {/* Math Equation Assistant side menu */}
+              <MathEquationAssistant
+                onInsertLatex={(latex) => {
+                  setTeksSoal((prev) => prev ? `${prev} ${latex}` : latex);
+                }}
+              />
+
+              {/* Teks Soal Input */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                  Pertanyaan
+                </label>
+                <textarea
+                  rows={4}
+                  value={teksSoal}
+                  onChange={(e) => setTeksSoal(e.target.value)}
+                  placeholder="Ketikkan teks pertanyaan di sini... Gunakan $...$ untuk matematika inline atau $$...$$ untuk matematika block."
+                  className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition resize-y font-mono text-xs"
+                />
+              </div>
+
+              {/* Kompetensi & Gambar Link */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Kompetensi Bab
+                  </label>
+                  <select
+                    value={kompetensiBabId}
+                    onChange={(e) => setKompetensiBabId(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition"
+                  >
+                    <option value="">-- Pilih Kompetensi --</option>
+                    {kompetensiList.map((k) => (
+                      <option key={k.id} value={k.id}>{k.nomerKompetensi} - {k.isiKompetensi.substring(0, 40)}...</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Gambar Soal (Opsional: Unggah / Link)
+                  </label>
+                  <div className="space-y-2">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          try {
+                            const url = await handleUploadImage(file);
+                            setLinkGambarSoal(url);
+                          } catch (err) {
+                            alert("Gagal mengunggah gambar. Silakan coba lagi.");
+                          }
+                        }
+                      }}
+                      className="w-full text-xs text-[var(--muted-foreground)] file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[var(--primary)] file:text-white hover:file:opacity-90 cursor-pointer"
+                    />
+                    <input
+                      type="text"
+                      value={linkGambarSoal}
+                      onChange={(e) => setLinkGambarSoal(e.target.value)}
+                      placeholder="Atau masukkan URL gambar (https://...)"
+                      className="w-full p-2.5 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition text-xs"
+                    />
+                  </div>
+                  {linkGambarSoal && (
+                    <div className="mt-2 relative group w-fit">
+                      <img src={linkGambarSoal} alt="Preview" className="h-16 rounded border object-contain bg-white p-1" />
+                      <button
+                        type="button"
+                        onClick={() => setLinkGambarSoal("")}
+                        className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 text-[10px] shadow"
+                        title="Hapus Gambar"
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Bobot Soal (Difficulty) & Tingkat Taksonomi Bloom */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Bobot Soal (Kesulitan 1 - 10)
+                  </label>
+                  <input
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(Number(e.target.value))}
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                    Tingkat Taksonomi Bloom
+                  </label>
+                  <select
+                    value={bloomLevel}
+                    onChange={(e) => setBloomLevel(e.target.value)}
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition"
+                  >
+                    <option value="C1">C1 - Mengingat (Remembering)</option>
+                    <option value="C2">C2 - Memahami (Understanding)</option>
+                    <option value="C3">C3 - Menerapkan (Applying)</option>
+                    <option value="C4">C4 - Menganalisis (Analyzing)</option>
+                    <option value="C5">C5 - Evaluasi (Evaluating)</option>
+                    <option value="C6">C6 - Mencipta (Creating)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* MCQ Options Dynamic Input */}
+              {formType === "MCQ" && (
+                <div className="space-y-3 border-t border-[var(--border)] pt-4">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-medium text-[var(--muted-foreground)]">
+                      Opsi Jawaban
+                    </label>
+                    <span className="text-xs text-[var(--muted-foreground)]">
+                      Pilih radio button untuk menandai jawaban benar
+                    </span>
+                  </div>
+
+                  {opsiJawaban.map((opsi, idx) => (
+                    <div key={idx} className="flex items-center gap-3">
+                      {/* Radio button for correct answer */}
+                      <input
+                        type="radio"
+                        name="correctAnswer"
+                        checked={jawabanBenarIndex === idx}
+                        onChange={() => setJawabanBenarIndex(idx)}
+                        className="w-5 h-5 text-[var(--primary)] border-[var(--input)] focus:ring-[var(--ring)] cursor-pointer"
+                        title="Tandai sebagai jawaban benar"
+                      />
+                      <span className="text-sm font-bold text-[var(--muted-foreground)] w-6 text-center">
+                        {String.fromCharCode(65 + idx)}.
+                      </span>
+                      <input
+                        type="text"
+                        value={opsi}
+                        onChange={(e) =>
+                          handleOptionChange(idx, e.target.value)
+                        }
+                        placeholder={`Masukkan opsi ${String.fromCharCode(65 + idx)}`}
+                        className={`flex-1 p-2 rounded-lg border focus:ring-2 focus:outline-none transition ${jawabanBenarIndex === idx ? "border-[var(--success)] focus:ring-[var(--success)]" : "border-[var(--input)] focus:ring-[var(--ring)]"} bg-[var(--background)] text-[var(--foreground)]`}
+                      />
+                      <button
+                        onClick={() => handleRemoveOption(idx)}
+                        disabled={opsiJawaban.length <= 2}
+                        className="text-[var(--error)] hover:bg-[#D9707015] p-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        title="Hapus opsi"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  ))}
+
+                  <button
+                    onClick={handleAddOption}
+                    className="mt-3 text-sm font-medium text-[var(--primary)] hover:text-[var(--foreground)] flex items-center gap-2 px-2 py-1 transition"
+                  >
+                    <Plus size={16} /> Tambah Opsi Lainnya
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 border-t border-[var(--border)] flex justify-end gap-3 bg-[var(--muted)] rounded-b-xl">
+              <button
+                onClick={closeModal}
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--border)] hover:text-[var(--foreground)] transition"
+              >
+                Batal
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={
+                  !teksSoal.trim() ||
+                  (formType === "MCQ" && opsiJawaban.some((o) => !o.trim()))
+                }
+                className="px-6 py-2 rounded-lg text-sm font-medium bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Simpan Soal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

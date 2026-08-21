@@ -37,6 +37,8 @@ enum StatusUjian {
 enum JobStatus {
   PENDING
   PROCESSING_PDF
+  EXTRACTING_IMAGES
+  CAPTIONING_IMAGES
   GENERATING_QUESTIONS
   DONE
   FAILED
@@ -71,6 +73,7 @@ model User {
   bukuDibuat  Buku[]
   ujianDibuat Ujian[]
   sesiUjian   SesiUjianSiswa[]
+  quizSessions QuizSession[]
 
   kelasDiajar Kelas[]          @relation("GuruKelas")
 
@@ -80,6 +83,8 @@ model User {
 model Kelas {
   id        Int      @id @default(autoincrement())
   namaKelas String   @map("nama_kelas")
+  isRetired Boolean  @default(false) @map("is_retired")
+  classCode String?  @unique @map("class_code")
   
   sekolahId Int      @map("sekolah_id")
   sekolah   Sekolah  @relation(fields: [sekolahId], references: [id])
@@ -116,10 +121,29 @@ model Buku {
   guru    User   @relation(fields: [guruId], references: [id])
 
   bab     Bab[]
-
-  jobs     GenerationJob[]
+  jobs    GenerationJob[]
+  images  BukuImage[]
 
   @@map("buku")
+}
+
+model BukuImage {
+  id          Int      @id @default(autoincrement())
+  bukuId      Int      @map("buku_id")
+  buku        Buku     @relation(fields: [bukuId], references: [id], onDelete: Cascade)
+  babId       Int?     @map("bab_id")
+  bab         Bab?     @relation(fields: [babId], references: [id], onDelete: SetNull)
+  
+  imagePath   String   @map("image_path")
+  pageNumber  Int      @map("page_number")
+  contextText String?  @map("context_text") @db.Text
+  caption     String?  @db.Text
+  keywords    String[]
+  status      String   @default("PENDING")
+
+  createdAt   DateTime @default(now()) @map("created_at")
+  
+  @@map("buku_image")
 }
 
 model GenerationJob {
@@ -130,6 +154,7 @@ model GenerationJob {
   errorMessage String?   @map("error_message") @db.Text
   jumlahSoal   Int       @default(10) @map("jumlah_soal")
   tokensSpent  Int       @default(0) @map("tokens_spent")
+  attempts     Int       @default(0)
 
   bukuId       Int       @map("buku_id")
   buku         Buku      @relation(fields: [bukuId], references: [id], onDelete: Cascade)
@@ -141,16 +166,20 @@ model GenerationJob {
 }
 
 model Bab {
-  id       Int    @id @default(autoincrement())
-  judulBab String @map("judul_bab")
+  id            Int      @id @default(autoincrement())
+  judulBab      String   @map("judul_bab")
+  startPage     Int?     @map("start_page")
+  endPage       Int?     @map("end_page")
   
-  bukuId   Int    @map("buku_id")
-  buku     Buku   @relation(fields: [bukuId], references: [id], onDelete: Cascade)
+  bukuId        Int      @map("buku_id")
+  buku          Buku     @relation(fields: [bukuId], references: [id], onDelete: Cascade)
 
-  learningGoals String?   @map("learning_goals") @db.Text // Hasil ekstraksi Gemini disimpan di sini
+  learningGoals String?  @map("learning_goals") @db.Text // Hasil ekstraksi Gemini disimpan di sini
 
-  soal     BankSoal[]
+  soal         BankSoal[]
   ujianBab     UjianBab[]
+  kompetensi   KompetensiBab[]
+  images       BukuImage[]
 
   @@map("bab")
 }
@@ -169,6 +198,13 @@ model BankSoal {
 
   difficulty Int
   bloomLevel String?
+
+  kompetensiBabId  Int?     @map("kompetensi_bab_id")
+  kompetensiBab    KompetensiBab? @relation(fields: [kompetensiBabId], references: [id], onDelete: SetNull)
+
+  linkGambarSoal   String?  @map("link_gambar_soal")
+  isAccepted       Boolean  @default(true) @map("is_accepted")
+  isRejected       Boolean  @default(false) @map("is_rejected")
 
   @@map("bank_soal")
 }
@@ -202,6 +238,8 @@ model Ujian {
   jadwalUjian     JadwalUjian[]
   ujianBab        UjianBab[]
   criteria        UjianCriteria?
+  templateKompetensi UjianTemplateKompetensi[]
+  quizSessions    QuizSession[]
 
   @@map("ujian")
 }
@@ -343,3 +381,61 @@ model UjianCriteria {
 
   @@map("ujian_criteria")
 }
+
+model KompetensiPelajaran {
+  id              Int      @id @default(autoincrement())
+  nomerKompetensi String   @map("nomer_kompetensi")
+  isiKompetensi   String   @map("isi_kompetensi") @db.Text
+  namaBab         String   @map("nama_bab")
+  namaBuku        String   @map("nama_buku")
+
+  kompetensiBab   KompetensiBab[]
+
+  @@map("kompetensi_pelajaran")
+}
+
+model KompetensiBab {
+  id                    Int                  @id @default(autoincrement())
+  babId                 Int                  @map("bab_id")
+  bab                   Bab                  @relation(fields: [babId], references: [id], onDelete: Cascade)
+  nomerKompetensi       String               @map("nomer_kompetensi")
+  isiKompetensi         String               @map("isi_kompetensi") @db.Text
+  kompetensiPelajaranId Int?                 @map("kompetensi_pelajaran_id")
+  kompetensiPelajaran   KompetensiPelajaran? @relation(fields: [kompetensiPelajaranId], references: [id], onDelete: SetNull)
+
+  soal                  BankSoal[]
+  templateKompetensi    UjianTemplateKompetensi[]
+
+  @@map("kompetensi_bab")
+}
+
+model UjianTemplateKompetensi {
+  id              Int           @id @default(autoincrement())
+  ujianId         Int           @map("ujian_id")
+  ujian           Ujian         @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  kompetensiBabId Int           @map("kompetensi_bab_id")
+  kompetensiBab   KompetensiBab @relation(fields: [kompetensiBabId], references: [id], onDelete: Cascade)
+  jumlahSoal      Int           @default(0) @map("jumlah_soal")
+  totalPoint      Float         @default(0.0) @map("total_point")
+  isEnabled       Boolean       @default(true) @map("is_enabled")
+
+  @@map("ujian_template_kompetensi")
+}
+
+model QuizSession {
+  id              Int           @id @default(autoincrement())
+  siswaId         Int           @map("siswa_id")
+  siswa           User          @relation(fields: [siswaId], references: [id], onDelete: Cascade)
+  ujianId         Int           @map("ujian_id")
+  ujian           Ujian         @relation(fields: [ujianId], references: [id], onDelete: Cascade)
+  currentLevel    Int           @default(1) @map("current_level")
+  status          String        @default("WAITING")
+  lastActiveAt    DateTime      @default(now()) @map("last_active_at")
+  createdAt       DateTime      @default(now()) @map("created_at")
+  startedAt       DateTime?     @map("started_at")
+  wrongStreak     Int           @default(0) @map("wrong_streak")
+  history         Json?         @map("history")
+
+  @@map("quiz_session")
+}
+

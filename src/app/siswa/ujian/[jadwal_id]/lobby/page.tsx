@@ -61,7 +61,19 @@ export default function ExamLobbyPage({ params }: { params: Promise<{ jadwal_id:
           </ul>
         </div>
 
-        {exam.isFinishedByUser || exam.isEnded || !exam.isOngoing ? (
+        {exam.isFinishedByUser ? (
+          <div className="space-y-3">
+            <Link 
+              href={`/siswa/ujian/${exam.jadwalId}/quiz/lobby`}
+              className="w-full block text-center bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-md"
+            >
+              Main Kuis Eagle's Open Room 🦅
+            </Link>
+            <p className="text-xs text-center text-gray-400">
+              Ujian ini sudah Anda selesaikan. Ayo asah kompetensimu lewat petualangan kuis bersama Elang!
+            </p>
+          </div>
+        ) : exam.isEnded || !exam.isOngoing ? (
           <button
             disabled
             className="w-full block text-center bg-gray-300 text-gray-500 py-4 rounded-xl font-bold text-lg cursor-not-allowed shadow-inner"

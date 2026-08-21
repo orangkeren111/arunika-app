@@ -1,5 +1,5 @@
 import React from "react";
-import { ReportProps, TaxonomyScore, QuestionDetail } from "@/src/app/types/report";
+import { ReportProps, CompetencyScore, QuestionDetail } from "@/src/app/types/report";
 
 // Pastikan tipe data props sudah sesuai dengan interface kamu
 export function ReportTemplate({
@@ -11,7 +11,7 @@ export function ReportTemplate({
   overviewText,
   recommendationText,
   weaknessText,
-  taxonomyScores,
+  competencyScores,
   questions,
   status,
 }: ReportProps) {
@@ -201,30 +201,32 @@ export function ReportTemplate({
         </div>
       </section>
 
-      {/* Taxonomy Section */}
+      {/* Competency Mastery Section */}
       <section className="mb-12">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-1.5 h-6 bg-[#7FA88F] rounded-full"></div>
           <h2 className="text-xl font-bold text-[#39434D]">
-            Cognitive Mastery (Bloom's)
+            Competency Mastery
           </h2>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          {taxonomyScores.map((tax: TaxonomyScore) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {competencyScores?.map((comp: CompetencyScore) => (
             <div
-              key={tax.level}
-              className="bg-white rounded-2xl p-5 border border-[#7FA88F]/20 text-center shadow-sm hover:shadow-md transition-shadow"
+              key={comp.code}
+              className="bg-white rounded-2xl p-5 border border-[#7FA88F]/20 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between"
             >
-              <span className="block text-2xl font-black text-[#39434D] mb-1">
-                {tax.level}
-              </span>
-              <span className="block text-xs uppercase font-bold text-[#7FA88F] tracking-wider mb-4">
-                {tax.name}
-              </span>
-              <div className="inline-block bg-[#FAF8F3] px-4 py-1.5 rounded-full border border-[#7FA88F]/30">
-                <span className="text-lg font-bold text-[#39434D]">
-                  {tax.correct} <span className="text-[#7FA88F] mx-1">/</span>{" "}
-                  {tax.total}
+              <div>
+                <span className="inline-block px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-[#7FA88F]/10 text-[#7FA88F] mb-2">
+                  Kode: {comp.code}
+                </span>
+                <p className="text-sm font-semibold text-[#39434D] mb-4 line-clamp-2 hover:line-clamp-none">
+                  {comp.name}
+                </p>
+              </div>
+              <div className="bg-[#FAF8F3] px-4 py-2 rounded-full border border-[#7FA88F]/30 flex justify-between items-center mt-2">
+                <span className="text-xs text-[var(--muted-foreground)]">Ketuntasan:</span>
+                <span className="text-base font-bold text-[#39434D]">
+                  {comp.correct} <span className="text-[#7FA88F] mx-0.5">/</span> {comp.total} Soal
                 </span>
               </div>
             </div>

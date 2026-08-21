@@ -5,13 +5,19 @@ import {
 } from "@/src/lib/services/llm/router";
 import { generateQuestionsWithGroq } from "@/src/lib/services/process-book/generate-questions";
 import { processPdfWithGemini } from "@/src/lib/services/process-book/upload-gemini";
+import { extractAndStorePdfPageImages } from "@/src/lib/services/process-book/extract-pdf-images";
+import { processKurikulumExtract } from "@/src/lib/services/process-book/extract-kurikulum";
+import { processPendingBookImages } from "@/src/lib/services/process-book/process-images";
 import { NextResponse } from "next/server";
+import fs from "fs/promises";
+
 
 export async function GET() {
   try {
     await Promise.allSettled([
-      processGenerationStateMachine(),
-      processTaskQueueBatch(),
+      processGenerationStateMachine(), // 1. Book PDF & Question Generation
+      processTaskQueueBatch(),          // 2. Report Generation & TaskQueue
+      processPendingBookImages(),       // 3. Book Image Vision AI Captioning
     ]);
 
     return NextResponse.json({ message: "Sweep completed successfully" });
@@ -27,13 +33,15 @@ export async function POST() {
 
 /**
  * 1. GenerationJob Sweeper (The Book)
- * Handles PDF processing and Question Generation in distinct steps.
+ * Handles PDF processing, Image Extraction, and Question Generation in distinct steps.
  */
 async function processGenerationStateMachine() {
   const job = await prisma.generationJob.findFirst({
     where: {
       OR: [
         { status: "PENDING" },
+        { status: "EXTRACTING_IMAGES" },
+        { status: "CAPTIONING_IMAGES" },
         { status: "GENERATING_QUESTIONS" },
         // Fallback: If Vercel timed out during PDF reading, retry after 5 mins
         {
@@ -47,7 +55,7 @@ async function processGenerationStateMachine() {
 
   if (!job) return;
 
-  //  // ATOMIC CLAIM: Try to lock it so other cron pings don't grab it
+  // ATOMIC CLAIM: Try to lock it so other cron pings don't grab it
   const claimResult = await prisma.generationJob.updateMany({
     where: {
       id: job.id,
@@ -64,20 +72,64 @@ async function processGenerationStateMachine() {
   console.log(`Advancing GenerationJob ${job.id} from state: ${job.status}`);
 
   try {
-    //    // PHASE 1: Extract PDF
+    // PHASE 1: Parse PDF text & chapter structure via Gemini (Zero image extraction yet)
     if (job.status === "PENDING" || job.status === "PROCESSING_PDF") {
       const result = await processPdfWithGemini(job.id, job.fileUrl ?? "");
 
-      // Advance to next state and STOP.
-      // Next cron ping will pick it up for Phase 2, avoiding Vercel timeouts!
+      // Advance to EXTRACTING_IMAGES state
       await prisma.generationJob.update({
         where: { id: job.id },
         data: {
-          status: "GENERATING_QUESTIONS",
+          status: "EXTRACTING_IMAGES",
           tokensSpent: { increment: result.tokens },
-          updatedAt: new Date()
+          updatedAt: new Date(),
         },
       });
+      return;
+    }
+
+    // PHASE 2: Extract embedded images from local PDF file
+    if (job.status === "EXTRACTING_IMAGES") {
+      if (job.fileUrl) {
+        await extractAndStorePdfPageImages(job.bukuId, job.fileUrl);
+        // Clean up the local temp PDF file after image extraction completes
+        await fs.unlink(job.fileUrl).catch(() => { });
+      }
+
+      // Advance to CAPTIONING_IMAGES state
+      await prisma.generationJob.update({
+        where: { id: job.id },
+        data: {
+          status: "CAPTIONING_IMAGES",
+          updatedAt: new Date(),
+        },
+      });
+      return;
+    }
+
+    // PHASE 3: Vision AI Image Captioning & Agentic Filter for this book
+    if (job.status === "CAPTIONING_IMAGES") {
+      // Process pending images for this specific bukuId
+      await processPendingBookImages(job.bukuId);
+
+      // Check if any PENDING images remain for this book
+      const remainingPendingCount = await prisma.bukuImage.count({
+        where: {
+          bukuId: job.bukuId,
+          status: "PENDING",
+        },
+      });
+
+      // If all images for this book are captioned & processed, advance to GENERATING_QUESTIONS!
+      if (remainingPendingCount === 0) {
+        await prisma.generationJob.update({
+          where: { id: job.id },
+          data: {
+            status: "GENERATING_QUESTIONS",
+            updatedAt: new Date(),
+          },
+        });
+      }
       return;
     }
 
@@ -126,16 +178,23 @@ async function processGenerationStateMachine() {
       return;
     }
   } catch (error: any) {
-    //    console.error(`GenerationJob ${job.id} failed:`, error);
+    // Rate Limit / Outage Check (429, 503, 500+, etc.)
+    const errCode = error.status || error.statusCode;
+    const errMsg = error.message ? error.message.toString() : String(error);
 
-    // Rate Limit / Outage Check
-    const isRateLimit =
-      error.status === 429 || (error.message && error.message.includes("429"));
-    const isServerDown = error.status >= 500;
+    const isRateLimit = errCode === 429 || errMsg.includes("429");
+    const isServerDown =
+      (typeof errCode === "number" && errCode >= 500 && errCode <= 599) ||
+      errMsg.includes("503") ||
+      errMsg.includes("UNAVAILABLE") ||
+      errMsg.includes("Service Unavailable");
 
-    if (isRateLimit || isServerDown) {
+    const currentAttempts = ((job as any).attempts ?? 0) + 1;
+    const isExhausted = currentAttempts >= 3;
+
+    if ((isRateLimit || isServerDown) && !isExhausted) {
       console.warn(
-        `Provider exhausted for GenerationJob ${job.id}. Backing off to retry next sweep.`,
+        `Provider overloaded/503 for GenerationJob ${job.id} (Attempt ${currentAttempts}/3). Backing off to retry next sweep.`,
       );
       await prisma.generationJob.update({
         where: { id: job.id },
@@ -143,17 +202,29 @@ async function processGenerationStateMachine() {
           status:
             job.status === "PROCESSING_PDF"
               ? "PENDING"
-              : "GENERATING_QUESTIONS",
+              : job.status === "EXTRACTING_IMAGES"
+                ? "EXTRACTING_IMAGES"
+                : job.status === "CAPTIONING_IMAGES"
+                  ? "CAPTIONING_IMAGES"
+                  : "GENERATING_QUESTIONS",
+          attempts: currentAttempts,
+          errorMessage: `Attempt ${currentAttempts}/3 failed: ${errMsg}`,
           updatedAt: new Date(),
         },
       });
       return;
     }
 
-    // Hard Error
+    // Hard Error OR Max Attempts (3) reached -> Mark as FAILED
+    console.error(`GenerationJob ${job.id} marked FAILED after attempt ${currentAttempts}. Error: ${errMsg}`);
     await prisma.generationJob.update({
       where: { id: job.id },
-      data: { status: "FAILED", errorMessage: error.message },
+      data: {
+        status: "FAILED",
+        attempts: currentAttempts,
+        errorMessage: errMsg || "Failed after 3 attempts due to Gemini/Provider error",
+        updatedAt: new Date(),
+      },
     });
   }
 }
@@ -163,11 +234,11 @@ async function processGenerationStateMachine() {
  * Grabs 6 tasks at a time, tracks LLM routing, and updates SavedResponses.
  */
 async function processTaskQueueBatch() {
-  //  // 1. Find oldest 6 pending tasks
+  // 1. Find 10 recent pending tasks
   const pendingTasks = await prisma.taskQueue.findMany({
     where: { status: "pending" },
     orderBy: { createdAt: "asc" },
-    take: 6,
+    take: 10,
   });
 
   if (pendingTasks.length === 0) return;
@@ -238,6 +309,15 @@ async function processTaskQueueBatch() {
               status: "DONE",
             },
           });
+        } else if (task.type === "extract_kurikulum") {
+          const result = await processKurikulumExtract(payload.tempFilePath);
+          tokensSpent = result.tokens;
+        } else if (task.type === "generate_soal") {
+          const result = await generateQuestionsWithGroq(
+            payload.babId,
+            payload.totalJumlahSoal || 10
+          );
+          tokensSpent = result.tokens;
         }
 
         // Mark task as completed

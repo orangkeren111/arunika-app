@@ -1,5 +1,5 @@
-export interface TaxonomyScore {
-  level: "C1" | "C2" | "C3" | "C4";
+export interface CompetencyScore {
+  code: string;
   name: string;
   correct: number;
   total: number;
@@ -21,7 +21,7 @@ export interface ReportProps {
   overviewText: string;
   weaknessText: string;
   recommendationText: string;
-  taxonomyScores: TaxonomyScore[];
+  competencyScores: CompetencyScore[];
   questions: QuestionDetail[];
   status?: string;
 }

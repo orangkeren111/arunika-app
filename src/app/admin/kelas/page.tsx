@@ -2,12 +2,11 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Plus, Edit2, Trash2, Users, X } from "lucide-react";
+import { Plus, Edit2, Trash2, Users, X, Archive } from "lucide-react";
 import { useKelasViewModel } from "./KelasViewModel";
 
 export default function KelasPage() {
-  // Asumsi: ViewModel sekarang mengembalikan array `teachers`
-  const { kelas, teachers, handleDelete, handleAdd, handleEdit } =
+  const { kelas, teachers, handleDelete, handleAdd, handleEdit, handleRetire } =
     useKelasViewModel();
 
   // State untuk mengelola Modal
@@ -112,8 +111,16 @@ export default function KelasPage() {
                   <Edit2 size={16} />
                 </button>
                 <button
+                  onClick={() => handleRetire(k.id)}
+                  className="p-1.5 text-[var(--muted-foreground)] hover:text-orange-500 transition"
+                  title="Retire / Tutup Kelas"
+                >
+                  <Archive size={16} />
+                </button>
+                <button
                   onClick={() => confirmDelete(k.id)}
                   className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--error)] transition"
+                  title="Hapus Kelas"
                 >
                   <Trash2 size={16} />
                 </button>

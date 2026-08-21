@@ -10,9 +10,17 @@ export default function SiswaKelasPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Ruang Kelas Anda</h1>
-        <p className="text-[var(--muted-foreground)] mt-1">Daftar kelas di mana Anda terdaftar.</p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-[var(--foreground)]">Ruang Kelas Anda</h1>
+          <p className="text-[var(--muted-foreground)] mt-1">Daftar kelas di mana Anda terdaftar.</p>
+        </div>
+        <Link
+          href="/siswa/join-kelas"
+          className="bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition"
+        >
+          Gabung Kelas
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

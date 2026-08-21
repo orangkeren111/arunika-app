@@ -101,12 +101,22 @@ async function main() {
     },
   });
 
+  function generateClassCode(): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    let result = "";
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  }
+
   // 5. Buat Kelas
   const kelasSurabaya = await prisma.kelas.create({
     data: {
       namaKelas: "X - Biologi Unggulan",
       sekolahId: sekolah1.id,
       teacherId: guru1.id,
+      classCode: generateClassCode(),
     },
   });
 
@@ -115,6 +125,7 @@ async function main() {
       namaKelas: "XI - Fisika Unggulan",
       sekolahId: sekolah2.id,
       teacherId: guru2.id,
+      classCode: generateClassCode(),
     },
   });
 

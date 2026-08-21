@@ -30,13 +30,21 @@ export function useUsersViewModel() {
   };
 
   const handleAdd = async (name: string, role: Role, email: string) => {
-    await adminRepository.addUser({ name, role, email }, sekolahId);
-    fetchUsers();
+    try {
+      await adminRepository.addUser({ name, role, email }, sekolahId);
+      fetchUsers();
+    } catch (error: any) {
+      alert(error.message || "Gagal menambahkan pengguna.");
+    }
   };
 
   const handleEdit = async (id: number, data: Partial<User>) => {
-    await adminRepository.updateUser(id, data);
-    fetchUsers();
+    try {
+      await adminRepository.updateUser(id, data);
+      fetchUsers();
+    } catch (error: any) {
+      alert(error.message || "Gagal memperbarui pengguna.");
+    }
   };
 
   return { users, loading, handleDelete, handleAdd, handleEdit };

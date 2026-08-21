@@ -44,6 +44,7 @@ export async function getAvailableModelForTask(
 
   switch (taskType) {
     case "extract_pdf":
+    case "extract_kurikulum":
       return "gemini";
 
     case "generate_report":

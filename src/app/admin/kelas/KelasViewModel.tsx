@@ -41,7 +41,12 @@ export function useKelasViewModel() {
   const handleEdit = async (id: number, data: Partial<Kelas>) => {
     await adminRepository.updateKelas(id, data);
     fetchKelas();
+  }, handleRetire = async (id: number) => {
+    if (confirm("Apakah Anda yakin ingin menonaktifkan/tutup kelas ini?")) {
+      await adminRepository.retireKelas(id);
+      fetchKelas();
+    }
   };
 
-  return { kelas, teachers, loading, handleDelete, handleAdd, handleEdit };
+  return { kelas, teachers, loading, handleDelete, handleAdd, handleEdit, handleRetire };
 }

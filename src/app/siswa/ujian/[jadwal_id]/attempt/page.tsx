@@ -10,6 +10,7 @@ import {
   Loader2,
   AlertCircle,
 } from "lucide-react";
+import { MathRenderer } from "@/src/components/MathRenderer";
 import { useExamAttempt } from "./SiswaUjianAttemptViewModel";
 
 const MAX_QUESTIONS = 40; // Sync with the default in your viewmodel
@@ -127,7 +128,7 @@ export default function ExamAttemptPage({
               </div>
 
               <div className="text-lg text-[var(--foreground)] leading-relaxed mb-10 prose dark:prose-invert max-w-none">
-                {currentQ?.text}
+                <MathRenderer text={currentQ?.text || ""} />
               </div>
 
               <div className="flex-1">
@@ -159,7 +160,7 @@ export default function ExamAttemptPage({
                             <span className="inline-block w-6 font-bold text-gray-400">
                               {String.fromCharCode(65 + idx)}.
                             </span>{" "}
-                            {opt}
+                            <MathRenderer text={opt} />
                           </span>
                         </label>
                       );

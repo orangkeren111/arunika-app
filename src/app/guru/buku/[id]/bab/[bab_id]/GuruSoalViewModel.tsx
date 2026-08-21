@@ -1,17 +1,29 @@
 import { guruRepository } from "@/src/lib/repositories/guruRepository";
 import { Bab, Soal } from "@/src/app/types/guru";
 import { useEffect, useState } from "react";
+import { getKompetensiBab } from "./kompetensi/actions";
+
+interface Kompetensi {
+  id: number;
+  nomerKompetensi: string;
+  isiKompetensi: string;
+}
 
 export function useSoalViewModel(babId: string) {
   const [bab, setBab] = useState<Bab | null>(null);
   const [soalList, setSoalList] = useState<Soal[]>([]);
+  const [kompetensiList, setKompetensiList] = useState<Kompetensi[]>([]);
   const [loading, setLoading] = useState(true);
-
+  
   const fetchSoal = () => {
     setLoading(true);
-    guruRepository.getSoalList(babId).then((res) => {
+    Promise.all([
+      guruRepository.getSoalList(babId),
+      getKompetensiBab(Number(babId)),
+    ]).then(([res, kompRes]) => {
       setBab(res.bab);
       setSoalList(res.soalList);
+      setKompetensiList(kompRes);
       setLoading(false);
     });
   };
@@ -31,6 +43,8 @@ export function useSoalViewModel(babId: string) {
     bloomLevel: string,
     options?: string[],
     correctAnswer?: string,
+    kompetensiBabId?: string | null,
+    linkGambarSoal?: string,
   ) => {
     await guruRepository.addSoal({
       babId,
@@ -40,6 +54,8 @@ export function useSoalViewModel(babId: string) {
       correctAnswer,
       difficulty,
       bloomLevel,
+      kompetensiBabId,
+      linkGambarSoal,
     });
     fetchSoal();
   };
@@ -54,13 +70,31 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   };
 
+  const handleAcceptSoal = async (id: string) => {
+    await guruRepository.editSoal(id, { babId, isAccepted: true, isRejected: false } as any);
+    fetchSoal();
+  };
+
+  const handleRejectSoal = async (id: string) => {
+    await guruRepository.editSoal(id, { babId, isAccepted: false, isRejected: true } as any);
+    fetchSoal();
+  };
+
+  const handleUploadImage = async (file: File): Promise<string> => {
+    return await guruRepository.uploadImage(file);
+  };
+
   return {
     bab,
     soalList,
+    kompetensiList,
     loading,
     handleAddSoal,
     handleEditSoal,
     handleDeleteSoal,
     handleGenerateQuestion,
+    handleAcceptSoal,
+    handleRejectSoal,
+    handleUploadImage,
   };
 }

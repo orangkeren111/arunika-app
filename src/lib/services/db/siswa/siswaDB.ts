@@ -188,11 +188,12 @@ export async function updateSessionElo(sesiId: number, newElo: number) {
   });
 }
 export async function finishSession(sesiId: number, finalScore: number) {
+  const roundedScore = Math.round(finalScore * 100) / 100;
   return prisma.sesiUjianSiswa.update({
     where: { id: sesiId },
     data: {
       waktuSelesai: new Date(),
-      nilaiAkhir: finalScore,
+      nilaiAkhir: roundedScore,
     },
   });
 }
@@ -209,7 +210,7 @@ export async function getListJawaban(attemptId: number) {
       attemptId: attemptId,
     },
     include: {
-      // Pull in the attempt to access the nested User (Siswa) data
+      soalAsli: true,
       attempt: {
         include: {
           siswa: {
@@ -276,4 +277,61 @@ export async function checkStudentFinishedExam(jadwalId: number, siswaId: number
     },
   });
   return !!session;
+}
+
+export async function getAttemptDetailForReport(attemptId: number) {
+  return await prisma.sesiUjianSiswa.findUnique({
+    where: { id: attemptId },
+    include: {
+      jadwalUjian: {
+        include: {
+          ujian: {
+            include: {
+              templateKompetensi: {
+                where: { isEnabled: true },
+                include: { kompetensiBab: true },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+export async function joinKelasByCode(siswaId: number, classCode: string): Promise<{ success: boolean; error?: string; className?: string }> {
+  const kelas = await prisma.kelas.findFirst({
+    where: {
+      classCode: {
+        equals: classCode.trim(),
+        mode: "insensitive"
+      }
+    }
+  });
+
+  if (!kelas) {
+    return { success: false, error: "Kelas tidak ditemukan. Periksa kembali kode kelas Anda." };
+  }
+
+  const existing = await prisma.kelasMember.findUnique({
+    where: {
+      kelasId_userId: {
+        kelasId: kelas.id,
+        userId: siswaId
+      }
+    }
+  });
+
+  if (existing) {
+    return { success: false, error: "Anda sudah terdaftar di dalam kelas ini." };
+  }
+
+  await prisma.kelasMember.create({
+    data: {
+      kelasId: kelas.id,
+      userId: siswaId
+    }
+  });
+
+  return { success: true, className: kelas.namaKelas };
 }

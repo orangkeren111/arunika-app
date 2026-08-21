@@ -242,4 +242,8 @@ export const siswaRepository = {
       aiSummary: a.aiLogs?.[0]?.overview || null,
     };
   },
+
+  joinKelasByCode: async (siswaId: number, classCode: string) => {
+    return await siswaDB.joinKelasByCode(siswaId, classCode);
+  },
 };

@@ -110,15 +110,7 @@ export async function getSoalList(babId: number) {
   });
 }
 
-export async function createSoal(data: {
-  babId: number;
-  teksSoal: string;
-  opsiJawaban?: any;
-  jawabanBenarMcq?: string;
-  difficulty: number;
-  bloomLevel?: string;
-  type: TipeSoal;
-}) {
+export async function createSoal(data: any) {
   return await prisma.bankSoal.create({
     data,
   });
@@ -167,6 +159,11 @@ export async function getUjianTemplateById(templateId: number) {
       id: templateId,
     },
     include: {
+      templateKompetensi: {
+        include: {
+          kompetensiBab: true,
+        },
+      },
       ujianBab: {
         include: {
           bab: {
@@ -188,28 +185,40 @@ export async function getUjianTemplateById(templateId: number) {
   });
 }
 export async function createTemplate(
-  data: Prisma.UjianCreateWithoutUjianBabInput,
+  data: Prisma.UjianCreateInput,
   babIds: number[],
+  templateKompetensi: { kompetensiBabId: number; jumlahSoal: number; totalPoint: number; isEnabled: boolean }[]
 ) {
-  // 1. Create the Ujian template first
+  // 1. Create main Ujian record
   const newUjian = await prisma.ujian.create({
-    data,
+    data: {
+      ...data,
+      isAdaptive: data.isAdaptive !== undefined ? data.isAdaptive : true,
+      templateKompetensi: {
+        create: templateKompetensi.map((tk) => ({
+          kompetensiBabId: tk.kompetensiBabId,
+          jumlahSoal: tk.jumlahSoal,
+          totalPoint: tk.totalPoint,
+          isEnabled: tk.isEnabled,
+        })),
+      },
+    },
   });
 
   // 2. If there are babs to link, insert them into the junction table
   if (babIds.length > 0) {
     await prisma.ujianBab.createMany({
       data: babIds.map((babId) => ({
-        ujianId: newUjian.id, // Use the ID from the newly created Ujian
+        ujianId: newUjian.id,
         babId: babId,
       })),
       skipDuplicates: true,
     });
   }
 
-  // Optional: return the newly created Ujian with its Babs included
   return await prisma.ujian.findUnique({
     where: { id: newUjian.id },
+    include: { templateKompetensi: true },
   });
 }
 
@@ -217,10 +226,22 @@ export async function upsertTemplateBabSafe(
   ujianId: number,
   data: Prisma.UjianUpdateInput,
   babIds: number[],
+  templateKompetensi: { kompetensiBabId: number; jumlahSoal: number; totalPoint: number; isEnabled: boolean }[]
 ) {
   return await prisma.$transaction(async (tx) => {
     const ujian = await tx.ujian.update({
-      data,
+      data: {
+        ...data,
+        templateKompetensi: {
+          deleteMany: {}, // clean old ones
+          create: templateKompetensi.map((tk) => ({
+            kompetensiBabId: tk.kompetensiBabId,
+            jumlahSoal: tk.jumlahSoal,
+            totalPoint: tk.totalPoint,
+            isEnabled: tk.isEnabled,
+          })),
+        },
+      },
       where: {
         id: ujianId,
       },
@@ -332,9 +353,10 @@ export async function updateAttemptScore(
   attemptId: number,
   nilaiAkhir: number,
 ) {
+  const roundedScore = Math.round(nilaiAkhir * 100) / 100;
   return await prisma.sesiUjianSiswa.update({
     where: { id: attemptId },
-    data: { nilaiAkhir },
+    data: { nilaiAkhir: roundedScore },
     include: { siswa: true },
   });
 }
@@ -444,3 +466,116 @@ export async function getClassGradesReport(kelasId: number) {
     orderBy: { id: "asc" },
   });
 }
+
+export async function getKompetensiBab(babId: number) {
+  return await prisma.kompetensiBab.findMany({
+    where: { babId },
+    orderBy: { nomerKompetensi: "asc" },
+  });
+}
+
+export async function upsertKompetensiBab(payload: {
+  id?: number;
+  babId: number;
+  nomerKompetensi: string;
+  isiKompetensi: string;
+  kompetensiPelajaranId?: number;
+}) {
+  if (payload.id) {
+    return await prisma.kompetensiBab.update({
+      where: { id: payload.id },
+      data: {
+        nomerKompetensi: payload.nomerKompetensi,
+        isiKompetensi: payload.isiKompetensi,
+        kompetensiPelajaranId: payload.kompetensiPelajaranId || null,
+      },
+    });
+  } else {
+    return await prisma.kompetensiBab.create({
+      data: {
+        babId: payload.babId,
+        nomerKompetensi: payload.nomerKompetensi,
+        isiKompetensi: payload.isiKompetensi,
+        kompetensiPelajaranId: payload.kompetensiPelajaranId || null,
+      },
+    });
+  }
+}
+
+export async function deleteKompetensiBab(id: number) {
+  return await prisma.kompetensiBab.delete({
+    where: { id },
+  });
+}
+
+export async function getAvailablePelajaranBooks() {
+  const result = await prisma.kompetensiPelajaran.groupBy({
+    by: ["namaBuku"],
+    orderBy: { namaBuku: "asc" },
+  });
+  return result.map((r) => r.namaBuku);
+}
+
+export async function getAvailablePelajaranChapters(bookName: string) {
+  const result = await prisma.kompetensiPelajaran.groupBy({
+    by: ["namaBab"],
+    where: { namaBuku: bookName },
+    orderBy: { namaBab: "asc" },
+  });
+  return result.map((r) => r.namaBab);
+}
+
+export async function getKompetensiPelajaran(bookName: string, chapterName: string) {
+  return await prisma.kompetensiPelajaran.findMany({
+    where: {
+      namaBuku: bookName,
+      namaBab: chapterName,
+    },
+    orderBy: { nomerKompetensi: "asc" },
+  });
+}
+
+export async function linkKompetensiPelajaranToBab(
+  babId: number,
+  competencyPelajaranIds: number[]
+) {
+  const sourceCompetencies = await prisma.kompetensiPelajaran.findMany({
+    where: { id: { in: competencyPelajaranIds } },
+  });
+
+  for (const comp of sourceCompetencies) {
+    await prisma.kompetensiBab.create({
+      data: {
+        babId,
+        nomerKompetensi: comp.nomerKompetensi,
+        isiKompetensi: comp.isiKompetensi,
+        kompetensiPelajaranId: comp.id,
+      },
+    });
+  }
+}
+
+export async function getKompetensiForBabs(babIds: number[]) {
+  return await prisma.kompetensiBab.findMany({
+    where: { babId: { in: babIds } },
+    orderBy: { nomerKompetensi: "asc" },
+  });
+}
+
+export async function getAvailableSoalCounts(babIds: number[]) {
+  const result = await prisma.bankSoal.groupBy({
+    by: ["kompetensiBabId"],
+    where: { 
+      babId: { in: babIds },
+      isAccepted: true,
+      isRejected: false,
+    },
+    _count: { id: true },
+  });
+  
+  return result.map((r) => ({
+    kompetensiBabId: r.kompetensiBabId,
+    count: r._count.id,
+  }));
+}
+
