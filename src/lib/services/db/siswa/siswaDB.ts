@@ -57,13 +57,25 @@ export async function getKelasDetail(kelasId: number) {
   });
 }
 
-export async function getJadwalByKelas(kelasId: number) {
+export async function getJadwalByKelas(kelasId: number, siswaId?: number) {
   return await prisma.jadwalUjian.findMany({
     where: {
       kelasId,
       status: { in: [StatusUjian.SCHEDULED, StatusUjian.ONGOING] },
     },
-    include: { ujian: true, tipeUjian: true },
+    include: {
+      ujian: {
+        include: {
+          quizSessions: siswaId
+            ? { where: { siswaId }, orderBy: { createdAt: "desc" }, take: 1 }
+            : false,
+        },
+      },
+      tipeUjian: true,
+      sesiSiswa: siswaId
+        ? { where: { siswaId }, orderBy: { waktuMulai: "desc" }, take: 1 }
+        : false,
+    },
   });
 }
 

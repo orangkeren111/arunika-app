@@ -103,6 +103,53 @@ export const guruRepository = {
     };
   },
 
+  getBukuExportData: async (bookId: string) => {
+    const rawData = await guruDB.getBukuWithBabsAndSoal(parseInt(bookId));
+    if (!rawData) return null;
+
+    const babs = rawData.bab.map((b: any) => ({
+      id: b.id.toString(),
+      title: b.judulBab,
+      judulBab: b.judulBab,
+      questionCount: b.soal.length,
+    }));
+
+    const allSoal: any[] = [];
+    for (const b of rawData.bab) {
+      for (const s of b.soal) {
+        allSoal.push({
+          id: s.id.toString(),
+          babId: b.id.toString(),
+          babTitle: b.judulBab,
+          teksSoal: s.teksSoal,
+          type: s.type,
+          opsiJawaban: s.opsiJawaban,
+          jawabanBenarMcq: s.jawabanBenarMcq,
+          jawabanBenarEssay: s.jawabanBenarEssay || "",
+          difficulty: s.difficulty,
+          bloomLevel: s.bloomLevel,
+          linkGambarSoal: s.linkGambarSoal || "",
+          kompetensi: s.kompetensiBab ? {
+            nomerKompetensi: s.kompetensiBab.nomerKompetensi,
+            isiKompetensi: s.kompetensiBab.isiKompetensi,
+          } : null,
+          isAccepted: s.isAccepted,
+          isRejected: s.isRejected,
+        });
+      }
+    }
+
+    return {
+      buku: {
+        id: rawData.id.toString(),
+        title: rawData.judul,
+        judul: rawData.judul,
+      },
+      babList: babs,
+      soalList: allSoal,
+    };
+  },
+
   addBab: async (bab: any) => {
     const newBab = await guruDB.createBab(
       parseInt(bab.bookId),
@@ -141,6 +188,7 @@ export const guruRepository = {
           options: s.opsiJawaban,
           correctAnswer: s.jawabanBenarMcq,
           jawabanBenarMcq: s.jawabanBenarMcq,
+          jawabanBenarEssay: s.jawabanBenarEssay || "",
           difficulty: s.difficulty,
           bloomLevel: s.bloomLevel,
           kompetensiBabId: s.kompetensiBabId?.toString() || null,
@@ -159,6 +207,7 @@ export const guruRepository = {
       type,
       opsiJawaban: soal.options || soal.opsiJawaban || null,
       jawabanBenarMcq: soal.correctAnswer || soal.jawabanBenarMcq || null,
+      jawabanBenarEssay: soal.jawabanBenarEssay || null,
       difficulty: soal.difficulty || null,
       bloomLevel: soal.bloomLevel || null,
       kompetensiBabId: soal.kompetensiBabId ? Number(soal.kompetensiBabId) : null,
@@ -174,6 +223,7 @@ export const guruRepository = {
       text: newSoal.teksSoal,
       options: newSoal.opsiJawaban,
       jawabanBenarMcq: newSoal.jawabanBenarMcq,
+      jawabanBenarEssay: newSoal.jawabanBenarEssay,
     };
   },
 
@@ -186,6 +236,7 @@ export const guruRepository = {
       type: soal.type ? (soal.type === "MCQ" ? TipeSoal.MCQ : TipeSoal.ESSAY) : undefined,
       opsiJawaban: soal.options !== undefined ? soal.options : (soal.opsiJawaban !== undefined ? soal.opsiJawaban : undefined),
       jawabanBenarMcq: soal.correctAnswer !== undefined ? soal.correctAnswer : (soal.jawabanBenarMcq !== undefined ? soal.jawabanBenarMcq : undefined),
+      jawabanBenarEssay: soal.jawabanBenarEssay !== undefined ? (soal.jawabanBenarEssay || null) : undefined,
       difficulty: soal.difficulty !== undefined ? Number(soal.difficulty) : undefined,
       bloomLevel: soal.bloomLevel !== undefined ? soal.bloomLevel : undefined,
       kompetensiBab: soal.kompetensiBabId !== undefined ? (
@@ -203,6 +254,7 @@ export const guruRepository = {
       text: updatedSoal.teksSoal,
       options: updatedSoal.opsiJawaban,
       jawabanBenarMcq: updatedSoal.jawabanBenarMcq,
+      jawabanBenarEssay: updatedSoal.jawabanBenarEssay,
       difficulty: updatedSoal.difficulty,
       bloomLevel: updatedSoal.bloomLevel,
     };
@@ -458,7 +510,8 @@ export const guruRepository = {
       jadwalId: a.jadwalUjianId.toString(),
       studentName: a.siswa.name,
       score: a.nilaiAkhir,
-      status: a.nilaiAkhir !== null ? "Graded" : "Pending Essay",
+      isChecked: a.isChecked,
+      status: a.isChecked ? "Checked" : (a.nilaiAkhir !== null ? "Graded" : "Pending Essay"),
       aiSummary: a.aiLogs[0]?.overview || "",
       answers: a.jawabanSiswa.map((ans: any) => ({
         jawabanId: ans.id.toString(),
@@ -468,6 +521,8 @@ export const guruRepository = {
         isCorrect: ans.isCorrect,
         point: ans.nilaiPoin,
         feedback: ans.catatanKoreksi || "",
+        aiResponse: ans.aiResponse || "",
+        jawabanBenarEssay: ans.jawabanBenarEssay || ans.soalAsli?.jawabanBenarEssay || "",
       })),
     };
   },
@@ -478,23 +533,22 @@ export const guruRepository = {
       jawabanId: number;
       nilaiPoin: number;
       catatanKoreksi: string;
+      isCorrect?: boolean;
     }[],
   ) => {
     const attemptIdNum = parseInt(attemptId);
 
     // 1. Update each graded essay answer individually
-    // Note: If you have many answers, you could use a Prisma $transaction here,
-    // but a simple loop works perfectly for a handful of essays.
     for (const answer of gradedAnswers) {
       await guruDB.gradeJawabanSiswa(
         answer.jawabanId,
         answer.nilaiPoin,
         answer.catatanKoreksi,
+        answer.isCorrect,
       );
     }
 
     // 2. Fetch ALL answers for this attempt to calculate the accurate final score
-    // (Assuming you have access to prisma here, or a helper function to fetch them)
     const allAnswers = await guruDB.getAttemptDetail(attemptIdNum);
 
     const newTotalScore =
@@ -510,7 +564,6 @@ export const guruRepository = {
     );
 
     // 4. Return the DTO expected by the frontend
-    // We grab the feedback from the first graded answer just like your initial DTO
     const primaryFeedback = gradedAnswers[0]?.catatanKoreksi || "";
 
     return {
@@ -518,10 +571,14 @@ export const guruRepository = {
       jadwalId: updated.jadwalUjianId.toString(),
       studentName: updated.siswa?.name || "Siswa",
       score: updated.nilaiAkhir,
-      status: "Graded",
+      status: updated.isChecked ? "Checked" : "Graded",
       feedback: primaryFeedback,
       aiSummary: "Koreksi manual berhasil disimpan oleh guru.",
     };
+  },
+
+  finishAttempt: async (attemptId: string) => {
+    return await guruDB.finishAttemptReview(parseInt(attemptId));
   },
 
   updateBab: async (id: string, title: string) => {

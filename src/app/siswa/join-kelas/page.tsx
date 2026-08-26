@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { Users, ArrowLeft, CheckCircle2, AlertTriangle, Loader2, Camera, CameraOff } from "lucide-react";
@@ -8,7 +8,7 @@ import Link from "next/link";
 import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 import { Html5Qrcode } from "html5-qrcode";
 
-export default function JoinKelasPage() {
+function JoinKelasContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, status } = useSession();
@@ -232,5 +232,19 @@ export default function JoinKelasPage() {
         </form>
       </div>
     </div>
+  );
+}
+
+export default function JoinKelasPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-[60vh] flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-[var(--primary)]" />
+        </div>
+      }
+    >
+      <JoinKelasContent />
+    </Suspense>
   );
 }

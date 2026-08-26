@@ -98,11 +98,42 @@ export async function updateQuizActivity(sessionId: number) {
   });
 }
 
-export async function finishOrFailSession(sessionId: number, status: "FINISHED" | "FAILED" | "AFK") {
+export async function finishOrFailSession(
+  sessionId: number,
+  status: "FINISHED" | "FAILED" | "AFK",
+  reason?: string,
+  latestCompetencyLog?: any
+) {
+  const existing = await prisma.quizSession.findUnique({
+    where: { id: sessionId },
+    select: { history: true },
+  });
+
+  let logs: any[] = [];
+  if (existing?.history) {
+    if (typeof existing.history === "object" && Array.isArray((existing.history as any).logs)) {
+      logs = [...(existing.history as any).logs];
+    } else if (Array.isArray(existing.history)) {
+      logs = [...existing.history];
+    }
+  }
+
+  if (latestCompetencyLog) {
+    logs.push(latestCompetencyLog);
+  }
+
+  const finalHistoryData = {
+    logs,
+    finalStatus: status,
+    finalReason: reason || status,
+    finishedAt: new Date().toISOString(),
+  };
+
   return await prisma.quizSession.update({
     where: { id: sessionId },
     data: {
       status,
+      history: finalHistoryData as any,
     },
   });
 }
@@ -128,8 +159,8 @@ export async function getLobbyQuizQuestions(ujianId: number) {
   return questions.sort(() => 0.5 - Math.random()).slice(0, 10);
 }
 
-export async function getCompetenciesForUjian(ujianId: number) {
-  return await prisma.ujianTemplateKompetensi.findMany({
+export async function getCompetenciesForUjian(ujianId: number, sessionId?: number) {
+  const competencies = await prisma.ujianTemplateKompetensi.findMany({
     where: { ujianId, isEnabled: true },
     include: {
       kompetensiBab: true,
@@ -137,6 +168,31 @@ export async function getCompetenciesForUjian(ujianId: number) {
     orderBy: {
       kompetensiBab: { nomerKompetensi: "asc" },
     },
+  });
+
+  let historyLogs: any[] = [];
+  if (sessionId) {
+    const session = await prisma.quizSession.findUnique({
+      where: { id: sessionId },
+      select: { history: true },
+    });
+    if (session?.history && typeof session.history === "object" && Array.isArray((session.history as any).logs)) {
+      historyLogs = (session.history as any).logs;
+    } else if (Array.isArray(session?.history)) {
+      historyLogs = session.history;
+    }
+  }
+
+  return competencies.map((item) => {
+    const finishedLog = historyLogs.find(
+      (l: any) =>
+        l.competencyId === item.kompetensiBab.id &&
+        (l.status === "FINISHED" || l.conceptUnderstood === true)
+    );
+    return {
+      ...item,
+      isCompleted: !!finishedLog,
+    };
   });
 }
 
@@ -161,9 +217,32 @@ export async function getQuizSessionDetail(sessionId: number) {
   });
 }
 
-export async function updateQuizSessionHistory(sessionId: number, history: any, levelCompleted?: boolean) {
+export async function updateQuizSessionHistory(
+  sessionId: number,
+  competencyLog: any,
+  levelCompleted?: boolean
+) {
+  const existing = await prisma.quizSession.findUnique({
+    where: { id: sessionId },
+    select: { history: true },
+  });
+
+  let logs: any[] = [];
+  if (existing?.history) {
+    if (typeof existing.history === "object" && Array.isArray((existing.history as any).logs)) {
+      logs = [...(existing.history as any).logs];
+    } else if (Array.isArray(existing.history)) {
+      logs = [...existing.history];
+    }
+  }
+
+  logs.push(competencyLog);
+
   const data: any = {
-    history,
+    history: {
+      logs,
+      updatedAt: new Date().toISOString(),
+    },
     lastActiveAt: new Date(),
   };
 
@@ -194,3 +273,10 @@ export async function getUjianIdByJadwal(jadwalId: number) {
   });
   return jadwal?.ujianId || null;
 }
+
+export async function getCompetencyById(kompetensiBabId: number) {
+  return await prisma.kompetensiBab.findUnique({
+    where: { id: kompetensiBabId },
+  });
+}
+

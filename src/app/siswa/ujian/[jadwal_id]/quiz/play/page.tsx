@@ -12,6 +12,7 @@ export default function QuizPlayPage({
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
   const sessionId = searchParams.get("sessionId");
+  const competencyId = searchParams.get("competencyId") || searchParams.get("competency_id");
 
   if (!sessionId) {
     return (
@@ -26,6 +27,7 @@ export default function QuizPlayPage({
     <QuizPlayClient
       sessionId={Number(sessionId)}
       jadwalId={resolvedParams.jadwal_id}
+      competencyId={competencyId ? Number(competencyId) : null}
     />
   );
 }

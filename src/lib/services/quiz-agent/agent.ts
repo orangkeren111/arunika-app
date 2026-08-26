@@ -1,174 +1,147 @@
 "use server";
 
-import { generateText, jsonSchema, isStepCount } from "ai";
-import { getFastTextModel, getSmartTextModel } from "../llm/providers";
+import { Content, Part } from "@google/genai";
 import prisma from "../db/prisma";
+import { googleGenAI as ai, DEFAULT_GEMINI_MODEL as DEFAULT_AGENT_MODEL } from "../llm/providers";
+import {
+  queryQuestionsToolDeclaration,
+  submitQuestionSelectionToolDeclaration,
+  submitAnswerEvaluationToolDeclaration,
+  executeQueryQuestionsFromBank,
+  executeFallbackQuestionSelection,
+} from "./tools";
 
-const QUIZ_AGENT_PROMPTS = {
+const CAPTAIN_CHILI_PROMPTS = {
   selectQuestions: (competencyName: string) => `
-You are an expert AI Teacher Assistant (acting as a friendly Eagle Mascot named Elang).
-Your task is to select exactly 5 questions to assess a student's understanding of the following competency:
+You are Captain Chili, a super friendly, relaxed, and encouraging Capybara AI Teacher assistant.
+Your main goal is to help teach the student and assess their learning progress effectively.
+
+You need to select exactly 5 questions to diagnose and evaluate a student's understanding of the following competency:
 "${competencyName}"
 
-To find questions, you must call the tool "queryQuestionsFromBank". 
-Try searching with different Bloom's taxonomy levels (C1 to C6) and keywords related to the competency topic.
-Once you have retrieved a pool of questions, you must select exactly 5 questions that provide a balanced mix of difficulty and Bloom's levels, and submit them by calling the tool "submitQuestionSelection" with your selected 5 question IDs.
+Instructions:
+1. First, search for candidate questions using the tool "queryQuestionsFromBank". Search with different Bloom's taxonomy levels (C1 to C6) and keywords relevant to the topic.
+2. Carefully review the retrieved questions. Pick 5 questions that offer a balanced progression from foundational understanding (C1-C2) to deeper application and analysis (C3-C6).
+3. Once you have chosen the best 5 questions, you MUST call the tool "submitQuestionSelection" with your selected 5 question IDs.
 `,
 
   evaluateAnswers: (answersData: string) => `
-You are Elang, a friendly and encouraging Eagle Mascot who acts as an AI Teacher.
-Review the student's answers for the 5 quiz questions. Provide a short, constructive, and fun feedback in Indonesian.
-Act like an encouraging mentor. Also, determine if the student has demonstrated a strong understanding of this competency (e.g. got most/all answers correct with good logic).
+You are Captain Chili, a friendly and warm Capybara AI Teacher who loves guiding students toward mastery.
+Your goal is to provide pedagogical feedback that helps the student learn from their results, feel motivated, and build confidence.
 
-Student Session Data:
+Review the student's submission for 5 quiz questions:
 ${answersData}
 
-You MUST call the tool "submitAnswerEvaluation" with your feedback and understanding assessment.
-`
+Instructions:
+1. Provide short, constructive, and highly encouraging pedagogical feedback in Indonesian as Captain Chili the Capybara mentor.
+2. Acknowledge what the student did well, explain concepts gently if they made mistakes, and inspire a growth mindset ("Santai tapi fokus bersama Kapten Chili!").
+3. Determine conceptUnderstood: Set conceptUnderstood to true ONLY if the student demonstrated genuine understanding by correctly answering key concept and higher-difficulty questions in this batch.
+4. You MUST call the tool "submitAnswerEvaluation" with your feedback and conceptUnderstood assessment.
+`,
 };
 
+/**
+ * Selects 5 balanced diagnostic questions for a given competency using Google GenAI SDK tool calling.
+ */
 export async function agentSelectQuestions(kompetensiBabId: number): Promise<number[]> {
   try {
     const competency = await prisma.kompetensiBab.findUnique({
       where: { id: kompetensiBabId },
     });
-    const competencyName = competency?.isiKompetensi || `Competency ID ${kompetensiBabId}`;
-    const prompt = QUIZ_AGENT_PROMPTS.selectQuestions(competencyName);
+    const competencyName = competency?.isiKompetensi || `Kompetensi ID ${kompetensiBabId}`;
+    const prompt = CAPTAIN_CHILI_PROMPTS.selectQuestions(competencyName);
 
     let selectedIds: number[] = [];
 
-    const result = await generateText({
-      model: getFastTextModel(),
-      prompt,
-      tools: {
-        queryQuestionsFromBank: {
-          description: "Search and retrieve questions from the bank for this competency filtering by Bloom's taxonomy level (C1-C6) and a search keyword.",
-          inputSchema: jsonSchema<{ bloomLevel: string; keyword: string }>({
-            type: "object",
-            properties: {
-              bloomLevel: {
-                type: "string",
-                enum: ["C1", "C2", "C3", "C4", "C5", "C6"],
-                description: "Bloom's taxonomy level (C1-C6)",
-              },
-              keyword: {
-                type: "string",
-                description: "Keyword to match against the question text",
-              },
-            },
-            required: ["bloomLevel", "keyword"],
-          }),
-          execute: async ({ bloomLevel, keyword }) => {
-            // Primary Search: competency + bloomLevel + keyword
-            let questions = await prisma.bankSoal.findMany({
-              where: {
-                kompetensiBabId,
-                bloomLevel,
-                teksSoal: { contains: keyword, mode: "insensitive" },
-                isAccepted: true,
-                isRejected: false,
-              },
-              select: {
-                id: true,
-                teksSoal: true,
-                difficulty: true,
-                bloomLevel: true,
-              },
-            });
-
-            // Fallback 1: Search by competency + bloomLevel (without keyword)
-            if (questions.length === 0) {
-              questions = await prisma.bankSoal.findMany({
-                where: {
-                  kompetensiBabId,
-                  bloomLevel,
-                  isAccepted: true,
-                  isRejected: false,
-                },
-                select: {
-                  id: true,
-                  teksSoal: true,
-                  difficulty: true,
-                  bloomLevel: true,
-                },
-              });
-            }
-
-            // Fallback 2: Search by competency + keyword (without bloomLevel)
-            if (questions.length === 0) {
-              questions = await prisma.bankSoal.findMany({
-                where: {
-                  kompetensiBabId,
-                  teksSoal: { contains: keyword, mode: "insensitive" },
-                  isAccepted: true,
-                  isRejected: false,
-                },
-                select: {
-                  id: true,
-                  teksSoal: true,
-                  difficulty: true,
-                  bloomLevel: true,
-                },
-              });
-            }
-
-            // Fallback 3: Retrieve any questions in this competency
-            if (questions.length === 0) {
-              questions = await prisma.bankSoal.findMany({
-                where: {
-                  kompetensiBabId,
-                  isAccepted: true,
-                  isRejected: false,
-                },
-                select: {
-                  id: true,
-                  teksSoal: true,
-                  difficulty: true,
-                  bloomLevel: true,
-                },
-                take: 15,
-              });
-            }
-
-            return {
-              status: "success",
-              count: questions.length,
-              questions: questions.map(q => ({
-                id: q.id,
-                text: q.teksSoal,
-                difficulty: q.difficulty,
-                bloomLevel: q.bloomLevel,
-              })),
-            };
-          },
-        },
-        submitQuestionSelection: {
-          description: "Submit the list of exactly 5 selected question IDs.",
-          inputSchema: jsonSchema<{ selectedIds: number[] }>({
-            type: "object",
-            properties: {
-              selectedIds: {
-                type: "array",
-                items: { type: "number" },
-                description: "Exactly 5 question IDs selected from the pool",
-              },
-            },
-            required: ["selectedIds"],
-          }),
-          execute: async (args: { selectedIds: number[] }) => {
-            selectedIds = args.selectedIds;
-            return "Question selection registered.";
-          },
-        },
+    const contents: Content[] = [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
       },
-      stopWhen: isStepCount(5), // Allow more steps for querying and selecting
-    });
+    ];
 
-    // Fallback in case tool execution didn't populate selectedIds
-    if (selectedIds.length === 0 && result.toolCalls && result.toolCalls.length > 0) {
-      const call = result.toolCalls.find((c) => c.toolName === "submitQuestionSelection") as any;
-      if (call && call.args && Array.isArray(call.args.selectedIds)) {
-        selectedIds = call.args.selectedIds.map(Number);
+    const tools = [
+      {
+        functionDeclarations: [
+          queryQuestionsToolDeclaration,
+          submitQuestionSelectionToolDeclaration,
+        ],
+      },
+    ];
+
+    // Multi-turn agent interaction loop
+    const MAX_TURNS = 6;
+    for (let turn = 0; turn < MAX_TURNS; turn++) {
+      const response = await ai.models.generateContent({
+        model: DEFAULT_AGENT_MODEL,
+        contents,
+        config: {
+          tools,
+          systemInstruction:
+            "You are Captain Chili, a pedagogical Capybara AI Teacher assistant focused on effective student learning and scaffolding.",
+        },
+      });
+
+      const candidate = response.candidates?.[0];
+      const modelContent = candidate?.content;
+
+      if (!modelContent) {
+        break;
+      }
+
+      // Push model's turn to conversation history
+      contents.push(modelContent);
+
+      const functionCalls = response.functionCalls;
+      if (!functionCalls || functionCalls.length === 0) {
+        // Model stopped calling tools
+        break;
+      }
+
+      const responseParts: Part[] = [];
+
+      for (const call of functionCalls) {
+        if (call.name === "queryQuestionsFromBank") {
+          const args = (call.args || {}) as { bloomLevel?: string; keyword?: string };
+          const bloomLevel = args.bloomLevel || "C1";
+          const keyword = args.keyword || "";
+
+          const queryResult = await executeQueryQuestionsFromBank(
+            kompetensiBabId,
+            bloomLevel,
+            keyword
+          );
+
+          responseParts.push({
+            functionResponse: {
+              name: "queryQuestionsFromBank",
+              response: queryResult as unknown as Record<string, unknown>,
+            },
+          });
+        } else if (call.name === "submitQuestionSelection") {
+          const args = (call.args || {}) as { selectedIds?: number[] };
+          if (Array.isArray(args.selectedIds)) {
+            selectedIds = args.selectedIds.map(Number);
+          }
+
+          responseParts.push({
+            functionResponse: {
+              name: "submitQuestionSelection",
+              response: { status: "registered", count: selectedIds.length },
+            },
+          });
+        }
+      }
+
+      if (responseParts.length > 0) {
+        contents.push({
+          role: "user",
+          parts: responseParts,
+        });
+      }
+
+      if (selectedIds.length === 5) {
+        return selectedIds;
       }
     }
 
@@ -176,28 +149,22 @@ export async function agentSelectQuestions(kompetensiBabId: number): Promise<num
       return selectedIds;
     }
 
-    // Ultimate fallback: query directly and return any 5 questions if agent failed
-    const directQuestions = await prisma.bankSoal.findMany({
-      where: {
-        kompetensiBabId,
-        isAccepted: true,
-        isRejected: false,
-      },
-      select: { id: true },
-      take: 5,
-    });
-    if (directQuestions.length > 0) {
-      return directQuestions.map((q) => q.id);
+    // Fallback: direct database query if tool loop ended without 5 selected IDs
+    const fallbackIds = await executeFallbackQuestionSelection(kompetensiBabId);
+    if (fallbackIds.length > 0) {
+      return fallbackIds;
     }
 
     throw new Error("No questions available for this competency");
   } catch (error) {
     console.error("Error in agentSelectQuestions:", error);
-    // Ultimate fallback empty array or generic logic
-    return [];
+    return await executeFallbackQuestionSelection(kompetensiBabId);
   }
 }
 
+/**
+ * Evaluates student quiz answers and generates pedagogical feedback from Captain Chili.
+ */
 export async function agentEvaluateAnswers(
   questionsWithAnswers: any[]
 ): Promise<{ feedback: string; conceptUnderstood: boolean }> {
@@ -211,61 +178,66 @@ export async function agentEvaluateAnswers(
     bloomLevel: item.bloomLevel || "C1",
   }));
 
-  const prompt = QUIZ_AGENT_PROMPTS.evaluateAnswers(JSON.stringify(formattedData, null, 2));
+  const prompt = CAPTAIN_CHILI_PROMPTS.evaluateAnswers(
+    JSON.stringify(formattedData, null, 2)
+  );
 
   try {
     let evaluationResult: { feedback: string; conceptUnderstood: boolean } | null = null;
 
-    const result = await generateText({
-      model: getSmartTextModel(),
-      prompt,
-      tools: {
-        submitAnswerEvaluation: {
-          description: "Submit evaluation feedback and concept understanding assessment for the student.",
-          inputSchema: jsonSchema<{ feedback: string; conceptUnderstood: boolean }>({
-            type: "object",
-            properties: {
-              feedback: {
-                type: "string",
-                description: "Constructive, friendly feedback in Indonesian written as Elang the eagle mascot.",
-              },
-              conceptUnderstood: {
-                type: "boolean",
-                description: "true ONLY if student correctly answered the relatively high-weight / high-difficulty questions in this competency batch (demonstrated mastery, not just random guessing on easy ones)",
-              },
-            },
-            required: ["feedback", "conceptUnderstood"],
-          }),
-          execute: async (args: { feedback: string; conceptUnderstood: boolean }) => {
-            evaluationResult = args;
-            return "Evaluation saved.";
-          },
-        },
+    const contents: Content[] = [
+      {
+        role: "user",
+        parts: [{ text: prompt }],
       },
-      stopWhen: isStepCount(3),
+    ];
+
+    const tools = [
+      {
+        functionDeclarations: [submitAnswerEvaluationToolDeclaration],
+      },
+    ];
+
+    const response = await ai.models.generateContent({
+      model: DEFAULT_AGENT_MODEL,
+      contents,
+      config: {
+        tools,
+        systemInstruction:
+          "You are Captain Chili, an encouraging Capybara AI Teacher mentor guiding students with growth-mindset feedback.",
+      },
     });
 
-    // Fallback in case tool execution didn't populate evaluationResult
-    if (!evaluationResult && result.toolCalls && result.toolCalls.length > 0) {
-      const call = result.toolCalls.find((c) => c.toolName === "submitAnswerEvaluation") as any;
-      if (call && call.args) {
-        evaluationResult = call.args;
+    const functionCalls = response.functionCalls;
+    if (functionCalls && functionCalls.length > 0) {
+      const evalCall = functionCalls.find((c) => c.name === "submitAnswerEvaluation");
+      if (evalCall && evalCall.args) {
+        const args = evalCall.args as any;
+        if (typeof args.feedback === "string" && typeof args.conceptUnderstood === "boolean") {
+          evaluationResult = {
+            feedback: args.feedback,
+            conceptUnderstood: args.conceptUnderstood,
+          };
+        }
       }
     }
 
     if (evaluationResult) {
       return evaluationResult;
     }
-    throw new Error("Agent failed to provide evaluation feedback");
+
+    throw new Error("Agent evaluation tool call not received");
   } catch (error) {
     console.error("Error in agentEvaluateAnswers:", error);
     const correctCount = questionsWithAnswers.filter((q) => q.isCorrect).length;
-    // Weighted fallback calculation: Check if high-difficulty questions (difficulty >= 6) were answered correctly
-    const highDifficultyCorrect = questionsWithAnswers.filter((q) => q.isCorrect && (q.difficulty || 5) >= 6).length;
-    const isConceptUnderstood = correctCount >= 4 || (correctCount >= 3 && highDifficultyCorrect >= 2);
+    const highDifficultyCorrect = questionsWithAnswers.filter(
+      (q) => q.isCorrect && (q.difficulty || 5) >= 6
+    ).length;
+    const isConceptUnderstood =
+      correctCount >= 4 || (correctCount >= 3 && highDifficultyCorrect >= 2);
 
     return {
-      feedback: `Hebat! Kamu berhasil menjawab ${correctCount} dari 5 soal dengan benar. Terus semangat belajar bersama Elang ya!`,
+      feedback: `Halo kawan! Kamu berhasil menjawab ${correctCount} dari 5 soal dengan benar. Tetap santai dan semangat belajar bersama Kapten Chili ya! 🦫🌶️`,
       conceptUnderstood: isConceptUnderstood,
     };
   }

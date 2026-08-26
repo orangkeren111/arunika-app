@@ -2,7 +2,7 @@
 
 import React, { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Trash2, Upload } from "lucide-react";
 import { useSoalViewModel } from "./GuruSoalViewModel";
 import { MathRenderer } from "@/src/components/MathRenderer";
 import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
@@ -29,11 +29,18 @@ export default function BankSoalClientPage({
     handleAcceptSoal,
     handleRejectSoal,
     handleUploadImage,
+    handleUploadBabPdf,
   } = useSoalViewModel(babId);
 
   // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // --- UPLOAD PDF MODAL STATE ---
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [selectedPdfFile, setSelectedPdfFile] = useState<File | null>(null);
+  const [jumlahSoalPdf, setJumlahSoalPdf] = useState<number>(10);
+  const [isUploadingPdf, setIsUploadingPdf] = useState(false);
 
   // --- FORM STATE ---
   const [formType, setFormType] = useState<TipeSoal>("MCQ");
@@ -42,6 +49,7 @@ export default function BankSoalClientPage({
   const [bloomLevel, setBloomLevel] = useState("");
   const [opsiJawaban, setOpsiJawaban] = useState<string[]>(["", "", "", ""]); // Default 4 opsi
   const [jawabanBenarIndex, setJawabanBenarIndex] = useState<number>(0);
+  const [jawabanBenarEssay, setJawabanBenarEssay] = useState<string>("");
   const [kompetensiBabId, setKompetensiBabId] = useState<string>("");
   const [linkGambarSoal, setLinkGambarSoal] = useState<string>("");
 
@@ -55,6 +63,7 @@ export default function BankSoalClientPage({
       setBloomLevel(soalToEdit.bloomLevel || "C1");
       setKompetensiBabId(soalToEdit.kompetensiBabId || "");
       setLinkGambarSoal(soalToEdit.linkGambarSoal || "");
+      setJawabanBenarEssay(soalToEdit.jawabanBenarEssay || "");
       if (soalToEdit.type === "MCQ") {
         setOpsiJawaban(soalToEdit.options || ["", "", "", ""]);
         const correctIdx = soalToEdit.options?.findIndex(
@@ -69,6 +78,7 @@ export default function BankSoalClientPage({
       setTeksSoal("");
       setOpsiJawaban(["", "", "", ""]);
       setJawabanBenarIndex(0);
+      setJawabanBenarEssay("");
       setDifficulty(1);
       setBloomLevel("C1");
       setKompetensiBabId("");
@@ -102,6 +112,7 @@ export default function BankSoalClientPage({
       opsiJawaban: formType === "MCQ" ? opsiJawaban : null,
       jawabanBenarMcq:
         formType === "MCQ" ? opsiJawaban[jawabanBenarIndex] : null,
+      jawabanBenarEssay: formType === "ESSAY" ? jawabanBenarEssay : null,
       babId: Number(babId),
       difficulty: difficulty ? difficulty : 1,
       bloomLevel: bloomLevel ? bloomLevel : "C1",
@@ -117,6 +128,7 @@ export default function BankSoalClientPage({
         text: payload.teksSoal,
         options: payload.opsiJawaban ?? [],
         correctAnswer: payload.jawabanBenarMcq ?? "",
+        jawabanBenarEssay: payload.jawabanBenarEssay ?? "",
         kompetensiBabId: kompetensiBabId || null,
         linkGambarSoal: linkGambarSoal || "",
       });
@@ -130,6 +142,7 @@ export default function BankSoalClientPage({
         payload.jawabanBenarMcq ?? "",
         kompetensiBabId || null,
         linkGambarSoal || "",
+        payload.jawabanBenarEssay ?? "",
       );
     }
 
@@ -159,7 +172,13 @@ export default function BankSoalClientPage({
             Kelola Soal Pilihan Ganda dan Essay.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <button
+            onClick={() => setIsUploadModalOpen(true)}
+            className="bg-blue-600/10 text-blue-600 border border-blue-500/20 px-4 py-2 rounded-lg text-sm hover:bg-blue-600/20 transition flex items-center gap-2 font-medium"
+          >
+            <Upload size={16} /> Upload PDF Materi
+          </button>
           <Link
             href={`/guru/buku/${id}/bab/${babId}/kompetensi`}
             className="bg-purple-600/10 text-purple-600 border border-purple-500/20 px-4 py-2 rounded-lg text-sm hover:bg-purple-600/20 transition flex items-center gap-2 font-medium"
@@ -289,6 +308,16 @@ export default function BankSoalClientPage({
                     </div>
                   );
                 })}
+              </div>
+            )}
+
+            {/* Kunci Jawaban untuk ESSAY */}
+            {soal.type === "ESSAY" && soal.jawabanBenarEssay && (
+              <div className="p-3 rounded-lg border border-emerald-500/20 bg-emerald-500/5 text-sm text-emerald-800 dark:text-emerald-300">
+                <span className="font-bold text-xs uppercase tracking-wider block mb-1">
+                  Kunci / Acuan Jawaban Essay:
+                </span>
+                <MathRenderer text={soal.jawabanBenarEssay} />
               </div>
             )}
           </div>
@@ -509,6 +538,22 @@ export default function BankSoalClientPage({
                   </button>
                 </div>
               )}
+
+              {/* ESSAY Answer Key Input */}
+              {formType === "ESSAY" && (
+                <div className="space-y-2 border-t border-[var(--border)] pt-4">
+                  <label className="block text-sm font-medium text-[var(--muted-foreground)]">
+                    Kunci / Panduan Jawaban Essay Benar
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={jawabanBenarEssay}
+                    onChange={(e) => setJawabanBenarEssay(e.target.value)}
+                    placeholder="Ketikkan kunci / acuan jawaban benar untuk essay ini (akan digunakan AI sebagai referensi penilaian)..."
+                    className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition text-xs"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Modal Footer */}
@@ -528,6 +573,87 @@ export default function BankSoalClientPage({
                 className="px-6 py-2 rounded-lg text-sm font-medium bg-[var(--primary)] text-[var(--primary-foreground)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Simpan Soal
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL UPLOAD PDF BAB --- */}
+      {isUploadModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-md p-6 space-y-4 shadow-xl">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <h3 className="text-lg font-bold text-[var(--foreground)]">
+                Upload PDF Materi Bab
+              </h3>
+              <button
+                onClick={() => setIsUploadModalOpen(false)}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Upload file PDF materi khusus untuk bab ini. AI akan mengekstrak tujuan pembelajaran, mengolah gambar, dan membuat bank soal reference.
+            </p>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  File PDF Materi
+                </label>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setSelectedPdfFile(e.target.files[0]);
+                    }
+                  }}
+                  className="w-full text-sm text-[var(--foreground)] file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--primary)] file:text-[var(--primary-foreground)] hover:file:opacity-90 cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Jumlah Soal yang Dihasilkan
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={jumlahSoalPdf}
+                  onChange={(e) => setJumlahSoalPdf(Number(e.target.value))}
+                  className="w-full p-2.5 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setIsUploadModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+              >
+                Batal
+              </button>
+              <button
+                disabled={!selectedPdfFile || isUploadingPdf}
+                onClick={async () => {
+                  if (selectedPdfFile) {
+                    setIsUploadingPdf(true);
+                    try {
+                      await handleUploadBabPdf(selectedPdfFile, jumlahSoalPdf);
+                      setIsUploadModalOpen(false);
+                      setSelectedPdfFile(null);
+                      alert("PDF berhasil diunggah! AI sedang memproses bab di latar belakang.");
+                    } catch (err) {
+                      alert("Gagal mengunggah PDF.");
+                    } finally {
+                      setIsUploadingPdf(false);
+                    }
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-sm bg-[var(--primary)] text-[var(--primary-foreground)] font-medium hover:opacity-90 disabled:opacity-50"
+              >
+                {isUploadingPdf ? "Mengunggah..." : "Upload & Proses AI"}
               </button>
             </div>
           </div>

@@ -15,7 +15,11 @@ interface Question {
   correctAnswer: string;
 }
 
-export function useQuizPlayViewModel(sessionId: number, jadwalId: string) {
+export function useQuizPlayViewModel(
+  sessionId: number,
+  jadwalId: string,
+  targetCompetencyId?: number | null
+) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
   const [competencies, setCompetencies] = useState<Competency[]>([]);
@@ -45,7 +49,7 @@ export function useQuizPlayViewModel(sessionId: number, jadwalId: string) {
       const detail = await quizRepository.getQuizSessionDetail(sessionId);
       if (!detail || detail.status !== "PLAYING") {
         setIsGameOver(true);
-        setGameOutcome(detail?.status as any || "FAIL");
+        setGameOutcome((detail?.status as any) || "FAIL");
         setLoading(false);
         return;
       }
@@ -55,17 +59,25 @@ export function useQuizPlayViewModel(sessionId: number, jadwalId: string) {
       const list = await quizRepository.getCompetenciesForUjian(detail.ujianId);
       setCompetencies(list);
 
-      const levelIdx = detail.currentLevel - 1;
-      if (levelIdx >= list.length) {
-        // Already cleared all levels!
-        await quizRepository.finishOrFailSession(sessionId, "FINISHED");
-        setGameOutcome("WIN");
-        setIsGameOver(true);
-        setLoading(false);
-        return;
+      // Resolve targeted competency or fallback to current session level
+      let activeComp: Competency | undefined;
+      if (targetCompetencyId) {
+        activeComp = list.find((c) => c.id === targetCompetencyId);
       }
 
-      const activeComp = list[levelIdx];
+      if (!activeComp) {
+        const levelIdx = detail.currentLevel - 1;
+        if (levelIdx >= list.length) {
+          // Already cleared all levels!
+          await quizRepository.finishOrFailSession(sessionId, "FINISHED");
+          setGameOutcome("WIN");
+          setIsGameOver(true);
+          setLoading(false);
+          return;
+        }
+        activeComp = list[levelIdx] || list[0];
+      }
+
       setCurrentComp(activeComp);
 
       // 3. Load active batch questions
@@ -159,13 +171,35 @@ export function useQuizPlayViewModel(sessionId: number, jadwalId: string) {
   };
 
   const handleTimeout = async () => {
-    await quizRepository.finishOrFailSession(sessionId, "FAILED");
+    const timeoutLog = {
+      siswaId: session?.siswaId,
+      ujianId: session?.ujianId,
+      competencyId: currentComp?.id,
+      competencyName: currentComp?.name,
+      status: "NOT_FINISHED",
+      reason: "TIME_EXPIRED",
+      agentFeedback: agentFeedback || "Waktu sesi kuis telah habis.",
+      conceptUnderstood: false,
+      timestamp: new Date().toISOString(),
+    };
+    await quizRepository.finishOrFailSession(sessionId, "FAILED", "TIME_EXPIRED", timeoutLog);
     setGameOutcome("FAIL");
     setIsGameOver(true);
   };
 
   const handleAfkKick = async () => {
-    await quizRepository.finishOrFailSession(sessionId, "AFK");
+    const afkLog = {
+      siswaId: session?.siswaId,
+      ujianId: session?.ujianId,
+      competencyId: currentComp?.id,
+      competencyName: currentComp?.name,
+      status: "NOT_FINISHED",
+      reason: "AFK_INACTIVITY",
+      agentFeedback: "Pemain tidak aktif (AFK). Sesi dihentikan.",
+      conceptUnderstood: false,
+      timestamp: new Date().toISOString(),
+    };
+    await quizRepository.finishOrFailSession(sessionId, "AFK", "AFK_INACTIVITY", afkLog);
     setGameOutcome("AFK");
     setIsGameOver(true);
     setShowIdlePrompt(false);
@@ -203,29 +237,56 @@ export function useQuizPlayViewModel(sessionId: number, jadwalId: string) {
 
     // 2. Count incorrect answers
     const wrongCount = evaluationData.filter((q) => !q.isCorrect).length;
+    const currentStreak = (session?.wrongStreak || 0) + wrongCount;
+
+    // Create structured competency log
+    const competencyLog = {
+      siswaId: session?.siswaId,
+      ujianId: session?.ujianId,
+      competencyId: currentComp?.id,
+      competencyName: currentComp?.name,
+      status: result.conceptUnderstood ? "FINISHED" : "NOT_FINISHED",
+      reason: result.conceptUnderstood
+        ? "CONCEPT_MASTERED"
+        : currentStreak >= 5
+        ? "WRONG_STREAK_EXCEEDED"
+        : "NEEDS_MORE_PRACTICE",
+      agentFeedback: result.feedback,
+      conceptUnderstood: result.conceptUnderstood,
+      evaluationBatch: evaluationData,
+      timestamp: new Date().toISOString(),
+    };
 
     if (result.conceptUnderstood) {
       setLevelCompleted(true);
-      // Update session level in DB
       const nextLevel = session.currentLevel + 1;
       const finishedAll = nextLevel > competencies.length;
 
-      await quizRepository.updateQuizSessionHistory(sessionId, evaluationData, true);
+      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, true);
 
       if (finishedAll) {
-        await quizRepository.finishOrFailSession(sessionId, "FINISHED");
+        await quizRepository.finishOrFailSession(
+          sessionId,
+          "FINISHED",
+          "ALL_COMPETENCIES_MASTERED",
+          competencyLog
+        );
         setGameOutcome("WIN");
         setIsGameOver(true);
       }
     } else {
-      // Add wrong streak count
-      let currentStreak = session.wrongStreak + wrongCount;
       if (currentStreak >= 5) {
-        await quizRepository.finishOrFailSession(sessionId, "FAILED");
+        await quizRepository.finishOrFailSession(
+          sessionId,
+          "FAILED",
+          "WRONG_STREAK_EXCEEDED",
+          competencyLog
+        );
         setGameOutcome("FAIL");
         setIsGameOver(true);
       } else {
-        // Just increment wrong streak in DB
+        // Log current attempt in history without levelling up
+        await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
         for (let i = 0; i < wrongCount; i++) {
           await quizRepository.incrementWrongStreak(sessionId);
         }

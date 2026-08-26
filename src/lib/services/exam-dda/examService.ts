@@ -58,10 +58,18 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
     examData.ujian.isAdaptive !== false
   );
 
+  const enabledComp = examData.ujian.templateKompetensi.filter((tk) => tk.isEnabled);
+  const totalQuestions = enabledComp.length > 0
+    ? enabledComp.reduce((sum, tk) => sum + tk.jumlahSoal, 0)
+    : examData.ujian.jumlahSoal || 10;
+  const durationMinutes = examData.ujian.durasiMenit || 90;
+
   return {
     sessionId: session.id,
     currentElo: session.currentElo,
     answeredCount: session.jawabanSiswa.length,
+    totalQuestions,
+    durationMinutes,
     nextQuestion,
     isResuming,
   };
@@ -114,41 +122,46 @@ export async function submitSingleAnswer(
       ? DDAHelper.calculateNewElo(eloBefore, originalQuestion.difficulty, isCorrect)
       : eloBefore;
 
-  // 5. Snapshot the answer to DB
-  const attemptNumber = session.jawabanSiswa.length + 1;
-  await siswaDB.saveSingleAnswer({
-    attemptId: sesiId,
-    soalAsliId: originalQuestion.id,
-    nomor: attemptNumber,
-    teksSoal: originalQuestion.teksSoal,
-    opsiJawaban: Array.isArray(originalQuestion.opsiJawaban) ? originalQuestion.opsiJawaban : [],
-    jawabanBenarMcq: originalQuestion.jawabanBenarMcq ?? "",
-    type: originalQuestion.type,
-    difficulty: originalQuestion.difficulty,
-    bloomLevel: originalQuestion.bloomLevel ?? "C1",
-    jawabanSiswa: jawabanSiswaText,
-    isCorrect: isCorrect,
-    nilaiPoin: originalQuestion.type === TipeSoal.MCQ ? (isCorrect ? 100 : 0) : null,
-    answeredAt: new Date(),
-    eloBefore: eloBefore,
-    eloAfter: eloAfter,
-  });
+  // 5. Snapshot the answer to DB if not already submitted
+  const alreadyAnswered = session.jawabanSiswa.some((j) => j.soalAsliId === soalId);
+  const attemptNumber = alreadyAnswered
+    ? session.jawabanSiswa.length
+    : session.jawabanSiswa.length + 1;
 
-  // 6. Update Session ELO
-  await siswaDB.updateSessionElo(sesiId, eloAfter);
+  if (!alreadyAnswered) {
+    await siswaDB.saveSingleAnswer({
+      attemptId: sesiId,
+      soalAsliId: originalQuestion.id,
+      nomor: attemptNumber,
+      teksSoal: originalQuestion.teksSoal,
+      opsiJawaban: Array.isArray(originalQuestion.opsiJawaban) ? originalQuestion.opsiJawaban : [],
+      jawabanBenarMcq: originalQuestion.jawabanBenarMcq ?? "",
+      type: originalQuestion.type,
+      difficulty: originalQuestion.difficulty,
+      bloomLevel: originalQuestion.bloomLevel ?? "C1",
+      jawabanSiswa: jawabanSiswaText,
+      isCorrect: isCorrect,
+      nilaiPoin: originalQuestion.type === TipeSoal.MCQ ? (isCorrect ? 100 : 0) : null,
+      answeredAt: new Date(),
+      eloBefore: eloBefore,
+      eloAfter: eloAfter,
+    });
+
+    // 6. Update Session ELO
+    await siswaDB.updateSessionElo(sesiId, eloAfter);
+  }
 
   // 7. Check if exam is over based on the enabled competencies
   const enabledCompetencies = session.jadwalUjian?.ujian?.templateKompetensi?.filter((tk) => tk.isEnabled) || [];
   const totalQuestionsLimit = enabledCompetencies.reduce((sum, tk) => sum + tk.jumlahSoal, 0);
 
   const newAnsweredCount = attemptNumber;
-  if (newAnsweredCount >= totalQuestionsLimit) {
+  if (totalQuestionsLimit > 0 && newAnsweredCount >= totalQuestionsLimit) {
     await finishExamSession(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
 
   // 8. Prepare next question
-  // Re-fetch all available questions for this exam
   const examData = await prisma.jadwalUjian.findUnique({
     where: { id: jId },
     include: {
@@ -183,6 +196,12 @@ export async function submitSingleAnswer(
     session.jadwalUjian?.ujian?.templateKompetensi || [],
     session.jadwalUjian?.ujian?.isAdaptive !== false
   );
+
+  if (!nextQuestion) {
+    // If no more valid questions exist to serve, finish session gracefully
+    await finishExamSession(sesiId);
+    return { isFinished: true, finalElo: eloAfter };
+  }
 
   return {
     isFinished: false,
@@ -244,13 +263,13 @@ async function _findNextQuestion(
   if (!targetCompetency) return null; // All competency target limits met!
 
   // 4. Filter available questions to only those matching target competency
-  const competencyQuestions = availableQuestions.filter(
-    (q) => q.kompetensiBabId === targetCompetency.kompetensiBabId
+  let competencyQuestions = availableQuestions.filter(
+    (q) => targetCompetency && q.kompetensiBabId === targetCompetency.kompetensiBabId
   );
 
   if (competencyQuestions.length === 0) {
-    // Fallback: If no questions for this competency, search generally
-    return null;
+    // Fallback: If no remaining questions match this specific competency, pick from any available question in the exam
+    competencyQuestions = availableQuestions;
   }
 
   // 5. Check if we have Essay questions. Essay questions must be statically served (same for all students)

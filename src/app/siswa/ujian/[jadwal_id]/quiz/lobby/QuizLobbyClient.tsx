@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useQuizLobbyViewModel } from "./QuizLobbyViewModel";
-import { HelpCircle, ChevronRight, Play, RefreshCw, Trophy, Users, ShieldAlert, X } from "lucide-react";
+import { HelpCircle, ChevronRight, Play, RefreshCw, Trophy, Users, ShieldAlert, X, Sparkles } from "lucide-react";
 
 export default function QuizLobbyClient({
   jadwalId,
@@ -31,138 +31,224 @@ export default function QuizLobbyClient({
     handleCheckRoomAvailability,
     handleCloseClaimModal,
   } = useQuizLobbyViewModel(jadwalId, ujianId, siswaId);
+
+  // Local Mascot interactive state
+  const [mascotAction, setMascotAction] = useState<"idle" | "sleep" | "dance" | "eat">("idle");
+  const [showQuickModal, setShowQuickModal] = useState(false);
+  const [quickFeedback, setQuickFeedback] = useState<string | null>(null);
+
+  const triggerMascotAction = (action: "idle" | "sleep" | "dance" | "eat") => {
+    setMascotAction(action);
+    setTimeout(() => {
+      setMascotAction("idle");
+    }, 3500);
+  };
+
   if (loading) {
     return (
-      <div className="min-h-screen flex flex-col justify-center items-center bg-[#FAF8F3] text-[#39434D]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#7FA88F] mb-4"></div>
-        <p className="font-semibold text-sm">Menghubungkan ke Eagle's Open Room...</p>
+      <div className="min-h-screen flex flex-col justify-center items-center bg-[#FDF5E6] text-[#8B5A2B] p-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-[#8B5A2B] mb-4"></div>
+        <p className="font-bold text-base text-center">Menghubungkan ke CapyQuiz Lounge...</p>
       </div>
     );
   }
 
   const currentQ = lobbyQuestions[currentQIndex];
 
+  const getMascotDisplay = () => {
+    switch (mascotAction) {
+      case "sleep":
+        return { src: "/asset/capy-quiz/capy-sleep.png", label: "Capy Ketiduran... Zzz", bg: "bg-blue-100 border-blue-400" };
+      case "dance":
+        return { src: "/asset/capy-quiz/capy-dance.png", label: "Capy Joget Santai!", bg: "bg-amber-100 border-amber-400" };
+      case "eat":
+        return { src: "/asset/capy-quiz/capy-eat.png", label: "Capy Nyam-nyam Semangka!", bg: "bg-green-100 border-green-400" };
+      default:
+        return { src: "/asset/capy-quiz/capy-idle.png", label: "Capy Chill Mode", bg: "bg-[#A2CDB0] border-[#6B8E23]" };
+    }
+  };
+
+  const mascot = getMascotDisplay();
+
   return (
-    <div className="min-h-screen bg-[#FAF8F3] text-[#39434D] py-8 px-4 font-sans relative overflow-hidden">
-      {/* Background soft shapes */}
-      <div className="absolute top-0 left-0 w-64 h-64 bg-[#7FA88F]/5 rounded-full filter blur-3xl"></div>
-      <div className="absolute bottom-0 right-0 w-80 h-80 bg-blue-500/5 rounded-full filter blur-3xl"></div>
+    <div className="min-h-screen bg-capy-dots text-[#8B5A2B] py-6 px-3 md:px-6 font-sans relative overflow-x-hidden">
+      {/* Floating Decor Icons (Responsive background) */}
+      <div className="fixed top-6 left-4 text-4xl md:text-6xl opacity-20 pointer-events-none -z-10 -rotate-12">🌿</div>
+      <div className="fixed bottom-12 right-4 text-4xl md:text-6xl opacity-20 pointer-events-none -z-10 rotate-12">🍉</div>
+      <div className="fixed top-1/3 right-6 text-3xl md:text-4xl opacity-20 pointer-events-none -z-10">🍊</div>
+      <div className="fixed bottom-1/4 left-6 text-4xl md:text-5xl opacity-20 pointer-events-none -z-10">🛁</div>
 
       <div className="max-w-4xl mx-auto space-y-6 relative z-10">
 
-        {/* Mascot & Welcome Banner */}
-        <div className="bg-white rounded-3xl p-6 md:p-8 border border-[#7FA88F]/20 shadow-lg flex flex-col md:flex-row items-center gap-6">
-          <div className="text-6xl select-none animate-bounce">🦅</div>
-          <div className="space-y-2 text-center md:text-left flex-1">
-            <div className="inline-block bg-[#7FA88F]/10 text-[#7FA88F] text-xs px-2.5 py-1 rounded-full font-bold">
-              Maskot Elang
-            </div>
-            <h1 className="text-2xl md:text-3xl font-black text-[#39434D]">
-              Halo! Aku Elang, Penjaga Eagle's Open Room!
+        {/* Header Container */}
+        <header className="bg-white rounded-3xl p-5 md:p-6 border-4 border-[#D2B48C] shadow-xl text-center relative overflow-hidden">
+          <div className="bg-[#A2CDB0] -mx-6 -mt-6 p-4 border-b-4 border-[#D2B48C] mb-4">
+            <h1 className="text-2xl md:text-4xl font-black text-[#8B5A2B] tracking-wider drop-shadow-sm">
+              CapyQuiz Chill Zone
             </h1>
-            <p className="text-gray-600 text-sm md:text-base leading-relaxed">
-              "Ujianmu sudah selesai dan nilaimu sudah dianalisis. Sekarang, mari asah pemahaman kompetensimu lewat kuis kognitif interaktif bersamaku!"
+            <p className="text-xs md:text-sm font-bold text-[#8B5A2B]/90 mt-1">
+              Bersantai, Asah Otak, dan Bersiap Ujian Bersama Capybara!
             </p>
+          </div>
+          <p className="text-xs md:text-sm text-gray-700 leading-relaxed max-w-xl mx-auto">
+            "Nilai ujianmu telah disintesis. Mari pemanasan dan persiapkan kompetensimu di lounge santai ini!"
+          </p>
+        </header>
+
+        {/* Interactive Mascot Lounge Area */}
+        <div className="bg-white rounded-3xl p-6 md:p-8 border-4 border-[#D2B48C] shadow-lg flex flex-col items-center justify-center relative min-h-[300px]">
+          <div className="text-center mb-4">
+            <span className="inline-block bg-[#A2CDB0]/40 text-[#8B5A2B] text-xs px-3 py-1 rounded-full font-black border border-[#6B8E23]/30">
+              Lounge Maskot Capy
+            </span>
+            <h2 className="text-lg md:text-xl font-bold mt-1 text-[#8B5A2B]">Sapa Maskot Capy Sebelum Beraksi!</h2>
+          </div>
+
+          {/* Mascot Stage */}
+          <div className="relative w-full max-w-md flex justify-center items-end h-56 mb-6">
+            {/* Interactive Action Buttons (Stacked on mobile, side menu on desktop) */}
+            <div className="absolute left-0 sm:left-2 top-1/2 -translate-y-1/2 flex flex-col gap-2 sm:gap-3 z-20">
+              <button
+                onClick={() => triggerMascotAction("sleep")}
+                className="btn-capy bg-[#D2B48C] hover:bg-[#c4a47c] text-white font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full text-xs sm:text-sm flex items-center gap-1.5 shadow"
+              >
+                <span>💤</span> Sleep
+              </button>
+              <button
+                onClick={() => triggerMascotAction("dance")}
+                className="btn-capy bg-[#D2B48C] hover:bg-[#c4a47c] text-white font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full text-xs sm:text-sm flex items-center gap-1.5 shadow"
+              >
+                <span>💃</span> Dance
+              </button>
+              <button
+                onClick={() => triggerMascotAction("eat")}
+                className="btn-capy bg-[#D2B48C] hover:bg-[#c4a47c] text-white font-bold py-1.5 px-3 sm:py-2 sm:px-4 rounded-full text-xs sm:text-sm flex items-center gap-1.5 shadow"
+              >
+                <span>🍉</span> Eat
+              </button>
+            </div>
+
+            {/* Main Capybara Mascot Avatar (Clean PNG Image) */}
+            <div className="relative z-10 flex flex-col items-center bounce-anim">
+              <img
+                src={mascot.src}
+                alt="Capybara Mascot"
+                className="w-40 h-40 sm:w-52 sm:h-52 object-contain drop-shadow-md transition-all duration-300"
+              />
+            </div>
+
+            {/* Grass Carpet Floor */}
+            <div className="absolute bottom-[-10px] w-3/4 sm:w-2/3 h-14 carpet -z-0"></div>
+          </div>
+
+          {/* Quick Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 w-full max-w-md mt-2">
+            <button
+              onClick={handleCheckRoomAvailability}
+              disabled={checkingAvailability}
+              className="btn-capy flex-1 bg-[#6B8E23] hover:bg-[#58771c] text-white text-base sm:text-lg font-black py-3.5 px-5 rounded-2xl flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              <RefreshCw size={20} className={checkingAvailability ? "animate-spin" : ""} />
+              <span>{checkingAvailability ? "Memeriksa Room..." : "Cek Ready (Play)"}</span>
+            </button>
+            <button
+              onClick={() => setShowQuickModal(true)}
+              className="btn-capy bg-[#8B5A2B] hover:bg-[#724922] text-white font-bold py-3.5 px-4 rounded-2xl text-xs sm:text-sm flex items-center justify-center gap-1.5"
+            >
+              <Sparkles size={18} />
+              <span>Pemanasan Modal</span>
+            </button>
           </div>
         </div>
 
-        {/* Rules & Queue Status Grid */}
+        {/* Rules & Room Status Section */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Rules Card */}
-          <div className="md:col-span-2 bg-[#7FA88F]/10 border border-[#7FA88F]/20 rounded-3xl p-6 space-y-4">
-            <h3 className="text-lg font-bold flex items-center gap-2">
-              <ShieldAlert className="text-[#7FA88F]" size={20} />
-              Aturan Main Eagle's Open Room
+          <div className="md:col-span-2 bg-[#FDF5E6] border-4 border-[#D2B48C] rounded-3xl p-5 md:p-6 space-y-3 shadow-md">
+            <h3 className="text-base md:text-lg font-black flex items-center gap-2 text-[#8B5A2B]">
+              <ShieldAlert className="text-[#6B8E23]" size={22} />
+              Aturan Main Lounge CapyQuiz
             </h3>
-            <ul className="text-sm space-y-2.5 text-gray-700">
+            <ul className="text-xs md:text-sm space-y-2 text-gray-800 font-medium">
               <li className="flex items-start gap-2">
-                <span className="text-[#7FA88F] font-bold">1.</span>
-                <span>Durasi maksimal 15 menit per sesi kuis kognitif.</span>
+                <span className="bg-[#6B8E23] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md mt-0.5">1</span>
+                <span>Maksimal durasi per sesi room kuis kognitif adalah 15 menit.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7FA88F] font-bold">2.</span>
-                <span>Batas toleransi 5 kesalahan berturut-turut (wrong streak).</span>
+                <span className="bg-[#6B8E23] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md mt-0.5">2</span>
+                <span>Toleransi kesalahan beruntun (wrong streak) maksimal 5 kali.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="text-[#7FA88F] font-bold">3.</span>
-                <span>Sesi berakhir otomatis ketika kamu menguasai seluruh kompetensi kuis.</span>
-              </li>
-              <li className="flex items-start gap-2">
-                <span className="text-[#7FA88F] font-bold">4.</span>
-                <span>AFK selama 5 menit tanpa aktivitas akan dikeluarkan otomatis dari room.</span>
+                <span className="bg-[#6B8E23] text-white text-[10px] font-extrabold px-1.5 py-0.5 rounded-md mt-0.5">3</span>
+                <span>Tunjukkan pemahaman kognitifmu hingga tuntas di setiap batch!</span>
               </li>
             </ul>
           </div>
 
           {/* Queue Widget */}
-          <div className="bg-white border border-[#7FA88F]/20 rounded-3xl p-6 flex flex-col justify-between shadow-sm">
+          <div className="bg-white border-4 border-[#D2B48C] rounded-3xl p-5 md:p-6 flex flex-col justify-between shadow-md">
             <div className="space-y-2">
-              <span className="text-xs uppercase font-bold text-gray-400 tracking-wider">Status Antrean</span>
+              <span className="text-xs uppercase font-black text-[#8B5A2B]/70 tracking-wider">Kapasitas Room</span>
               <div className="flex items-baseline gap-2">
-                <span className="text-4xl font-black text-[#39434D]">{activeSessions}</span>
-                <span className="text-gray-400 font-medium">/ 20 Aktif</span>
+                <span className="text-3xl md:text-4xl font-black text-[#8B5A2B]">{activeSessions}</span>
+                <span className="text-gray-500 font-bold text-sm">/ 20 Aktif</span>
               </div>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                Untuk membatasi biaya token AI, kapasitas room dibatasi. Kamu akan otomatis masuk setelah slot kosong tersedia.
+              <p className="text-xs text-gray-600 leading-relaxed">
+                Slot room dibatasi untuk pengalaman terbaik. Kamu akan langsung diberi ruang saat slot tersedia!
               </p>
             </div>
 
-            <div className="pt-4 border-t border-gray-100 space-y-3">
-              <div className="flex items-center gap-2.5 text-xs font-semibold text-[#7FA88F]">
+            <div className="pt-3 border-t-2 border-[#D2B48C]/30 mt-3">
+              <div className="flex items-center gap-2 text-xs font-bold text-[#6B8E23]">
                 <Users size={16} className="animate-pulse" />
-                <span>Menunggu giliran bermain...</span>
+                <span>Status: {sessionStatus === "PLAYING" ? "Siap Masuk Room!" : "Menunggu giliran..."}</span>
               </div>
-              <button
-                onClick={handleCheckRoomAvailability}
-                disabled={checkingAvailability}
-                className="w-full flex items-center justify-center gap-2 bg-[#7FA88F]/10 hover:bg-[#7FA88F]/20 text-[#7FA88F] py-2 rounded-xl text-xs font-bold transition disabled:opacity-50"
-              >
-                <RefreshCw size={14} className={checkingAvailability ? "animate-spin" : ""} />
-                {checkingAvailability ? "Memeriksa..." : "Cek Ketersediaan Room"}
-              </button>
             </div>
           </div>
         </div>
 
-        {/* Lobby Mini-Game */}
-        <div className="bg-white border border-[#7FA88F]/20 rounded-3xl p-6 md:p-8 shadow-sm space-y-6">
-          <div className="flex justify-between items-center pb-4 border-b border-gray-100">
+        {/* Lobby Mini-Game (Warm-up Inline Card) */}
+        <div className="bg-white border-4 border-[#D2B48C] rounded-3xl p-5 md:p-8 shadow-md space-y-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 pb-4 border-b-2 border-gray-100">
             <div>
-              <h3 className="text-lg font-bold text-[#39434D]">Kuis Pemanasan (Warm-up)</h3>
-              <p className="text-xs text-gray-400">Sambil mengantre, asah kemampuan otakmu di sini!</p>
+              <h3 className="text-lg font-black text-[#8B5A2B] flex items-center gap-2">
+                <HelpCircle size={20} className="text-[#6B8E23]" />
+                Kuis Pemanasan (Warm-up Inline)
+              </h3>
+              <p className="text-xs text-gray-500 font-medium">Asah fokusmu sambil menunggu slot room terbuka!</p>
             </div>
             {!showResults && lobbyQuestions.length > 0 && (
-              <span className="text-xs bg-gray-100 px-2.5 py-1 rounded-full font-bold">
+              <span className="text-xs bg-[#A2CDB0]/30 text-[#8B5A2B] font-bold px-3 py-1 rounded-full border border-[#6B8E23]/30">
                 Soal {currentQIndex + 1} / {lobbyQuestions.length}
               </span>
             )}
           </div>
 
           {lobbyQuestions.length === 0 ? (
-            <p className="text-center text-sm text-gray-400 py-8">Memuat kuis pemanasan...</p>
+            <p className="text-center text-sm text-gray-500 py-8 font-semibold">Memuat kuis pemanasan Capy...</p>
           ) : showResults ? (
             /* Results page */
-            <div className="space-y-6">
-              <div className="text-center py-6 space-y-2 bg-[#7FA88F]/10 rounded-2xl">
-                <Trophy size={40} className="mx-auto text-[#7FA88F]" />
-                <h4 className="text-xl font-bold">Latihan Selesai!</h4>
-                <p className="text-sm text-gray-600">Berikut adalah kunci jawaban kuis pemanasan.</p>
+            <div className="space-y-5">
+              <div className="text-center py-5 space-y-2 bg-[#FDF5E6] rounded-2xl border-2 border-[#D2B48C]">
+                <Trophy size={44} className="mx-auto text-[#6B8E23]" />
+                <h4 className="text-xl font-black text-[#8B5A2B]">Latihan Selesai!</h4>
+                <p className="text-xs md:text-sm text-gray-700 font-semibold">Berikut ulasan kunci jawaban kuis pemanasan.</p>
               </div>
 
-              <div className="space-y-4 max-h-96 overflow-y-auto pr-2 divide-y divide-gray-100">
+              <div className="space-y-3 max-h-80 overflow-y-auto pr-2 divide-y divide-gray-100">
                 {lobbyQuestions.map((q, idx) => {
                   const userAns = userAnswers[q.id];
                   const isCorrect = userAns === q.correctAnswer;
                   return (
-                    <div key={q.id} className="pt-4 first:pt-0 space-y-2">
-                      <p className="font-semibold text-sm">
+                    <div key={q.id} className="pt-3 first:pt-0 space-y-1.5">
+                      <p className="font-bold text-xs md:text-sm text-[#8B5A2B]">
                         {idx + 1}. {q.text}
                       </p>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
-                        <div className={`p-2.5 rounded-lg ${isCorrect ? "bg-green-500/10 text-green-700" : "bg-red-500/10 text-red-700"}`}>
-                          Jawabanmu: {userAns || "Tidak dijawab"}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium">
+                        <div className={`p-2.5 rounded-xl border ${isCorrect ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
+                          Jawabanmu: {userAns || "(Tidak dijawab)"}
                         </div>
-                        <div className="p-2.5 rounded-lg bg-green-500/10 text-green-700">
+                        <div className="p-2.5 rounded-xl bg-green-50 border border-green-300 text-green-800">
                           Kunci Jawaban: {q.correctAnswer}
                         </div>
                       </div>
@@ -173,43 +259,52 @@ export default function QuizLobbyClient({
 
               <button
                 onClick={handleResetLobbyGame}
-                className="w-full flex items-center justify-center gap-2 bg-[#7FA88F]/10 text-[#7FA88F] py-2.5 rounded-xl hover:bg-[#7FA88F]/20 transition text-sm font-semibold"
+                className="btn-capy w-full flex items-center justify-center gap-2 bg-[#A2CDB0] hover:bg-[#8ebf9d] text-[#8B5A2B] py-3 rounded-2xl text-sm font-black shadow"
               >
-                <RefreshCw size={16} /> Coba Kuis Baru
+                <RefreshCw size={16} /> Coba Kuis Pemanasan Baru
               </button>
             </div>
           ) : (
             /* Playing Lobby Game */
             currentQ && (
-              <div className="space-y-6">
-                <p className="text-base md:text-lg font-bold leading-relaxed">{currentQ.text}</p>
+              <div className="space-y-5">
+                <p className="text-base md:text-lg font-bold leading-relaxed text-gray-800">{currentQ.text}</p>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {currentQ.options.map((opt) => {
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {currentQ.options.map((opt, optIdx) => {
                     const selected = userAnswers[currentQ.id] === opt;
+                    const letter = String.fromCharCode(65 + optIdx);
                     return (
                       <button
                         key={opt}
                         onClick={() => handleSelectAnswer(currentQ.id, opt)}
-                        className={`p-4 text-left text-sm rounded-2xl border transition-all ${selected
-                            ? "bg-[#7FA88F] text-white border-[#7FA88F] shadow-md"
-                            : "bg-[#FAF8F3] border-gray-200 hover:border-[#7FA88F]/50"
-                          }`}
+                        className={`btn-capy p-3.5 md:p-4 text-left text-xs md:text-sm rounded-2xl border-2 transition-all flex items-center gap-3 ${
+                          selected
+                            ? "bg-[#6B8E23] text-white border-[#556B2F] font-bold shadow-md"
+                            : "bg-[#FDF5E6] border-[#D2B48C] text-[#8B5A2B] hover:bg-[#A2CDB0]/30"
+                        }`}
                       >
-                        {opt}
+                        <span
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
+                            selected ? "bg-white text-[#6B8E23]" : "bg-[#D2B48C] text-white"
+                          }`}
+                        >
+                          {letter}
+                        </span>
+                        <span className="leading-snug">{opt}</span>
                       </button>
                     );
                   })}
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-gray-100">
+                <div className="flex justify-end pt-3 border-t border-gray-100">
                   <button
                     disabled={!userAnswers[currentQ.id]}
                     onClick={handleNextQuestion}
-                    className="flex items-center gap-1.5 bg-[#7FA88F] text-white px-5 py-2.5 rounded-xl hover:opacity-95 transition text-sm font-semibold disabled:opacity-50"
+                    className="btn-capy flex items-center gap-1.5 bg-[#6B8E23] hover:bg-[#58771c] text-white px-6 py-2.5 rounded-xl text-xs md:text-sm font-black disabled:opacity-50"
                   >
                     <span>Lanjut</span>
-                    <ChevronRight size={16} />
+                    <ChevronRight size={18} />
                   </button>
                 </div>
               </div>
@@ -218,10 +313,62 @@ export default function QuizLobbyClient({
         </div>
       </div>
 
+      {/* --- QUICK TRIVIA MODAL OVERLAY --- */}
+      {showQuickModal && currentQ && (
+        <div className="fixed inset-0 bg-[#8B5A2B]/70 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 text-center space-y-4 shadow-2xl border-4 border-[#D2B48C] relative">
+            <button
+              onClick={() => setShowQuickModal(false)}
+              className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700"
+            >
+              <X size={20} />
+            </button>
+            <span className="text-3xl">🌿</span>
+            <h3 className="text-xl font-black text-[#6B8E23]">Trivia Pemanasan Capy!</h3>
+            <p className="text-sm font-bold text-gray-800 leading-snug">{currentQ.text}</p>
+
+            <div className="flex flex-col gap-2 pt-2">
+              {currentQ.options.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => {
+                    handleSelectAnswer(currentQ.id, opt);
+                    if (opt === currentQ.correctAnswer) {
+                      setQuickFeedback("Jawaban Benar! Capy Senang Sekali! 🌿");
+                    } else {
+                      setQuickFeedback(`Jawaban Kurang Tepat. Kunci: ${currentQ.correctAnswer}`);
+                    }
+                    setTimeout(() => {
+                      setQuickFeedback(null);
+                      setShowQuickModal(false);
+                      handleNextQuestion();
+                    }, 1400);
+                  }}
+                  className="btn-capy bg-[#FDF5E6] border-2 border-[#D2B48C] text-[#8B5A2B] font-bold p-3 rounded-xl text-xs md:text-sm text-left hover:bg-[#A2CDB0]/40 transition"
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+
+            {quickFeedback && (
+              <p className="text-xs font-black text-[#6B8E23] animate-bounce pt-2">{quickFeedback}</p>
+            )}
+
+            <button
+              onClick={() => setShowQuickModal(false)}
+              className="text-xs font-bold text-[#8B5A2B] underline pt-2 block mx-auto"
+            >
+              Tutup Modal
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* --- SLOT OPENED / CLAIMED MODAL POPUP --- */}
       {slotClaimed && (
-        <div className="fixed inset-0 bg-[#39434D]/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 text-center space-y-5 shadow-2xl border border-[#7FA88F]/20 relative">
+        <div className="fixed inset-0 bg-[#8B5A2B]/80 flex items-center justify-center z-50 p-4 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 md:p-8 text-center space-y-5 shadow-2xl border-4 border-[#D2B48C] relative">
             <button
               onClick={handleCloseClaimModal}
               className="absolute top-4 right-4 p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition"
@@ -229,12 +376,16 @@ export default function QuizLobbyClient({
             >
               <X size={20} />
             </button>
-            <div className="text-6xl select-none animate-bounce">🦅</div>
+            <img
+              src="/asset/capy-quiz/capy-hai.png"
+              alt="Capybara Lounge Ready"
+              className="w-28 h-28 mx-auto rounded-full border-4 border-[#6B8E23] object-cover shadow-md animate-bounce bg-[#FDF5E6]"
+            />
             <div className="space-y-1">
-              <span className="text-xs uppercase font-extrabold text-[#7FA88F] tracking-wider">Eagle's Room Terbuka!</span>
-              <h3 className="text-2xl font-black text-[#39434D]">Pilih Room Kompetensi</h3>
-              <p className="text-xs text-gray-500 leading-relaxed">
-                "Kawan, room petualangan kompetensi telah siap! Selesaikan kuis pada tiap room kompetensi ini satu per satu."
+              <span className="text-xs uppercase font-black text-[#6B8E23] tracking-wider">Capy Lounge Siap!</span>
+              <h3 className="text-2xl font-black text-[#8B5A2B]">Room Kuis Siap Diberikan</h3>
+              <p className="text-xs md:text-sm text-gray-600 font-medium leading-relaxed">
+                "Kawan, room petualangan kompetensimu telah terbuka! Masuk dan selesaikan tantangan kuis sekarang!"
               </p>
             </div>
 
@@ -242,26 +393,50 @@ export default function QuizLobbyClient({
             {competencies.length > 0 && (
               <div className="space-y-2 text-left max-h-48 overflow-y-auto pr-1">
                 {competencies.map((comp: any, idx: number) => (
-                  <div key={comp.id} className="p-3 bg-[#FAF8F3] border border-gray-200 rounded-2xl flex items-center justify-between">
+                  <button
+                    key={comp.id}
+                    onClick={() => {
+                      window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}&competencyId=${comp.id}`;
+                    }}
+                    className={`btn-capy w-full p-3 border-2 rounded-2xl flex items-center justify-between transition cursor-pointer text-left ${
+                      comp.isCompleted
+                        ? "bg-green-50 border-green-300 hover:bg-green-100"
+                        : "bg-[#FDF5E6] border-[#D2B48C] hover:bg-[#A2CDB0]/40"
+                    }`}
+                  >
                     <div>
-                      <span className="text-[10px] font-mono font-bold bg-[#7FA88F]/20 text-[#7FA88F] px-2 py-0.5 rounded-full">
-                        Level {idx + 1} • {comp.code}
-                      </span>
-                      <p className="text-xs font-bold text-[#39434D] mt-1 line-clamp-1">{comp.name}</p>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono font-bold bg-[#6B8E23]/20 text-[#6B8E23] px-2 py-0.5 rounded-full">
+                          Level {idx + 1} • {comp.code}
+                        </span>
+                        {comp.isCompleted ? (
+                          <span className="text-[10px] font-bold bg-green-200 text-green-800 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            ✓ Selesai
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
+                            Belum Selesai
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs font-bold text-[#8B5A2B] mt-1 line-clamp-1">{comp.name}</p>
                     </div>
-                  </div>
+                    <ChevronRight size={18} className="text-[#6B8E23] shrink-0" />
+                  </button>
                 ))}
               </div>
             )}
 
             <button
               onClick={() => {
-                window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}`;
+                const targetCompId = competencies.length > 0 ? competencies[0].id : null;
+                const compQuery = targetCompId ? `&competencyId=${targetCompId}` : "";
+                window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}${compQuery}`;
               }}
-              className="w-full flex items-center justify-center gap-2 bg-[#7FA88F] text-white py-3.5 rounded-2xl hover:opacity-95 transition text-base font-bold shadow-md"
+              className="btn-capy w-full flex items-center justify-center gap-2 bg-[#6B8E23] hover:bg-[#58771c] text-white py-3.5 rounded-2xl text-base font-black shadow-lg"
             >
-              <Play size={18} fill="white" />
-              Masuk ke Room Kuis Kompetensi
+              <Play size={20} fill="white" />
+              Masuk ke Room Kuis Sekarang
             </button>
           </div>
         </div>

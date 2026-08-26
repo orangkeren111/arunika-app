@@ -73,18 +73,30 @@ Do not include any markdown formatting like \`\`\`json.
 `,
 };
 
-/**
- * 8. Report Prompts
- */
 export const REPORT_PROMPTS = {
   analysis: (historicalData: string) => `
-You are an expert educational evaluator. Review the following historical quiz data for a student.
-You MUST respond with a valid JSON object containing exactly three keys: "overview", "weakness", and "recommendation".
-Do not include any markdown formatting like \`\`\`json.
+You are an expert educational evaluator. Review the following student quiz attempt history, which includes question competency, taxonomy level, question type (MCQ or ESSAY), reference answer / correct key, student's answer, and whether it was marked correct.
 
-1. "overview": A brief summary of their overall performance.
-2. "weakness": Identify specific concepts or Bloom's Taxonomy levels they struggle with.
-3. "recommendation": Actionable steps for improvement.
+For any ESSAY questions included in the student data, evaluate the student's essay answer against the question context and reference answer. Determine:
+- "isCorrect": boolean (true if the answer demonstrates understanding, false otherwise)
+- "points": number (suggested points/score for this essay, e.g. 0 to 100 based on accuracy)
+- "aiResponse": string (detailed breakdown explanation of why this point was awarded, what key concepts were covered or missed)
+
+You MUST respond with a valid JSON object matching this structure:
+{
+  "essayChecks": [
+    {
+      "jawabanId": 123,
+      "isCorrect": true,
+      "points": 85,
+      "aiResponse": "The student explained..."
+    }
+  ],
+  "overview": "A brief summary of overall performance.",
+  "weakness": "Specific concepts or Bloom's Taxonomy levels the student struggles with.",
+  "recommendation": "Actionable steps for improvement."
+}
+Do not include any markdown formatting like \`\`\`json.
 
 Student Data:
 ${historicalData}

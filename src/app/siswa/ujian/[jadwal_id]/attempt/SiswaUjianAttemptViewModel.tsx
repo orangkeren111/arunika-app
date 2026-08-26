@@ -3,15 +3,16 @@ import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 
-export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
+export function useExamAttempt(jadwalId: string) {
   // State for the single active question
   const [currentQ, setCurrentQ] = useState<ExamQuestion | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0); // Tracks Question 1, 2, 3...
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [totalQuestions, setTotalQuestions] = useState(10);
 
   // Stores answers, mapped by question ID
   const [answers, setAnswers] = useState<Record<string, string>>({});
 
-  const [timeLeft, setTimeLeft] = useState(90 * 60); // 90 Menit
+  const [timeLeft, setTimeLeft] = useState(90 * 60); // Default fallback 90 mins
   const [loading, setLoading] = useState(true);
   const [isFinished, setIsFinished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +46,6 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
 
   // 1. Initialize Exam / Resume Exam
   useEffect(() => {
-    // Wait until session is loaded to ensure we have the siswaId
     if (session?.user?.id) {
       const initExam = async () => {
         try {
@@ -54,12 +54,16 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
             Number(session.user.id ?? 0),
           );
 
-          if (res && res.length > 0) {
-            setCurrentQ(res[0]);
-            // If resuming, you might want to fetch the actual count from the backend,
-            // but for now, we start at 0 or derive from a custom endpoint if needed.
+          if (res && res.nextQuestion) {
+            setCurrentQ(res.nextQuestion);
+            setCurrentIndex(res.answeredCount || 0);
+            if (res.totalQuestions) {
+              setTotalQuestions(res.totalQuestions);
+            }
+            if (res.durationMinutes) {
+              setTimeLeft(res.durationMinutes * 60);
+            }
           } else {
-            // No questions returned usually means the exam is already finished
             setIsFinished(true);
           }
         } catch (error) {
@@ -81,7 +85,7 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmitExam(); // Auto-submit when time runs out
+          handleSubmitExam();
           return 0;
         }
         return prev - 1;
@@ -105,7 +109,6 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
     try {
       const studentAnswer = answers[currentQ.id] || "";
 
-      // Submit the current answer. The backend calculates ELO and returns the next question.
       const response = await siswaRepository.submitExamAttempt(
         jadwalId,
         { [currentQ.id]: studentAnswer },
@@ -133,7 +136,6 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
     setIsSubmitting(true);
 
     try {
-      // Passing empty answers signals the backend to force finish the session
       await siswaRepository.submitExamAttempt(
         jadwalId,
         {},
@@ -159,6 +161,7 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
   return {
     currentQ,
     currentIndex,
+    totalQuestions,
     answers,
     handleAnswer,
     nextQuestion,
@@ -167,7 +170,6 @@ export function useExamAttempt(jadwalId: string, maxQuestions: number = 40) {
     timeLeft: formatTime(timeLeft),
     isFinished: isFinished || timeLeft === 0,
     loading: loading || isSubmitting,
-    // Calculate progress based on a known max questions length
-    progress: Math.round((currentIndex / maxQuestions) * 100),
+    progress: totalQuestions > 0 ? Math.min(100, Math.round(((currentIndex + 1) / totalQuestions) * 100)) : 0,
   };
 }

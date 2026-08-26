@@ -25,6 +25,7 @@ export async function initiatePdfExtraction(formData: FormData) {
     await fs.writeFile(tempFilePath, buffer);
 
     const jumlahSoal = formData.get("jumlahSoal") as string;
+    const babId = formData.get("babId") as string | null;
 
     // 3. Create the Job Queue record in Prisma
     const job = await prisma.generationJob.create({
@@ -33,6 +34,7 @@ export async function initiatePdfExtraction(formData: FormData) {
         fileUrl: tempFilePath, // Storing local path for the worker to find
         status: "PENDING",
         bukuId: Number(bukuId),
+        babId: babId ? Number(babId) : null,
         jumlahSoal: jumlahSoal ? Number(jumlahSoal) : 10,
       },
     });

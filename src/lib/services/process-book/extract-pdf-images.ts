@@ -69,6 +69,7 @@ function isContentImage(imgObj: any, srcData: Uint8Array): boolean {
 export async function extractAndStorePdfPageImages(
   bukuId: number,
   pdfFilePath: string,
+  babId?: number | null,
 ) {
   try {
     const uploadDir = path.join(process.cwd(), "public", "uploads", "book_images");
@@ -202,7 +203,7 @@ export async function extractAndStorePdfPageImages(
             await prisma.bukuImage.create({
               data: {
                 bukuId,
-                babId: matchingBab?.id ?? null,
+                babId: babId ?? matchingBab?.id ?? null,
                 imagePath: publicImagePath,
                 pageNumber: pageNum,
                 contextText: pageText.slice(0, 2500) || `Teks halaman ${pageNum}`,

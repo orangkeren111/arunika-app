@@ -30,11 +30,17 @@ export function useAttemptViewModel(attemptId: string) {
       jawabanId: number;
       nilaiPoin: number;
       catatanKoreksi: string;
+      isCorrect?: boolean;
     }[],
   ) => {
     await guruRepository.gradeAttempt(attemptId, gradedAnswers);
     fetchAttempt();
   };
 
-  return { attempt, reportData, loading, handleGradeAttempt };
+  const handleFinishAttempt = async () => {
+    await guruRepository.finishAttempt(attemptId);
+    fetchAttempt();
+  };
+
+  return { attempt, reportData, loading, handleGradeAttempt, handleFinishAttempt };
 }

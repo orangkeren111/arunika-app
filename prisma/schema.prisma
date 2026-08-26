@@ -159,6 +159,9 @@ model GenerationJob {
   bukuId       Int       @map("buku_id")
   buku         Buku      @relation(fields: [bukuId], references: [id], onDelete: Cascade)
   
+  babId        Int?      @map("bab_id")
+  bab          Bab?      @relation(fields: [babId], references: [id], onDelete: SetNull)
+
   createdAt    DateTime  @default(now()) @map("created_at")
   updatedAt    DateTime  @updatedAt @map("updated_at")
   
@@ -180,6 +183,7 @@ model Bab {
   ujianBab     UjianBab[]
   kompetensi   KompetensiBab[]
   images       BukuImage[]
+  jobs         GenerationJob[]
 
   @@map("bab")
 }
@@ -189,6 +193,7 @@ model BankSoal {
   teksSoal         String   @map("teks_soal") @db.Text
   opsiJawaban      Json?    @map("opsi_jawaban")
   jawabanBenarMcq  String?  @map("jawaban_benar_mcq")
+  jawabanBenarEssay String? @map("jawaban_benar_essay") @db.Text
   type             TipeSoal
 
   babId            Int      @map("bab_id")
@@ -286,6 +291,8 @@ model SesiUjianSiswa {
 
   currentElo    Float     @default(1000.0) @map("current_elo")
 
+  isChecked     Boolean   @default(false) @map("is_checked")
+
   jadwalUjianId Int       @map("jadwal_ujian_id")
   siswaId       Int       @map("siswa_id")
 
@@ -309,6 +316,7 @@ model JawabanSiswa {
   teksSoal         String   @map("teks_soal") @db.Text
   opsiJawaban      Json?    @map("opsi_jawaban")
   jawabanBenarMcq  String?  @map("jawaban_benar_mcq")
+  jawabanBenarEssay String? @map("jawaban_benar_essay") @db.Text
   type             TipeSoal
 
   // Student answer
@@ -317,6 +325,7 @@ model JawabanSiswa {
 
   nilaiPoin        Float?   @map("nilai_poin")
   catatanKoreksi   String?  @map("catatan_koreksi") @db.Text
+  aiResponse       String?  @map("ai_response") @db.Text
 
   answeredAt       DateTime? @map("answered_at")
 

@@ -13,7 +13,7 @@ Arunika is an AI-driven, competency-based educational evaluation and learning ap
 ### B. Guru (Teacher)
 * **Book & Chapter Management**: Organizes books and chapters (Bab) and configures learning goals.
 * **Competency Management**: Defines local competency definitions (`KompetensiBab`) for each chapter, either manually or by linking them to curriculum standards.
-* **Question Bank Operations**: Triggers AI question generation (MCQ or Essay) grouped by competency, and flags (accepts/declines) questions to build a feedback loop for the LLM.
+* **Question Bank Operations**: Triggers AI question generation (MCQ or Essay) grouped by competency, and flags (accepts/declines) questions to build a feedback loop for the LLM. Link image to a soal by throwing via prompt.
 * **Exam Templates Builder**: Configures exam criteria based on competency distributions (question counts and scoring weights) rather than rigid cognitive limits.
 * **Essay Grading**: Reviews student essay answers, inputs points, and adds feedback.
 

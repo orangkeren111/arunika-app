@@ -1,7 +1,7 @@
 "use client";
 
 import React, { use, useState, useEffect } from "react";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Bot } from "lucide-react";
 import { useAttemptViewModel } from "./GuruReportsAttemptViewModel";
 import { ReportTemplate } from "@/src/components/ReportTemplate";
 
@@ -11,31 +11,30 @@ export default function AttemptReviewPage({
   params: Promise<{ attempt_id: string }>;
 }) {
   const resolvedParams = use(params);
-  const { attempt, reportData, handleGradeAttempt } = useAttemptViewModel(
+  const { attempt, reportData, handleGradeAttempt, handleFinishAttempt } = useAttemptViewModel(
     resolvedParams.attempt_id,
   );
 
   // Local state to track inputs for each answer being graded
   const [grades, setGrades] = useState<
-    Record<string, { nilaiPoin: number; catatanKoreksi: string }>
+    Record<string, { nilaiPoin: number; catatanKoreksi: string; isCorrect: boolean }>
   >({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
 
   // Pre-fill the local state if the answer already has points
   useEffect(() => {
     if (attempt?.answers) {
       const initialGrades: Record<
         string,
-        { nilaiPoin: number; catatanKoreksi: string }
+        { nilaiPoin: number; catatanKoreksi: string; isCorrect: boolean }
       > = {};
       attempt.answers.forEach((ans) => {
-        // We only pre-fill for ESSAY to allow grading overrides
-        if (ans.type === "ESSAY") {
-          initialGrades[ans.jawabanId] = {
-            nilaiPoin: ans.point || 0,
-            catatanKoreksi: attempt.feedback || "", // Using top-level feedback if specific isn't mapped yet
-          };
-        }
+        initialGrades[ans.jawabanId] = {
+          nilaiPoin: ans.point ?? 0,
+          catatanKoreksi: ans.feedback || "",
+          isCorrect: ans.isCorrect ?? (ans.point > 0),
+        };
       });
       setGrades(initialGrades);
     }
@@ -43,8 +42,8 @@ export default function AttemptReviewPage({
 
   const onGradeChange = (
     jawabanId: string,
-    field: "nilaiPoin" | "catatanKoreksi",
-    value: string | number,
+    field: "nilaiPoin" | "catatanKoreksi" | "isCorrect",
+    value: string | number | boolean,
   ) => {
     setGrades((prev) => ({
       ...prev,
@@ -63,6 +62,7 @@ export default function AttemptReviewPage({
         jawabanId: parseInt(jawabanId),
         nilaiPoin: Number(data.nilaiPoin),
         catatanKoreksi: data.catatanKoreksi,
+        isCorrect: data.isCorrect,
       }));
 
       await handleGradeAttempt(payload);
@@ -72,6 +72,20 @@ export default function AttemptReviewPage({
       alert("Terjadi kesalahan saat menyimpan nilai.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const onFinish = async () => {
+    setIsFinishing(true);
+    try {
+      await onSave();
+      await handleFinishAttempt();
+      alert("Pemeriksaan selesai dan laporan dipublikasikan ke siswa!");
+    } catch (error) {
+      console.error("Gagal menyelesaikan pemeriksaan", error);
+      alert("Terjadi kesalahan saat menyelesaikan pemeriksaan.");
+    } finally {
+      setIsFinishing(false);
     }
   };
 
@@ -94,19 +108,19 @@ export default function AttemptReviewPage({
           <h1 className="text-2xl font-bold text-[var(--foreground)]">
             Review Jawaban: {attempt.studentName}
           </h1>
-          <p className="text-[var(--muted-foreground)] mt-1">
+          <p className="text-[var(--muted-foreground)] mt-1 flex items-center gap-2">
             Status saat ini:{" "}
-            <span className="font-medium text-[var(--foreground)]">
-              {attempt.status}
+            <span className="font-semibold text-[var(--foreground)]">
+              {attempt.isChecked ? "Selesai Diperiksa (Publik)" : attempt.status}
             </span>
           </p>
         </div>
         <div className="text-right">
           <p className="text-sm text-[var(--muted-foreground)]">
-            Total Skor (Sementara)
+            Total Skor
           </p>
           <p className="text-3xl font-bold text-[var(--primary)]">
-            {attempt.score || "0"}
+            {attempt.score !== null ? attempt.score : "0"}
           </p>
         </div>
       </div>
@@ -122,12 +136,37 @@ export default function AttemptReviewPage({
               <span className="bg-[var(--accent)] text-white text-xs px-2 py-1 rounded font-bold">
                 {ans.type || "SOAL"} #{index + 1}
               </span>
-              <span className="text-sm text-[var(--muted-foreground)]">
-                Poin Saat Ini: {ans.point || 0}
-              </span>
+              <div className="flex items-center gap-4 text-sm">
+                <span className="text-[var(--muted-foreground)]">
+                  Poin: {grades[ans.jawabanId]?.nilaiPoin ?? (ans.point || 0)}
+                </span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs font-semibold">
+                  <input
+                    type="checkbox"
+                    checked={grades[ans.jawabanId]?.isCorrect ?? ans.isCorrect}
+                    onChange={(e) =>
+                      onGradeChange(ans.jawabanId, "isCorrect", e.target.checked)
+                    }
+                    className="rounded border-[var(--border)] text-[var(--primary)] focus:ring-[var(--ring)]"
+                  />
+                  Status Benar
+                </label>
+              </div>
             </div>
 
             <p className="text-[var(--foreground)] font-medium">{ans.text}</p>
+
+            {/* Kunci / Panduan Jawaban Essay Benar jika ada */}
+            {ans.type === "ESSAY" && ans.jawabanBenarEssay && (
+              <div className="bg-emerald-50/50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-800 p-3 rounded-lg text-xs space-y-1">
+                <span className="font-bold text-emerald-700 dark:text-emerald-300 block">
+                  Kunci / Panduan Jawaban Benar (Referensi Soal):
+                </span>
+                <p className="text-[var(--foreground)] whitespace-pre-wrap">
+                  {ans.jawabanBenarEssay}
+                </p>
+              </div>
+            )}
 
             <div className="bg-[var(--background)] p-4 rounded-lg border border-[var(--input)] text-sm text-[var(--foreground)]">
               <p className="font-semibold text-[var(--muted-foreground)] mb-2">
@@ -140,17 +179,30 @@ export default function AttemptReviewPage({
               )}
             </div>
 
-            {/* Panel Penilaian Manual - Only show for essays */}
+            {/* Rekomendasi AI jika ada */}
+            {ans.aiResponse && (
+              <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800 p-4 rounded-lg text-sm space-y-1">
+                <div className="flex items-center gap-2 font-semibold text-blue-700 dark:text-blue-300">
+                  <Bot size={16} /> Analisis AI (Rekomendasi Penilaian)
+                </div>
+                <p className="text-[var(--foreground)] whitespace-pre-wrap">
+                  {ans.aiResponse}
+                </p>
+              </div>
+            )}
+
+            {/* Panel Penilaian Manual - Available for all / editable for essays */}
             {ans.type === "ESSAY" && (
               <div className="bg-[var(--muted)] p-4 rounded-lg space-y-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                    Berikan Poin
+                    Berikan Poin (0 - 100)
                   </label>
                   <input
                     type="number"
                     min="0"
-                    value={grades[ans.jawabanId].nilaiPoin}
+                    max="100"
+                    value={grades[ans.jawabanId]?.nilaiPoin ?? 0}
                     onChange={(e) =>
                       onGradeChange(ans.jawabanId, "nilaiPoin", e.target.value)
                     }
@@ -164,7 +216,7 @@ export default function AttemptReviewPage({
                   </label>
                   <textarea
                     rows={3}
-                    value={grades[ans.jawabanId].catatanKoreksi}
+                    value={grades[ans.jawabanId]?.catatanKoreksi ?? ""}
                     onChange={(e) =>
                       onGradeChange(
                         ans.jawabanId,
@@ -185,10 +237,18 @@ export default function AttemptReviewPage({
       <div className="flex justify-end gap-4 mt-6">
         <button
           onClick={onSave}
-          disabled={isSubmitting}
-          className="bg-[var(--primary)] text-[var(--primary-foreground)] px-6 py-2 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
+          disabled={isSubmitting || isFinishing}
+          className="bg-[var(--secondary)] text-[var(--secondary-foreground)] px-6 py-2.5 rounded-lg font-medium hover:opacity-90 transition disabled:opacity-50"
         >
-          {isSubmitting ? "Menyimpan..." : "Simpan Nilai"}
+          {isSubmitting ? "Menyimpan..." : "Simpan Nilai Draf"}
+        </button>
+        <button
+          onClick={onFinish}
+          disabled={isSubmitting || isFinishing}
+          className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-lg font-medium inline-flex items-center gap-2 transition disabled:opacity-50"
+        >
+          <CheckCircle2 size={18} />
+          {isFinishing ? "Memproses..." : "Selesai Review & Publikasikan"}
         </button>
       </div>
 

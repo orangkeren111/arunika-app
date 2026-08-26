@@ -2,8 +2,12 @@ import { generateText } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { GoogleGenAI } from "@google/genai";
 
 // Initialize SDK Instances (Singletons)
+export const googleGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+export const DEFAULT_GEMINI_MODEL = process.env.QUIZ_AGENT_MODEL || "gemini-3.5-flash-lite";
+
 export const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
 export const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 export const groq = createOpenAI({
@@ -63,9 +67,32 @@ export function getSmartTextModel() {
   }
 }
 
+export function getPromptGuardModel() {
+  if (process.env.GROQ_API_KEY) {
+    return groq("meta-llama/llama-prompt-guard-2-86m");
+  }
+  return google("models/gemini-3.5-flash-lite");
+}
+
 /**
  * Standardized Caller Functions
  */
+export async function callPromptGuard(
+  prompt: string,
+): Promise<{ safe: boolean; text: string; tokens: number }> {
+  try {
+    const { text, usage } = await generateText({
+      model: getPromptGuardModel(),
+      prompt: prompt,
+    });
+    const isSafe = !text.toUpperCase().includes("UNSAFE") && !text.toUpperCase().includes("INJECTION") && !text.toUpperCase().includes("JAILBREAK");
+    return { safe: isSafe, text, tokens: usage?.totalTokens ?? 0 };
+  } catch (error) {
+    console.warn("Prompt guard check error, failing open safely:", error);
+    return { safe: true, text: "SAFE", tokens: 0 };
+  }
+}
+
 export async function callGemini(
   prompt: string,
   system?: string,

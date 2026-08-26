@@ -39,11 +39,11 @@ export const siswaRepository = {
       const avgScore =
         gradedHistory.length > 0
           ? Math.round(
-              gradedHistory.reduce(
-                (acc: number, curr: any) => acc + (curr.score || 0),
-                0,
-              ) / gradedHistory.length,
-            )
+            gradedHistory.reduce(
+              (acc: number, curr: any) => acc + (curr.score || 0),
+              0,
+            ) / gradedHistory.length,
+          )
           : 0;
 
       return {
@@ -73,11 +73,11 @@ export const siswaRepository = {
     }));
   },
 
-  getKelasDetail: async (kelasId: string) => {
+  getKelasDetail: async (kelasId: string, siswaId?: number) => {
     const rawKelas = await siswaDB.getKelasDetail(parseInt(kelasId));
     if (!rawKelas) return { kelas: null, exams: [] };
 
-    const rawJadwal = await siswaDB.getJadwalByKelas(parseInt(kelasId));
+    const rawJadwal = await siswaDB.getJadwalByKelas(parseInt(kelasId), siswaId);
 
     return {
       kelas: {
@@ -89,14 +89,23 @@ export const siswaRepository = {
             : "Belum Ditugaskan",
         studentCount: rawKelas._count?.members || 0,
       },
-      exams: rawJadwal.map((j: any) => ({
-        jadwalId: j.id.toString(),
-        title: j.ujian.judulUjian,
-        className: rawKelas.namaKelas,
-        startTime: j.waktuMulaiAktif?.toISOString() || "Unknown",
-        durationMinutes: j.ujian.durasiMenit,
-        type: j.tipeUjian.namaTipeUjian,
-      })),
+      exams: rawJadwal.map((j: any) => {
+        const attempt = j.sesiSiswa?.[0];
+        const quizSession = j.ujian?.quizSessions?.[0];
+        const isFinished = !!attempt?.waktuSelesai || quizSession?.status === "FINISHED";
+
+        return {
+          jadwalId: j.id.toString(),
+          title: j.ujian.judulUjian,
+          className: rawKelas.namaKelas,
+          startTime: j.waktuMulaiAktif?.toISOString() || "Unknown",
+          durationMinutes: j.ujian.durasiMenit,
+          type: j.tipeUjian.namaTipeUjian,
+          attemptId: attempt?.id ? attempt.id.toString() : null,
+          sessionId: quizSession?.id ? quizSession.id.toString() : null,
+          isFinished,
+        };
+      }),
     };
   },
 
@@ -132,9 +141,12 @@ export const siswaRepository = {
   getExamQuestions: async (jadwalId: string, siswaId: number = 6) => {
     const sessionState = await examService.startExamSession(jadwalId, siswaId);
 
-    // Return as array to maintain compatibility if frontend expects an array
-    if (!sessionState.nextQuestion) return [];
-    return [sessionState.nextQuestion];
+    return {
+      nextQuestion: sessionState.nextQuestion,
+      answeredCount: sessionState.answeredCount,
+      totalQuestions: sessionState.totalQuestions,
+      durationMinutes: sessionState.durationMinutes,
+    };
   },
 
   /**
@@ -177,11 +189,19 @@ export const siswaRepository = {
 
     const soalIds = Object.keys(answers);
 
-    // 2. If frontend sends empty answers, treat as a forced "Finish Exam" command
+    // 2. If frontend sends empty answers, safely resume/fetch current session state without terminating
     if (soalIds.length === 0) {
-      await examService.finishExamSession(currentSesiId);
-      enqueueStudentReport(currentSesiId);
-      return { finished: true };
+      const sessionState = await examService.startExamSession(jadwalId, siswaId);
+      if (!sessionState.nextQuestion) {
+        await examService.finishExamSession(currentSesiId);
+        await enqueueStudentReport(currentSesiId);
+        return { finished: true };
+      }
+      return {
+        finished: false,
+        newElo: sessionState.currentElo,
+        nextQuestion: sessionState.nextQuestion,
+      };
     }
 
     // 3. Extract the most recent answer (Real-Time processing)

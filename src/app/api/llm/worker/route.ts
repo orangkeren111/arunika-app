@@ -3,6 +3,7 @@ import {
   executeLLMStrategy,
   getAvailableModelForTask,
 } from "@/src/lib/services/llm/router";
+import { callPromptGuard } from "@/src/lib/services/llm/providers";
 import { generateQuestionsWithGroq } from "@/src/lib/services/process-book/generate-questions";
 import { processPdfWithGemini } from "@/src/lib/services/process-book/upload-gemini";
 import { extractAndStorePdfPageImages } from "@/src/lib/services/process-book/extract-pdf-images";
@@ -91,7 +92,7 @@ async function processGenerationStateMachine() {
     // PHASE 2: Extract embedded images from local PDF file
     if (job.status === "EXTRACTING_IMAGES") {
       if (job.fileUrl) {
-        await extractAndStorePdfPageImages(job.bukuId, job.fileUrl);
+        await extractAndStorePdfPageImages(job.bukuId, job.fileUrl, job.babId);
         // Clean up the local temp PDF file after image extraction completes
         await fs.unlink(job.fileUrl).catch(() => { });
       }
@@ -133,40 +134,47 @@ async function processGenerationStateMachine() {
       return;
     }
 
-    //    // PHASE 2: Generate Questions for each Bab
+    // PHASE 4: Generate Questions for each Bab or specific Bab
     if (job.status === "GENERATING_QUESTIONS") {
-      // Use nested relation to get babs tied to the buku for this job
-      const babs = await prisma.bab.findMany({
-        where: {
-          buku: {
-            jobs: {
-              some: {
-                id: job.id,
+      let results: any[] = [];
+
+      if (job.babId) {
+        // Single Bab generation
+        results = [await generateQuestionsWithGroq(job.babId, job.jumlahSoal)];
+      } else {
+        // Use nested relation to get babs tied to the buku for this job
+        const babs = await prisma.bab.findMany({
+          where: {
+            buku: {
+              jobs: {
+                some: {
+                  id: job.id,
+                },
               },
             },
-          },
-          soal: {
-            none: {},
-          },
-        },
-        include: {
-          buku: {
-            include: {
-              jobs: true,
+            soal: {
+              none: {},
             },
           },
-          soal: true,
-        },
-      });
+          include: {
+            buku: {
+              include: {
+                jobs: true,
+              },
+            },
+            soal: true,
+          },
+        });
 
-      // Execute Groq concurrently for massive speed
-      const results = await Promise.all(
-        babs.map((bab: any) => generateQuestionsWithGroq(bab.id, job.jumlahSoal)),
-      );
+        // Execute Groq concurrently for massive speed
+        results = await Promise.all(
+          babs.map((bab: any) => generateQuestionsWithGroq(bab.id, job.jumlahSoal)),
+        );
+      }
 
       const additionalTokens = results.reduce((sum, r) => sum + r.tokens, 0);
 
-      // Entire book is finished!
+      // Job is finished!
       await prisma.generationJob.update({
         where: { id: job.id },
         data: {
@@ -292,11 +300,31 @@ async function processTaskQueueBatch() {
 
         let tokensSpent = 0;
         if (task.type === "generate_report") {
+          // Step 1: Prompt Guard Verification (Run on untrusted student input text, truncated to safe 1500 chars limit)
+          const textToGuard = payload.studentInputOnly || (typeof payload.prompt === "string" ? payload.prompt.slice(0, 1500) : "");
+          const guardCheck = await callPromptGuard(textToGuard);
+          tokensSpent += guardCheck.tokens;
+
+          if (!guardCheck.safe) {
+            console.warn(`Task ${task.id} failed prompt guard check:`, guardCheck.text);
+            await prisma.savedResponses.update({
+              where: { attemptId: payload.attemptId },
+              data: {
+                overview: "Peringatan Keamanan: Terdeteksi indikasi manipulasi prompt pada jawaban/pertanyaan.",
+                weakness: "Tidak dapat menganalisis karena masalah keamanan.",
+                recommendation: "Silakan periksa jawaban siswa secara manual.",
+                status: "FAILED",
+              },
+            });
+            throw new Error("Prompt guard rejected payload");
+          }
+
+          // Step 2: Thinker LLM Execution
           const result = await executeLLMStrategy(
             assignedProvider,
             payload.prompt,
           );
-          tokensSpent = result.tokens;
+          tokensSpent += result.tokens;
           const parsedResult = JSON.parse(result.text);
 
           // Update the SavedResponse table based on the payload's attemptId
@@ -309,6 +337,24 @@ async function processTaskQueueBatch() {
               status: "DONE",
             },
           });
+
+          // Update essay question answers with AI response and score if present
+          if (Array.isArray(parsedResult.essayChecks)) {
+            for (const check of parsedResult.essayChecks) {
+              if (check.jawabanId) {
+                await prisma.jawabanSiswa.update({
+                  where: { id: Number(check.jawabanId) },
+                  data: {
+                    aiResponse: check.aiResponse || null,
+                    isCorrect: typeof check.isCorrect === "boolean" ? check.isCorrect : undefined,
+                    nilaiPoin: typeof check.points === "number" ? check.points : undefined,
+                  },
+                }).catch((e) => {
+                  console.error(`Failed to update JawabanSiswa ${check.jawabanId}:`, e);
+                });
+              }
+            }
+          }
         } else if (task.type === "extract_kurikulum") {
           const result = await processKurikulumExtract(payload.tempFilePath);
           tokensSpent = result.tokens;

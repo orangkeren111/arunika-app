@@ -13,6 +13,7 @@ import {
   X,
   Upload,
   FileText,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useBabViewModel } from "./GuruBukuBabViewModel";
 
@@ -126,6 +127,12 @@ export default function BabPage({
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <Link
+            href={`/guru/buku/${buku.id}/export`}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-green-600/30 text-green-600 bg-green-500/10 px-3 py-2 rounded-lg hover:bg-green-500/20 transition text-sm md:text-base font-semibold whitespace-nowrap"
+          >
+            <FileSpreadsheet size={18} /> Export Excel
+          </Link>
           <button
             onClick={handleViewBook}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-[var(--primary)] text-[var(--primary)] px-3 py-2 rounded-lg hover:bg-[var(--primary)] hover:bg-opacity-10 transition text-sm md:text-base whitespace-nowrap"

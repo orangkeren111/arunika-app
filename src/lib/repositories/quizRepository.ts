@@ -27,8 +27,13 @@ export const quizRepository = {
     return await quizDB.updateQuizActivity(sessionId);
   },
 
-  finishOrFailSession: async (sessionId: number, status: "FINISHED" | "FAILED" | "AFK") => {
-    return await quizDB.finishOrFailSession(sessionId, status);
+  finishOrFailSession: async (
+    sessionId: number,
+    status: "FINISHED" | "FAILED" | "AFK",
+    reason?: string,
+    latestCompetencyLog?: any
+  ) => {
+    return await quizDB.finishOrFailSession(sessionId, status, reason, latestCompetencyLog);
   },
 
   getLobbyQuizQuestions: async (ujianId: number) => {
@@ -41,13 +46,14 @@ export const quizRepository = {
     }));
   },
 
-  getCompetenciesForUjian: async (ujianId: number) => {
-    const list = await quizDB.getCompetenciesForUjian(ujianId);
-    return list.map((item) => ({
+  getCompetenciesForUjian: async (ujianId: number, sessionId?: number) => {
+    const list = await quizDB.getCompetenciesForUjian(ujianId, sessionId);
+    return list.map((item: any) => ({
       id: item.kompetensiBab.id,
       code: item.kompetensiBab.nomerKompetensi,
       name: item.kompetensiBab.isiKompetensi,
       jumlahSoal: item.jumlahSoal,
+      isCompleted: item.isCompleted,
     }));
   },
 
@@ -98,5 +104,15 @@ export const quizRepository = {
 
   getUjianIdByJadwal: async (jadwalId: number) => {
     return await quizDB.getUjianIdByJadwal(jadwalId);
+  },
+
+  getCompetencyById: async (kompetensiBabId: number) => {
+    const comp = await quizDB.getCompetencyById(kompetensiBabId);
+    if (!comp) return null;
+    return {
+      id: comp.id,
+      code: comp.nomerKompetensi,
+      name: comp.isiKompetensi,
+    };
   },
 };

@@ -45,6 +45,7 @@ export function useSoalViewModel(babId: string) {
     correctAnswer?: string,
     kompetensiBabId?: string | null,
     linkGambarSoal?: string,
+    jawabanBenarEssay?: string,
   ) => {
     await guruRepository.addSoal({
       babId,
@@ -52,6 +53,7 @@ export function useSoalViewModel(babId: string) {
       text,
       options,
       correctAnswer,
+      jawabanBenarEssay,
       difficulty,
       bloomLevel,
       kompetensiBabId,
@@ -84,6 +86,16 @@ export function useSoalViewModel(babId: string) {
     return await guruRepository.uploadImage(file);
   };
 
+  const handleUploadBabPdf = async (file: File, jumlahSoal: number = 10) => {
+    if (!bab) return;
+    const formData = new FormData();
+    formData.append("bookId", bab.bookId);
+    formData.append("babId", babId);
+    formData.append("pdfFile", file);
+    formData.append("jumlahSoal", jumlahSoal.toString());
+    await guruRepository.uploadAndGenerateBookPdf(formData);
+  };
+
   return {
     bab,
     soalList,
@@ -96,5 +108,6 @@ export function useSoalViewModel(babId: string) {
     handleAcceptSoal,
     handleRejectSoal,
     handleUploadImage,
+    handleUploadBabPdf,
   };
 }

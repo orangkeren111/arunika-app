@@ -97,8 +97,79 @@
   --color-success: var(--success);
   --color-warning: var(--warning);
   --color-error: var(--error);
-  --color-info: var(--info);
+  --color-capy-brown: #8B5A2B;
+  --color-capy-light-brown: #D2B48C;
+  --color-capy-green: #6B8E23;
+  --color-capy-light-green: #A2CDB0;
+  --color-capy-bg: #FDF5E6;
 
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+}
+
+.bg-capy-dots {
+  background-color: #FDF5E6;
+  background-image: radial-gradient(#D2B48C 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+.btn-capy {
+  transition: all 0.2s ease-in-out;
+  box-shadow: 0 4px 6px rgba(139, 90, 43, 0.25);
+}
+
+.btn-capy:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(139, 90, 43, 0.35);
+}
+
+.btn-capy:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgba(139, 90, 43, 0.25);
+}
+
+.carpet {
+  border-radius: 50% 50% 50% 50% / 30% 30% 70% 70%;
+  background: repeating-linear-gradient(45deg, #6B8E23, #6B8E23 10px, #556B2F 10px, #556B2F 20px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+.bounce-anim {
+  animation: capyBounce 2s infinite ease-in-out;
+}
+
+@keyframes capyBounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.correct-answer {
+  background-color: #34D399 !important;
+  color: white !important;
+  border-color: #059669 !important;
+  animation: pulseCorrect 0.5s ease-in-out;
+}
+
+.wrong-answer {
+  background-color: #F87171 !important;
+  color: white !important;
+  border-color: #DC2626 !important;
+  animation: shakeWrong 0.5s ease-in-out;
+}
+
+@keyframes pulseCorrect {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.03); }
+  100% { transform: scale(1); }
+}
+
+@keyframes shakeWrong {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
 }

@@ -38,7 +38,7 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
           quizRepository.getLobbyQuizQuestions(ujianId),
         ]);
 
-        const compList = await quizRepository.getCompetenciesForUjian(ujianId);
+        const compList = await quizRepository.getCompetenciesForUjian(ujianId, session.id);
 
         if (isMounted) {
           setActiveSessions(count);
@@ -130,21 +130,21 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
       const count = await quizRepository.getActiveSessionsCount(ujianId);
       setActiveSessions(count);
 
-      if (sessionId && (sessionStatus === "WAITING" || !slotClaimed)) {
+      if (sessionId) {
+        // Attempt to claim playing slot or verify active playing status
         const claimed = await quizRepository.claimPlayingSlot(sessionId);
-        if (claimed) {
+        if (claimed || sessionStatus === "PLAYING") {
           setSessionStatus("PLAYING");
           setSlotClaimed(true);
-          setDismissedModal(false);
+          setDismissedModal(false); // Force show popup modal so user can choose competency
         }
       }
     } catch (err) {
       console.error("Failed checking availability:", err);
     } finally {
-      // 2 seconds cooldown for checking availability
       setTimeout(() => {
         setCheckingAvailability(false);
-      }, 2000);
+      }, 1000);
     }
   };
 

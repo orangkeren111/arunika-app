@@ -2,12 +2,15 @@
 
 import React, { use } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, CalendarClock, Play } from 'lucide-react';
+import { useSession } from 'next-auth/react';
+import { ArrowLeft, CalendarClock, Play, FileText } from 'lucide-react';
 import { useKelasDetail } from './SiswaKelasDetailViewModel';
 
 export default function KelasDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
-  const { kelas, exams } = useKelasDetail(resolvedParams.id);
+  const { data: session } = useSession();
+  const studentId = session?.user?.id ? Number(session.user.id) : undefined;
+  const { kelas, exams } = useKelasDetail(resolvedParams.id, studentId);
 
   if (!kelas) return <p className="text-[var(--muted-foreground)]">Memuat data kelas...</p>;
 
@@ -35,9 +38,27 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
                 <p className="font-medium text-[var(--card-foreground)]">{exam.title}</p>
                 <p className="text-xs text-[var(--muted-foreground)]">{exam.startTime} • {exam.durationMinutes} Menit</p>
               </div>
-              <Link href={`/siswa/ujian/${exam.jadwalId}/lobby`} className="text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded flex items-center gap-1 hover:opacity-90 transition">
-                <Play size={14} /> Lobby
-              </Link>
+              <div className="flex items-center gap-2">
+                {exam.isFinished ? (
+                  <>
+                    {exam.attemptId && (
+                      <Link href={`/siswa/history/${exam.attemptId}`} className="text-xs md:text-sm bg-[#6B8E23] text-white px-3 py-2 rounded flex items-center gap-1 hover:opacity-90 transition font-bold">
+                        <FileText size={14} /> Lihat Laporan
+                      </Link>
+                    )}
+                    <Link
+                      href={`/siswa/ujian/${exam.jadwalId}/quiz/play${exam.sessionId ? `?sessionId=${exam.sessionId}` : ''}`}
+                      className="text-xs md:text-sm bg-[#8B5A2B] text-white px-3 py-2 rounded flex items-center gap-1 hover:opacity-90 transition font-bold"
+                    >
+                      <Play size={14} /> Play Quiz
+                    </Link>
+                  </>
+                ) : (
+                  <Link href={`/siswa/ujian/${exam.jadwalId}/quiz/lobby`} className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded flex items-center gap-1 hover:opacity-90 transition font-bold">
+                    <Play size={14} /> Lobby
+                  </Link>
+                )}
+              </div>
             </div>
           ))
         )}

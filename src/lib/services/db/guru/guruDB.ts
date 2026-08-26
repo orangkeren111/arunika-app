@@ -79,6 +79,25 @@ export async function getBabList(bukuId: number) {
     },
   });
 }
+
+export async function getBukuWithBabsAndSoal(bukuId: number) {
+  return await prisma.buku.findUnique({
+    where: { id: bukuId },
+    include: {
+      bab: {
+        orderBy: { id: "asc" },
+        include: {
+          soal: {
+            orderBy: { id: "asc" },
+            include: {
+              kompetensiBab: true,
+            },
+          },
+        },
+      },
+    },
+  });
+}
 export async function getSoalByBab(babId: number) {
   return await prisma.bankSoal.findMany({
     where: { babId: babId },
@@ -343,7 +362,15 @@ export async function getAttemptDetail(attemptId: number) {
     where: { id: attemptId },
     include: {
       siswa: true,
-      jawabanSiswa: true,
+      jawabanSiswa: {
+        include: {
+          soalAsli: {
+            include: {
+              kompetensiBab: true,
+            },
+          },
+        },
+      },
       aiLogs: true,
     },
   });
@@ -365,10 +392,22 @@ export async function gradeJawabanSiswa(
   jawabanId: number,
   nilaiPoin: number,
   catatanKoreksi: string,
+  isCorrect?: boolean,
 ) {
   return await prisma.jawabanSiswa.update({
     where: { id: jawabanId },
-    data: { nilaiPoin, catatanKoreksi, isCorrect: nilaiPoin > 0 },
+    data: {
+      nilaiPoin,
+      catatanKoreksi,
+      isCorrect: isCorrect !== undefined ? isCorrect : nilaiPoin > 0,
+    },
+  });
+}
+
+export async function finishAttemptReview(attemptId: number) {
+  return await prisma.sesiUjianSiswa.update({
+    where: { id: attemptId },
+    data: { isChecked: true },
   });
 }
 

@@ -22,6 +22,7 @@ export interface Soal {
   bloomLevel?: string;
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
+  jawabanBenarEssay?: string;
   kompetensiBabId?: string | null;
   linkGambarSoal?: string;
   isAccepted?: boolean;
@@ -79,6 +80,7 @@ export interface AttemptReport {
   jadwalId: string;
   studentName: string;
   score: number | null;
+  isChecked?: boolean;
   status: string;
   feedback?: string;
   aiSummary?: string;
