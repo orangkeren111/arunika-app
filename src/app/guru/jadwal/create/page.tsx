@@ -7,6 +7,8 @@ import { useJadwalViewModel } from "../GuruJadwalViewModel";
 
 export default function CreateJadwalPage() {
   const {
+    judulJadwal,
+    setJudulJadwal,
     selectedTemplate,
     setSelectedTemplate,
     selectedKelas,
@@ -35,7 +37,7 @@ export default function CreateJadwalPage() {
           Jadwalkan Ujian Baru
         </h1>
         <p className="text-[var(--muted-foreground)] mt-1">
-          Tentukan template, kelas, dan waktu pengerjaan.
+          Tentukan nama sesi ujian, template, kelas, tipe, dan waktu pengerjaan.
         </p>
       </div>
 
@@ -46,6 +48,22 @@ export default function CreateJadwalPage() {
         }}
         className="bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] space-y-5"
       >
+        {/* NAMA / JUDUL SESI UJIAN */}
+        <div>
+          <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
+            Nama / Judul Sesi Ujian
+          </label>
+          <input
+            type="text"
+            value={judulJadwal}
+            onChange={(e) => setJudulJadwal(e.target.value)}
+            placeholder="Contoh: Kuis Harian Bab 1 Sel / PTS Biologi Semester 1"
+            className="w-full p-2.5 border border-[var(--input)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm"
+          />
+          <p className="text-xs text-[var(--muted-foreground)] mt-1">
+            Kosongkan jika ingin menggunakan judul default template.
+          </p>
+        </div>
         {/* TEMPLATE UJIAN */}
         <div>
           <label className="block text-sm font-medium text-[var(--foreground)] mb-1">

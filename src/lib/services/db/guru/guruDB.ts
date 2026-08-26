@@ -308,9 +308,19 @@ export async function getKelas(sekolah_id: number, guru_id: number) {
 }
 
 export async function getTipeUjian() {
-  return await prisma.tipeUjian.findMany({
-    orderBy: { id: "desc" },
+  let list = await prisma.tipeUjian.findMany({
+    orderBy: { id: "asc" },
   });
+
+  if (list.length === 0) {
+    const defaultTypes = ["Kuis Harian", "Ulangan Harian", "UTS", "UAS", "Tryout", "Tugas / PR"];
+    for (const nama of defaultTypes) {
+      await prisma.tipeUjian.create({ data: { namaTipeUjian: nama } });
+    }
+    list = await prisma.tipeUjian.findMany({ orderBy: { id: "asc" } });
+  }
+
+  return list;
 }
 
 // --- JADWAL UJIAN ---
@@ -332,6 +342,7 @@ export async function createJadwal(data: {
   tipeUjianId: number;
   waktuMulaiAktif: Date;
   waktuSelesaiAktif: Date;
+  judulJadwal?: string;
 }) {
   return await prisma.jadwalUjian.create({
     data: {
@@ -617,4 +628,210 @@ export async function getAvailableSoalCounts(babIds: number[]) {
     count: r._count.id,
   }));
 }
+
+// --- VALIDATION STAGES ---
+
+export async function getBooksNeedingValidation(guruId: number) {
+  return await prisma.buku.findMany({
+    where: {
+      guruId,
+      jobs: {
+        some: {
+          status: {
+            in: ["WAITING_EXTRACTION_VALIDATION", "WAITING_CAPTION_VALIDATION"],
+          },
+        },
+      },
+    },
+    include: {
+      jobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      _count: { select: { bab: true, images: true } },
+    },
+    orderBy: { id: "desc" },
+  });
+}
+
+export async function getExtractionValidationData(bukuId: number) {
+  const buku = await prisma.buku.findUnique({
+    where: { id: bukuId },
+    include: {
+      jobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      bab: {
+        orderBy: { id: "asc" },
+        include: {
+          kompetensi: {
+            orderBy: { nomerKompetensi: "asc" },
+          },
+        },
+      },
+      images: {
+        orderBy: [{ pageNumber: "asc" }, { id: "asc" }],
+      },
+    },
+  });
+
+  return buku;
+}
+
+export async function confirmExtractionValidation(
+  bukuId: number,
+  imageKeepMap: Record<number, boolean>,
+  babsKompetensi: Array<{
+    babId: number;
+    kompetensiList: Array<{ id?: number; nomerKompetensi: string; isiKompetensi: string }>;
+  }>
+) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Update images keep status
+    for (const [imageIdStr, isKept] of Object.entries(imageKeepMap)) {
+      const imageId = parseInt(imageIdStr);
+      await tx.bukuImage.update({
+        where: { id: imageId },
+        data: { isKept },
+      });
+    }
+
+    // 2. Update/create/delete competencies for each bab
+    for (const item of babsKompetensi) {
+      const existingKompetensi = await tx.kompetensiBab.findMany({
+        where: { babId: item.babId },
+      });
+
+      const submittedIds = item.kompetensiList.filter((k) => k.id).map((k) => k.id!);
+      const toDelete = existingKompetensi.filter((k) => !submittedIds.includes(k.id));
+
+      if (toDelete.length > 0) {
+        await tx.kompetensiBab.deleteMany({
+          where: { id: { in: toDelete.map((k) => k.id) } },
+        });
+      }
+
+      for (const k of item.kompetensiList) {
+        if (k.id) {
+          await tx.kompetensiBab.update({
+            where: { id: k.id },
+            data: {
+              nomerKompetensi: k.nomerKompetensi,
+              isiKompetensi: k.isiKompetensi,
+            },
+          });
+        } else {
+          await tx.kompetensiBab.create({
+            data: {
+              babId: item.babId,
+              nomerKompetensi: k.nomerKompetensi,
+              isiKompetensi: k.isiKompetensi,
+            },
+          });
+        }
+      }
+    }
+
+    // 3. Advance GenerationJob status to CAPTIONING_IMAGES
+    const job = await tx.generationJob.findFirst({
+      where: { bukuId, status: "WAITING_EXTRACTION_VALIDATION" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (job) {
+      await tx.generationJob.update({
+        where: { id: job.id },
+        data: { status: "CAPTIONING_IMAGES", updatedAt: new Date() },
+      });
+    }
+
+    return true;
+  });
+}
+
+export async function getCaptionValidationData(bukuId: number) {
+  const buku = await prisma.buku.findUnique({
+    where: { id: bukuId },
+    include: {
+      jobs: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
+      bab: {
+        orderBy: { id: "asc" },
+      },
+      images: {
+        where: { isKept: true },
+        orderBy: [{ pageNumber: "asc" }, { id: "asc" }],
+      },
+    },
+  });
+
+  return buku;
+}
+
+export async function confirmCaptionValidation(
+  bukuId: number,
+  updatedCaptions: Array<{ id: number; caption: string; contextText?: string; babId?: number | null }>,
+  deletedImageIds: number[],
+  newImages: Array<{ imagePath: string; caption: string; babId?: number | null; pageNumber?: number; contextText?: string }>
+) {
+  return await prisma.$transaction(async (tx) => {
+    // 1. Update existing captions
+    for (const item of updatedCaptions) {
+      await tx.bukuImage.update({
+        where: { id: item.id },
+        data: {
+          caption: item.caption,
+          contextText: item.contextText !== undefined ? item.contextText : undefined,
+          babId: item.babId !== undefined ? item.babId : undefined,
+          status: "CAPTIONED",
+        },
+      });
+    }
+
+    // 2. Discard/delete discarded image IDs
+    if (deletedImageIds.length > 0) {
+      await tx.bukuImage.updateMany({
+        where: { id: { in: deletedImageIds } },
+        data: { isKept: false },
+      });
+    }
+
+    // 3. Insert newly added manual images
+    for (const img of newImages) {
+      await tx.bukuImage.create({
+        data: {
+          bukuId,
+          babId: img.babId || null,
+          imagePath: img.imagePath,
+          pageNumber: img.pageNumber || 0,
+          caption: img.caption,
+          contextText: img.contextText || null,
+          isKept: true,
+          isManualUpload: true,
+          status: "CAPTIONED",
+          keywords: [],
+        },
+      });
+    }
+
+    // 4. Advance GenerationJob status to GENERATING_QUESTIONS
+    const job = await tx.generationJob.findFirst({
+      where: { bukuId, status: "WAITING_CAPTION_VALIDATION" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (job) {
+      await tx.generationJob.update({
+        where: { id: job.id },
+        data: { status: "GENERATING_QUESTIONS", updatedAt: new Date() },
+      });
+    }
+
+    return true;
+  });
+}
+
 

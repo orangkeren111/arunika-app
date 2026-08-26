@@ -9,19 +9,24 @@ import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
 
 type TipeSoal = "MCQ" | "ESSAY";
 
+import { useParams } from "next/navigation";
+
 export default function BankSoalClientPage({
-  id,
-  babId,
+  id: propId,
+  babId: propBabId,
 }: {
-  id: string;
-  babId: string;
+  id?: string;
+  babId?: string;
 }) {
-  console.log("abcd");
+  const params = useParams();
+  const id = propId || (params?.id as string) || "";
+  const babId = propBabId || (params?.bab_id as string) || "";
 
   const {
     bab,
     soalList,
     kompetensiList,
+    loading,
     handleAddSoal,
     handleEditSoal,
     handleDeleteSoal,
@@ -149,10 +154,31 @@ export default function BankSoalClientPage({
     closeModal();
   };
 
-  if (!bab)
+  if (loading) {
     return (
-      <p className="text-[var(--muted-foreground)] p-6">Memuat bank soal...</p>
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-3">
+        <div className="w-8 h-8 border-3 border-[var(--primary)] border-t-transparent rounded-full animate-spin"></div>
+        <p className="text-sm text-[var(--muted-foreground)]">Memuat data bab & bank soal...</p>
+      </div>
     );
+  }
+
+  if (!bab) {
+    return (
+      <div className="p-8 text-center bg-[var(--card)] rounded-2xl border border-[var(--border)] space-y-4">
+        <h2 className="text-lg font-bold text-[var(--foreground)]">Bab tidak ditemukan</h2>
+        <p className="text-sm text-[var(--muted-foreground)]">
+          Data bab ID #{babId} tidak ditemukan di database. Bab ini mungkin telah dihapus atau tidak terdaftar.
+        </p>
+        <Link
+          href={id ? `/guru/buku/${id}` : "/guru/buku"}
+          className="inline-flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg text-xs font-semibold hover:opacity-90 transition"
+        >
+          <ArrowLeft size={14} /> Kembali ke Buku
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 relative">

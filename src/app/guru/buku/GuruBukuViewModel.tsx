@@ -4,8 +4,9 @@ import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 
 export function useBukuViewModel() {
-  const [bukuList, setBukuList] = useState<Buku[]>([]);
+  const [bukuList, setBukuList] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeFilter, setActiveFilter] = useState<"ALL" | "NEED_VALIDATION" | "PROCESSING" | "DONE">("ALL");
   const { data: session, status } = useSession();
 
   const fetchBuku = () => {
@@ -39,5 +40,29 @@ export function useBukuViewModel() {
     fetchBuku();
   };
 
-  return { bukuList, loading, handleAddBuku, handleEditBuku, handleDeleteBuku };
+  const filteredBukuList = bukuList.filter((buku) => {
+    const status = buku.jobStatus;
+    if (activeFilter === "NEED_VALIDATION") {
+      return status === "WAITING_EXTRACTION_VALIDATION" || status === "WAITING_CAPTION_VALIDATION";
+    }
+    if (activeFilter === "PROCESSING") {
+      return ["PENDING", "PROCESSING_PDF", "EXTRACTING_IMAGES", "CAPTIONING_IMAGES", "GENERATING_QUESTIONS"].includes(status);
+    }
+    if (activeFilter === "DONE") {
+      return status === "DONE" || !status;
+    }
+    return true;
+  });
+
+  return {
+    bukuList,
+    filteredBukuList,
+    loading,
+    activeFilter,
+    setActiveFilter,
+    handleAddBuku,
+    handleEditBuku,
+    handleDeleteBuku,
+    refetch: fetchBuku,
+  };
 }

@@ -74,13 +74,21 @@ export function useKelasDetailViewModel(kelasId: string) {
     fetchFormMetadata();
   }, [kelasId, session, status]);
 
+  const [judulJadwal, setJudulJadwal] = useState("");
+
   const handleCreateJadwal = async () => {
     if (!selectedTemplate || !selectedTipe || !waktuMulai) {
       alert("Harap lengkapi semua field form pembuatan ujian!");
       return;
     }
+    const templateObj = templateList.find((t) => t.id === selectedTemplate);
+    const tipeObj = tipeList.find((t) => t.id === selectedTipe);
+    const fallbackTitle = `${tipeObj ? tipeObj.namaTipeUjian : "Ujian"} - ${templateObj ? templateObj.title : "Materi"}`;
+    const finalTitle = judulJadwal.trim() || fallbackTitle;
+
     const end = waktuSelesai ? waktuSelesai : new Date(new Date(waktuMulai).getTime() + 90 * 60000).toISOString();
     await guruRepository.createJadwal({
+      title: finalTitle,
       templateId: selectedTemplate,
       kelasId: kelasId,
       startTime: waktuMulai,
@@ -88,6 +96,7 @@ export function useKelasDetailViewModel(kelasId: string) {
       tipeUjianId: selectedTipe,
     });
     // Clear form states
+    setJudulJadwal("");
     setSelectedTemplate("");
     setSelectedTipe("");
     setWaktuMulai("");
@@ -123,6 +132,8 @@ export function useKelasDetailViewModel(kelasId: string) {
     loadingGrades,
     templateList,
     tipeList,
+    judulJadwal,
+    setJudulJadwal,
     selectedTemplate,
     setSelectedTemplate,
     selectedTipe,

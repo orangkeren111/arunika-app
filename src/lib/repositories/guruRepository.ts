@@ -36,6 +36,48 @@ export const guruRepository = {
     }
   },
 
+  // --- VALIDATION PIPELINE ---
+  getBooksNeedingValidation: async (guruId: number = 1) => {
+    const books = await guruDB.getBooksNeedingValidation(guruId);
+    return books.map((b: any) => ({
+      id: b.id.toString(),
+      judul: b.judul,
+      title: b.judul,
+      chapterCount: b._count?.bab || 0,
+      imageCount: b._count?.images || 0,
+      jobStatus: b.jobs?.[0]?.status || null,
+      jobId: b.jobs?.[0]?.id || null,
+    }));
+  },
+
+  getExtractionValidationData: async (bukuId: string) => {
+    return await guruDB.getExtractionValidationData(parseInt(bukuId));
+  },
+
+  confirmExtractionValidation: async (
+    bukuId: string,
+    imageKeepMap: Record<number, boolean>,
+    babsKompetensi: Array<{
+      babId: number;
+      kompetensiList: Array<{ id?: number; nomerKompetensi: string; isiKompetensi: string }>;
+    }>
+  ) => {
+    return await guruDB.confirmExtractionValidation(parseInt(bukuId), imageKeepMap, babsKompetensi);
+  },
+
+  getCaptionValidationData: async (bukuId: string) => {
+    return await guruDB.getCaptionValidationData(parseInt(bukuId));
+  },
+
+  confirmCaptionValidation: async (
+    bukuId: string,
+    updatedCaptions: Array<{ id: number; caption: string; contextText?: string; babId?: number | null }>,
+    deletedImageIds: number[],
+    newImages: Array<{ imagePath: string; caption: string; babId?: number | null; pageNumber?: number; contextText?: string }>
+  ) => {
+    return await guruDB.confirmCaptionValidation(parseInt(bukuId), updatedCaptions, deletedImageIds, newImages);
+  },
+
   // --- BUKU ---
   getBukuList: async (guruId: number = 1) => {
     const rawBuku = await guruDB.getBukuList(guruId);
@@ -404,6 +446,7 @@ export const guruRepository = {
     return rawJadwal.map((j: any) => ({
       id: j.id.toString(),
       templateId: j.ujianId.toString(),
+      title: j.judulJadwal || j.ujian?.judulUjian || "Ujian",
       className: j.kelas.namaKelas,
       startTime: j.waktuMulaiAktif?.toISOString() || "",
       status:
@@ -449,6 +492,7 @@ export const guruRepository = {
       ujianId: parseInt(jadwal.templateId),
       kelasId: parseInt(jadwal.kelasId),
       tipeUjianId: parseInt(jadwal.tipeUjianId || 1), // Fallback to TipeUjian ID 1
+      judulJadwal: jadwal.title || jadwal.judulJadwal || undefined,
       waktuMulaiAktif: jadwal.startTime
         ? new Date(jadwal.startTime)
         : new Date(),
@@ -471,6 +515,7 @@ export const guruRepository = {
       .map((j: any) => ({
         id: j.id.toString(),
         templateId: j.ujianId.toString(),
+        title: j.judulJadwal || j.ujian?.judulUjian || "Ujian",
         className: j.kelas.namaKelas,
         startTime: j.waktuMulaiAktif?.toISOString() || "",
         status: "Completed",
@@ -486,6 +531,7 @@ export const guruRepository = {
       jadwal: {
         id: detail.id.toString(),
         templateId: detail.ujian.id.toString(),
+        title: detail.judulJadwal || detail.ujian.judulUjian,
         className: detail.kelas.namaKelas,
         startTime: detail.waktuMulaiAktif?.toISOString() || "",
         status: "Completed",
@@ -628,15 +674,15 @@ export const guruRepository = {
 
   getExamsByKelas: async (kelasId: string) => {
     const raw = await guruDB.getExamsByKelas(parseInt(kelasId));
-    return raw.map((j) => ({
+    return raw.map((j: any) => ({
       id: j.id.toString(),
       templateId: j.ujianId.toString(),
-      title: j.ujian.judulUjian,
+      title: j.judulJadwal || j.ujian.judulUjian,
       startTime: j.waktuMulaiAktif?.toISOString() || "",
       endTime: j.waktuSelesaiAktif?.toISOString() || "",
       durationMinutes: j.ujian.durasiMenit,
       status: j.status,
-      type: j.tipeUjian.namaTipeUjian,
+      type: j.tipeUjian?.namaTipeUjian || "Ujian",
     }));
   },
 
@@ -646,9 +692,9 @@ export const guruRepository = {
 
   getStudentHistoryInClass: async (siswaId: string, kelasId: string) => {
     const raw = await guruDB.getStudentHistoryInClass(parseInt(siswaId), parseInt(kelasId));
-    return raw.map((s) => ({
+    return raw.map((s: any) => ({
       attemptId: s.id.toString(),
-      title: s.jadwalUjian.ujian.judulUjian,
+      title: s.jadwalUjian?.judulJadwal || s.jadwalUjian?.ujian?.judulUjian || "Ujian",
       score: s.nilaiAkhir,
       submittedAt: s.waktuSelesai?.toISOString() || "Belum Selesai",
     }));
@@ -656,10 +702,11 @@ export const guruRepository = {
 
   getClassGradesReport: async (kelasId: string) => {
     const raw = await guruDB.getClassGradesReport(parseInt(kelasId));
-    return raw.map((j) => ({
+    return raw.map((j: any) => ({
       jadwalId: j.id.toString(),
-      examTitle: j.ujian.judulUjian,
-      grades: j.sesiSiswa.map((s) => ({
+      examTitle: j.judulJadwal || j.ujian.judulUjian,
+      type: j.tipeUjian?.namaTipeUjian || "Ujian",
+      grades: j.sesiSiswa.map((s: any) => ({
         siswaId: s.siswaId.toString(),
         siswaName: s.siswa.name,
         score: s.nilaiAkhir,

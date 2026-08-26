@@ -100,16 +100,16 @@ function LoginForm() {
 
       {/* Box Notifikasi Error */}
       {error && (
-        <div className="flex items-start gap-3 bg-[var(--error)] bg-opacity-10 border border-[var(--error)] text-[var(--error)] p-4 rounded-xl text-sm transition-all duration-300">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-red-500/10 border border-red-500/30 text-[var(--foreground)] p-4 rounded-xl text-sm transition-all duration-300">
+          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5 text-red-500" />
           <p className="font-medium">{error}</p>
         </div>
       )}
 
       {/* Box Notifikasi Sukses */}
       {successMsg && (
-        <div className="flex items-start gap-3 bg-[var(--success)] bg-opacity-10 border border-[var(--success)] text-[var(--success)] p-4 rounded-xl text-sm transition-all duration-300">
-          <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+        <div className="flex items-start gap-3 bg-emerald-500/10 border border-emerald-500/30 text-[var(--foreground)] p-4 rounded-xl text-sm transition-all duration-300">
+          <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5 text-emerald-500" />
           <p className="font-medium">{successMsg}</p>
         </div>
       )}

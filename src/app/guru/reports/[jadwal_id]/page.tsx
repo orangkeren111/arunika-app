@@ -18,8 +18,18 @@ export default function ReportDetailPage({ params }: { params: Promise<{ jadwal_
       </Link>
 
       <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">Leaderboard: {jadwal.className}</h1>
-        <p className="text-[var(--muted-foreground)] mt-1">{jadwal.type} | {jadwal.startTime}</p>
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-bold bg-[var(--primary)]/10 text-[var(--primary)] px-2.5 py-0.5 rounded">
+            {jadwal.type}
+          </span>
+          <span className="text-sm font-semibold text-[var(--muted-foreground)]">
+            Kelas: {jadwal.className}
+          </span>
+        </div>
+        <h1 className="text-2xl font-bold text-[var(--foreground)]">{jadwal.title}</h1>
+        <p className="text-xs text-[var(--muted-foreground)] mt-1">
+          Waktu: {jadwal.startTime ? new Date(jadwal.startTime).toLocaleString("id-ID") : "-"}
+        </p>
       </div>
 
       <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden">
@@ -38,9 +48,9 @@ export default function ReportDetailPage({ params }: { params: Promise<{ jadwal_
                 <td className="p-4 font-medium">{attempt.studentName}</td>
                 <td className="p-4 text-center font-bold text-[var(--primary)]">{attempt.score !== null ? attempt.score : '-'}</td>
                 <td className="p-4 flex justify-center">
-                   {attempt.status === 'Graded' ? 
-                      <span className="flex items-center gap-1 text-[var(--success)] text-xs"><CheckCircle size={14}/> Dinilai</span> :
-                      <span className="flex items-center gap-1 text-[var(--warning)] text-xs"><Clock size={14}/> Menunggu Koreksi</span>
+                   {attempt.status === 'Graded' || attempt.status === 'Checked' ? 
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-[var(--foreground)]"><CheckCircle size={14} className="text-emerald-500"/> Dinilai</span> :
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-[var(--foreground)]"><Clock size={14} className="text-amber-500"/> Menunggu Koreksi</span>
                    }
                 </td>
                 <td className="p-4 text-right">

@@ -97,36 +97,37 @@ async function processGenerationStateMachine() {
         await fs.unlink(job.fileUrl).catch(() => { });
       }
 
-      // Advance to CAPTIONING_IMAGES state
+      // Advance to WAITING_EXTRACTION_VALIDATION state for teacher review
       await prisma.generationJob.update({
         where: { id: job.id },
         data: {
-          status: "CAPTIONING_IMAGES",
+          status: "WAITING_EXTRACTION_VALIDATION",
           updatedAt: new Date(),
         },
       });
       return;
     }
 
-    // PHASE 3: Vision AI Image Captioning & Agentic Filter for this book
+    // PHASE 3: Vision AI Image Captioning for kept images of this book
     if (job.status === "CAPTIONING_IMAGES") {
-      // Process pending images for this specific bukuId
+      // Process pending kept images for this specific bukuId
       await processPendingBookImages(job.bukuId);
 
-      // Check if any PENDING images remain for this book
+      // Check if any PENDING kept images remain for this book
       const remainingPendingCount = await prisma.bukuImage.count({
         where: {
           bukuId: job.bukuId,
           status: "PENDING",
+          isKept: true,
         },
       });
 
-      // If all images for this book are captioned & processed, advance to GENERATING_QUESTIONS!
+      // If all kept images for this book are captioned, advance to WAITING_CAPTION_VALIDATION!
       if (remainingPendingCount === 0) {
         await prisma.generationJob.update({
           where: { id: job.id },
           data: {
-            status: "GENERATING_QUESTIONS",
+            status: "WAITING_CAPTION_VALIDATION",
             updatedAt: new Date(),
           },
         });

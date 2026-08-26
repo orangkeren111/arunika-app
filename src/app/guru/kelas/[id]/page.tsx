@@ -31,6 +31,8 @@ export default function GuruKelasDetailPage({
     loadingGrades,
     templateList,
     tipeList,
+    judulJadwal,
+    setJudulJadwal,
     selectedTemplate,
     setSelectedTemplate,
     selectedTipe,
@@ -268,8 +270,13 @@ export default function GuruKelasDetailPage({
                   <tr>
                     <th className="p-4 font-bold">Siswa</th>
                     {gradesReport.map((exam) => (
-                      <th key={exam.jadwalId} className="p-4 font-bold text-center truncate max-w-[150px]" title={exam.examTitle}>
-                        {exam.examTitle}
+                      <th key={exam.jadwalId} className="p-4 font-bold text-center max-w-[200px]" title={exam.examTitle}>
+                        <div className="flex flex-col items-center gap-1">
+                          <span className="text-[10px] bg-[var(--primary)]/10 text-[var(--primary)] px-2 py-0.5 rounded font-bold uppercase">
+                            {exam.type}
+                          </span>
+                          <span className="text-xs line-clamp-2">{exam.examTitle}</span>
+                        </div>
                       </th>
                     ))}
                   </tr>
@@ -312,6 +319,19 @@ export default function GuruKelasDetailPage({
             </h3>
 
             <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
+                  Nama / Judul Sesi Ujian
+                </label>
+                <input
+                  type="text"
+                  value={judulJadwal}
+                  onChange={(e) => setJudulJadwal(e.target.value)}
+                  placeholder="Contoh: Kuis Harian Bab 1 Sel / PTS Biologi 1"
+                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
+                />
+              </div>
+
               <div>
                 <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
                   Pilih Template Ujian

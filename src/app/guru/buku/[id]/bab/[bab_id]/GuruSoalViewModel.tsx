@@ -16,16 +16,25 @@ export function useSoalViewModel(babId: string) {
   const [loading, setLoading] = useState(true);
   
   const fetchSoal = () => {
+    if (!babId || isNaN(Number(babId))) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     Promise.all([
       guruRepository.getSoalList(babId),
       getKompetensiBab(Number(babId)),
-    ]).then(([res, kompRes]) => {
-      setBab(res.bab);
-      setSoalList(res.soalList);
-      setKompetensiList(kompRes);
-      setLoading(false);
-    });
+    ])
+      .then(([res, kompRes]) => {
+        setBab(res.bab);
+        setSoalList(res.soalList);
+        setKompetensiList(kompRes);
+        setLoading(false);
+      })
+      .catch((err) => {
+        console.error("Error fetching soal:", err);
+        setLoading(false);
+      });
   };
 
   useEffect(() => {

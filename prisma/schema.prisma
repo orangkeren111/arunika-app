@@ -38,7 +38,9 @@ enum JobStatus {
   PENDING
   PROCESSING_PDF
   EXTRACTING_IMAGES
+  WAITING_EXTRACTION_VALIDATION
   CAPTIONING_IMAGES
+  WAITING_CAPTION_VALIDATION
   GENERATING_QUESTIONS
   DONE
   FAILED
@@ -140,6 +142,8 @@ model BukuImage {
   caption     String?  @db.Text
   keywords    String[]
   status      String   @default("PENDING")
+  isKept      Boolean  @default(true) @map("is_kept")
+  isManualUpload Boolean @default(false) @map("is_manual_upload")
 
   createdAt   DateTime @default(now()) @map("created_at")
   
@@ -262,6 +266,7 @@ model UjianBab {
 
 model JadwalUjian {
   id                 Int         @id @default(autoincrement())
+  judulJadwal        String?     @map("judul_jadwal")
   waktuMulaiAktif    DateTime?   @map("waktu_mulai_aktif")
   waktuSelesaiAktif  DateTime?   @map("waktu_selesai_aktif")
   status             StatusUjian @default(DRAFT)

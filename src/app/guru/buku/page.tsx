@@ -2,12 +2,18 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Plus, BookOpen, Pencil, Trash2, X } from "lucide-react";
+import { Plus, BookOpen, Pencil, Trash2, X, AlertCircle, ArrowRight, CheckCircle2, Clock } from "lucide-react";
 import { useBukuViewModel } from "./GuruBukuViewModel";
 
 export default function BukuPage() {
-  const { bukuList, handleAddBuku, handleEditBuku, handleDeleteBuku } =
-    useBukuViewModel();
+  const {
+    filteredBukuList,
+    activeFilter,
+    setActiveFilter,
+    handleAddBuku,
+    handleEditBuku,
+    handleDeleteBuku,
+  } = useBukuViewModel();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
@@ -56,104 +62,164 @@ export default function BukuPage() {
             Koleksi Buku Materi
           </h1>
           <p className="text-[var(--muted-foreground)] mt-1">
-            Kelola bank soal Anda berdasarkan buku dan bab.
+            Kelola bank soal Anda berdasarkan buku, bab, dan tahapan validasi AI.
           </p>
         </div>
         <button
           onClick={openAddModal}
-          className="flex items-center justify-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition w-full sm:w-auto"
+          className="flex items-center justify-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition w-full sm:w-auto text-sm font-medium"
         >
           <Plus size={18} /> Buat Buku Baru
         </button>
       </div>
 
+      {/* FILTER TABS */}
+      <div className="flex items-center gap-2 overflow-x-auto pb-2 border-b border-[var(--border)]">
+        {[
+          { id: "ALL", label: "Semua Buku" },
+          { id: "NEED_VALIDATION", label: "⚠️ Perlu Validasi" },
+          { id: "PROCESSING", label: "⏳ Proses AI" },
+          { id: "DONE", label: "✅ Selesai" },
+        ].map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setActiveFilter(tab.id as any)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
+              activeFilter === tab.id
+                ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+                : "bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]"
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {bukuList.map((buku) => {
-          const isProcessing = buku.jobStatus ? ["PENDING", "PROCESSING_PDF", "GENERATING_QUESTIONS"].includes(buku.jobStatus) : false;
+        {filteredBukuList.map((buku) => {
+          const status = buku.jobStatus;
+          const isStage1Validation = status === "WAITING_EXTRACTION_VALIDATION";
+          const isStage2Validation = status === "WAITING_CAPTION_VALIDATION";
+          const isNeedsValidation = isStage1Validation || isStage2Validation;
+          const isProcessing = ["PENDING", "PROCESSING_PDF", "EXTRACTING_IMAGES", "CAPTIONING_IMAGES", "GENERATING_QUESTIONS"].includes(status);
+
+          let badgeContent = null;
+          if (isStage1Validation) {
+            badgeContent = (
+              <span className="text-[11px] bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 px-2.5 py-1 rounded-md font-bold flex items-center gap-1">
+                <AlertCircle size={12} /> Validasi Stage 1: Gambar & Kompetensi
+              </span>
+            );
+          } else if (isStage2Validation) {
+            badgeContent = (
+              <span className="text-[11px] bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 px-2.5 py-1 rounded-md font-bold flex items-center gap-1">
+                <AlertCircle size={12} /> Validasi Stage 2: Captions AI
+              </span>
+            );
+          } else if (isProcessing) {
+            badgeContent = (
+              <span className="text-[11px] bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300 px-2.5 py-1 rounded-md font-bold flex items-center gap-1">
+                <Clock size={12} className="animate-spin" /> Sedang Diproses AI...
+              </span>
+            );
+          } else {
+            badgeContent = (
+              <span className="text-[11px] bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300 px-2.5 py-1 rounded-md font-semibold flex items-center gap-1">
+                <CheckCircle2 size={12} /> Siap / Selesai
+              </span>
+            );
+          }
+
           return (
             <div
               key={buku.id}
-              className={`bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] transition shadow-sm flex flex-col h-full group relative ${
-                isProcessing ? "opacity-60 pointer-events-none select-none border-dashed" : "hover:border-[var(--primary)]"
+              className={`bg-[var(--card)] p-6 rounded-xl border transition shadow-sm flex flex-col justify-between h-full group relative ${
+                isNeedsValidation
+                  ? "border-amber-500/80 shadow-amber-500/5 ring-1 ring-amber-500/20"
+                  : "border-[var(--border)] hover:border-[var(--primary)]"
               }`}
             >
-              {/* Header Item & Action Buttons */}
-              <div className="flex justify-between items-start mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-[var(--muted)] text-[var(--primary)] rounded-lg relative">
-                    <BookOpen size={24} />
-                    {isProcessing && (
-                      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
-                      </span>
-                    )}
-                  </div>
-                  {isProcessing ? (
-                    <div>
-                      <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
-                        {buku.title}
-                      </h3>
-                      <span className="text-[10px] bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-bold">
-                        Sedang Diproses AI...
-                      </span>
+              <div>
+                {/* Header Item & Action Buttons */}
+                <div className="flex justify-between items-start mb-3">
+                  <div className="flex items-center gap-3">
+                    <div className="p-3 bg-[var(--muted)] text-[var(--primary)] rounded-lg relative">
+                      <BookOpen size={24} />
                     </div>
-                  ) : (
-                    <Link
-                      href={`/guru/buku/${buku.id}`}
-                      className="hover:underline"
+                    <div>
+                      <Link
+                        href={`/guru/buku/${buku.id}`}
+                        className="hover:underline"
+                      >
+                        <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
+                          {buku.title}
+                        </h3>
+                      </Link>
+                      <div className="mt-1">{badgeContent}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                    <button
+                      onClick={() => openEditModal(buku)}
+                      className="p-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--muted)] rounded-md transition"
+                      title="Edit Buku"
                     >
-                      <h3 className="text-lg font-semibold text-[var(--card-foreground)] line-clamp-2">
-                        {buku.title}
-                      </h3>
-                    </Link>
-                  )}
+                      <Pencil size={16} />
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            "Apakah Anda yakin ingin menghapus buku ini?",
+                          )
+                        ) {
+                          handleDeleteBuku(buku.id);
+                        }
+                      }}
+                      className="p-2 text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-50 rounded-md transition"
+                      title="Hapus Buku"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
                 </div>
 
-              <div className="flex gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
-                <button
-                  onClick={() => openEditModal(buku)}
-                  className="p-2 text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--muted)] rounded-md transition"
-                  title="Edit Buku"
-                >
-                  <Pencil size={16} />
-                </button>
-                <button
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "Apakah Anda yakin ingin menghapus buku ini?",
-                      )
-                    ) {
-                      handleDeleteBuku(buku.id);
-                    }
-                  }}
-                  className="p-2 text-[var(--muted-foreground)] hover:text-red-500 hover:bg-red-50 rounded-md transition"
-                  title="Hapus Buku"
-                >
-                  <Trash2 size={16} />
-                </button>
+                <p className="text-sm text-[var(--muted-foreground)] mb-4 flex-grow line-clamp-2">
+                  {buku.description || "Buku referensi pembelajaran & bank soal AI."}
+                </p>
+              </div>
+
+              <div className="space-y-3 pt-4 border-t border-[var(--border)] mt-2">
+                <div className="flex justify-between items-center text-sm font-medium">
+                  <span className="text-[var(--secondary)]">
+                    {buku.chapterCount} Bab Materi
+                  </span>
+                </div>
+
+                {/* STAGE VALIDATION ACTION BUTTON */}
+                {isStage1Validation && (
+                  <Link
+                    href={`/guru/buku/${buku.id}/validate-extraction`}
+                    className="w-full flex items-center justify-center gap-2 bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm"
+                  >
+                    Validasi Gambar & Kompetensi <ArrowRight size={14} />
+                  </Link>
+                )}
+
+                {isStage2Validation && (
+                  <Link
+                    href={`/guru/buku/${buku.id}/validate-captions`}
+                    className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-xs font-bold transition shadow-sm"
+                  >
+                    Validasi Captions AI <ArrowRight size={14} />
+                  </Link>
+                )}
               </div>
             </div>
-
-            <p className="text-sm text-[var(--muted-foreground)] mb-4 flex-grow line-clamp-3">
-              {buku.description}
-            </p>
-
-            <div className="flex justify-between items-center text-sm font-medium pt-4 border-t border-[var(--border)]">
-              <span className="text-[var(--secondary)]">
-                {buku.chapterCount} Bab Materi
-              </span>
-              {/* {buku.mapel && (
-                <span className="bg-[var(--muted)] text-[var(--muted-foreground)] px-2.5 py-1 rounded-md text-xs">
-                  {buku.mapel}
-                </span>
-              )} */}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
 
       {/* Modal Tambah/Edit Buku */}
       {isModalOpen && (

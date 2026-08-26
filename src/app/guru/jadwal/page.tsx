@@ -23,23 +23,34 @@ export default function JadwalPage() {
       <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="bg-[var(--muted)] text-[var(--muted-foreground)] border-b border-[var(--border)]">
-              <th className="p-4 font-medium">Kelas</th>
-              <th className="p-4 font-medium">Tipe Ujian</th>
-              <th className="p-4 font-medium">Waktu Mulai</th>
-              <th className="p-4 font-medium">Status</th>
+            <tr className="bg-[var(--muted)] text-[var(--muted-foreground)] border-b border-[var(--border)] text-sm font-semibold">
+              <th className="p-4 font-bold">Nama Sesi Ujian</th>
+              <th className="p-4 font-bold">Kelas</th>
+              <th className="p-4 font-bold">Tipe Ujian</th>
+              <th className="p-4 font-bold">Waktu Mulai</th>
+              <th className="p-4 font-bold text-center">Status</th>
             </tr>
           </thead>
           <tbody>
-            {jadwalList.map(j => (
-              <tr key={j.id} className="border-b border-[var(--border)] last:border-0 text-[var(--card-foreground)]">
+            {jadwalList.map((j: any) => (
+              <tr key={j.id} className="border-b border-[var(--border)] last:border-0 text-[var(--card-foreground)] hover:bg-[var(--muted)]/20 transition">
+                <td className="p-4 font-bold text-[var(--foreground)]">{j.title}</td>
                 <td className="p-4 font-medium">{j.className}</td>
-                <td className="p-4">{j.type}</td>
-                <td className="p-4 flex items-center gap-2"><Calendar size={16} className="text-[var(--muted-foreground)]"/> {j.startTime}</td>
                 <td className="p-4">
-                  <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                    j.status === 'Active' ? 'bg-[var(--success)] text-[var(--success)] bg-opacity-20' : 
-                    'bg-[var(--muted)] text-[var(--muted-foreground)]'
+                  <span className="text-xs bg-[var(--primary)]/10 text-[var(--primary)] px-2.5 py-1 rounded-md font-bold">
+                    {j.type}
+                  </span>
+                </td>
+                <td className="p-4 text-xs text-[var(--muted-foreground)] flex items-center gap-2">
+                  <Calendar size={14} /> {j.startTime ? new Date(j.startTime).toLocaleString("id-ID") : "Langsung/Aktif"}
+                </td>
+                <td className="p-4 text-center">
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border ${
+                    j.status === 'Active' || j.status === 'ONGOING'
+                      ? 'bg-emerald-500/15 border-emerald-500/30 text-[var(--foreground)]'
+                      : j.status === 'Upcoming' || j.status === 'SCHEDULED'
+                      ? 'bg-blue-500/15 border-blue-500/30 text-[var(--foreground)]'
+                      : 'bg-[var(--muted)] border-[var(--border)] text-[var(--muted-foreground)]'
                   }`}>
                     {j.status}
                   </span>

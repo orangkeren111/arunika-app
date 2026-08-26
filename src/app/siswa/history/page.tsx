@@ -32,11 +32,16 @@ export default function HistoryPage() {
                 <td className="p-4 font-medium">{item.title}</td>
                 <td className="p-4 text-sm text-[var(--muted-foreground)]">{item.submittedAt}</td>
                 <td className="p-4 text-center">
-                  <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium ${
-                    item.status === 'Dinilai' ? 'bg-[var(--success)] text-[var(--success)] bg-opacity-10' : 
-                    'bg-[var(--warning)] text-[var(--warning)] bg-opacity-10'
+                  <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold text-[var(--foreground)] border ${
+                    item.status === 'Dinilai' || item.status === 'Checked' || item.status === 'Graded'
+                      ? 'bg-emerald-500/15 border-emerald-500/30'
+                      : 'bg-amber-500/15 border-amber-500/30'
                   }`}>
-                    {item.status === 'Dinilai' ? <FileCheck2 size={12}/> : <Clock size={12}/>}
+                    {item.status === 'Dinilai' || item.status === 'Checked' || item.status === 'Graded' ? (
+                      <FileCheck2 size={12} className="text-emerald-500" />
+                    ) : (
+                      <Clock size={12} className="text-amber-500" />
+                    )}
                     {item.status}
                   </span>
                 </td>

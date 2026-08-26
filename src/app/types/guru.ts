@@ -69,6 +69,7 @@ export interface Kelas {
 export interface JadwalUjian {
   id: string;
   templateId: string;
+  title?: string;
   className: string;
   startTime: string;
   type: string; // e.g., 'Ulangan Harian', 'Ujian Akhir'

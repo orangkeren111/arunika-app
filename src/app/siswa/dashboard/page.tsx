@@ -79,7 +79,11 @@ export default function SiswaDashboardPage() {
                   )}
                 </div>
                 <span
-                  className={`text-xs px-2 py-1 rounded-full ${hist.status === "Dinilai" ? "bg-[var(--success)] text-[var(--foreground)] bg-opacity-10" : "bg-[var(--warning)] text-[var(--foreground)] bg-opacity-10"}`}
+                  className={`text-xs px-3 py-1 rounded-full font-semibold inline-flex items-center gap-1 text-[var(--foreground)] border ${
+                    hist.status === "Dinilai" || hist.status === "Checked" || hist.status === "Graded"
+                      ? "bg-emerald-500/15 border-emerald-500/30"
+                      : "bg-amber-500/15 border-amber-500/30"
+                  }`}
                 >
                   {hist.status}
                 </span>

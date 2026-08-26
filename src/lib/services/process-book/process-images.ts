@@ -36,6 +36,7 @@ export async function processPendingBookImages(bukuId?: number) {
       where: {
         bukuId: targetBukuId,
         status: "PENDING",
+        isKept: true,
       },
       take: 10,
     });
