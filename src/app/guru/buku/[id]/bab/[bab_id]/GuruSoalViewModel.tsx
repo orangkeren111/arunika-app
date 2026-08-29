@@ -28,7 +28,6 @@ export function useSoalViewModel(babId: string) {
 
   const fetchSoal = () => {
     if (!babId || isNaN(Number(babId))) {
-      setLoading(false);
       return;
     }
     setLoading(true);

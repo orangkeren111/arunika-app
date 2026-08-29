@@ -761,7 +761,7 @@ export default function BankSoalClientPage({
                 <X size={20} />
               </button>
             </div>
-            
+
             <p className="text-sm text-[var(--muted-foreground)]">
               AI akan secara otomatis membuat bank soal pilihan ganda dan essay sesuai indikator & taksonomi Bloom pada bab ini.
             </p>
@@ -776,7 +776,7 @@ export default function BankSoalClientPage({
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal yang Ingin Dibuat
+                  Jumlah Soal yang Ingin Dibuat di Tiap Kompetensi
                 </label>
                 <input
                   type="number"
