@@ -66,6 +66,7 @@ export const quizRepository = {
       correctAnswer: q.jawabanBenarMcq || "",
       difficulty: q.difficulty,
       bloomLevel: q.bloomLevel,
+      linkGambarSoal: q.linkGambarSoal || null,
     }));
   },
 

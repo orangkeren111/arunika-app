@@ -13,7 +13,41 @@ import { NextResponse } from "next/server";
 import fs from "fs/promises";
 
 
+const globalForWorker = globalThis as unknown as {
+  isWorkerRunning?: boolean;
+  lastWorkerRunTimestamp?: number;
+};
+
 export async function GET() {
+  const now = Date.now();
+  const COOLDOWN_MS = 60_000; // 1 minute limit
+
+  // 1. Rate Limit Guard: 1 request per minute
+  if (
+    globalForWorker.lastWorkerRunTimestamp &&
+    now - globalForWorker.lastWorkerRunTimestamp < COOLDOWN_MS
+  ) {
+    const remainingSec = Math.ceil(
+      (COOLDOWN_MS - (now - globalForWorker.lastWorkerRunTimestamp)) / 1000
+    );
+    return NextResponse.json({
+      skipped: true,
+      message: `Rate limit active: 1 sweep per minute. Retry in ${remainingSec}s.`,
+    });
+  }
+
+  // 2. Concurrency Lock Guard: Prevent overlapping runs
+  if (globalForWorker.isWorkerRunning) {
+    return NextResponse.json({
+      skipped: true,
+      message: "Sweep already in progress. Skipping overlapping request.",
+    });
+  }
+
+  // Acquire Lock & Record Timestamp
+  globalForWorker.isWorkerRunning = true;
+  globalForWorker.lastWorkerRunTimestamp = now;
+
   try {
     await Promise.allSettled([
       processGenerationStateMachine(), // 1. Book PDF & Question Generation
@@ -25,6 +59,8 @@ export async function GET() {
   } catch (error) {
     console.error("Sweeper crash:", error);
     return NextResponse.json({ error: "Sweeper failed" }, { status: 500 });
+  } finally {
+    globalForWorker.isWorkerRunning = false;
   }
 }
 
@@ -187,23 +223,12 @@ async function processGenerationStateMachine() {
       return;
     }
   } catch (error: any) {
-    // Rate Limit / Outage Check (429, 503, 500+, etc.)
-    const errCode = error.status || error.statusCode;
     const errMsg = error.message ? error.message.toString() : String(error);
-
-    const isRateLimit = errCode === 429 || errMsg.includes("429");
-    const isServerDown =
-      (typeof errCode === "number" && errCode >= 500 && errCode <= 599) ||
-      errMsg.includes("503") ||
-      errMsg.includes("UNAVAILABLE") ||
-      errMsg.includes("Service Unavailable");
-
     const currentAttempts = ((job as any).attempts ?? 0) + 1;
-    const isExhausted = currentAttempts >= 3;
 
-    if ((isRateLimit || isServerDown) && !isExhausted) {
+    if (currentAttempts < 3) {
       console.warn(
-        `Provider overloaded/503 for GenerationJob ${job.id} (Attempt ${currentAttempts}/3). Backing off to retry next sweep.`,
+        `GenerationJob ${job.id} failed attempt ${currentAttempts}/3. Re-queueing for next sweep. Error: ${errMsg}`,
       );
       await prisma.generationJob.update({
         where: { id: job.id },
@@ -224,14 +249,14 @@ async function processGenerationStateMachine() {
       return;
     }
 
-    // Hard Error OR Max Attempts (3) reached -> Mark as FAILED
-    console.error(`GenerationJob ${job.id} marked FAILED after attempt ${currentAttempts}. Error: ${errMsg}`);
+    // Fail count reached 3 -> Mark as FAILED
+    console.error(`GenerationJob ${job.id} marked FAILED after ${currentAttempts} attempts. Error: ${errMsg}`);
     await prisma.generationJob.update({
       where: { id: job.id },
       data: {
         status: "FAILED",
         attempts: currentAttempts,
-        errorMessage: errMsg || "Failed after 3 attempts due to Gemini/Provider error",
+        errorMessage: errMsg || "Failed after 3 attempts due to LLM/Provider error",
         updatedAt: new Date(),
       },
     });
@@ -373,34 +398,32 @@ async function processTaskQueueBatch() {
           data: { status: "completed", tokensSpent },
         });
       } catch (error: any) {
-        //        console.error(`Task ${task.id} failed:`, error);
+        const currentAttempts = (task.attempts ?? 0) + 1;
+        const errMsg = error.message ? error.message.toString() : String(error);
 
-        const isRateLimit =
-          error.status === 429 ||
-          (error.message && error.message.includes("429"));
-        const isServerDown = error.status >= 500;
-        const isExhausted = task.attempts >= 3;
-
-        if ((isRateLimit || isServerDown) && !isExhausted) {
-          // Soft Fail: Provider busy, put back in queue for next sweep
+        if (currentAttempts < 3) {
+          // Re-queue task with incremented attempts
+          console.warn(`Task ${task.id} failed attempt ${currentAttempts}/3. Re-queueing. Error: ${errMsg}`);
           await prisma.taskQueue.update({
             where: { id: task.id },
             data: {
               status: "pending",
-              attempts: task.attempts + 1,
-              errorLog: "Provider overloaded, backing off",
+              attempts: currentAttempts,
+              errorLog: `Attempt ${currentAttempts}/3 failed: ${errMsg}`,
               lockedAt: null,
               updatedAt: new Date(),
             },
           });
         } else {
-          // Hard Fail: JSON Parse error or max attempts reached
+          // Fail count reached 3 -> Mark as failed
+          console.error(`Task ${task.id} marked failed after ${currentAttempts} attempts. Error: ${errMsg}`);
           await prisma.taskQueue.update({
             where: { id: task.id },
             data: {
               status: "failed",
-              attempts: task.attempts + 1,
-              errorLog: error.message,
+              attempts: currentAttempts,
+              errorLog: errMsg || "Failed after 3 attempts.",
+              updatedAt: new Date(),
             },
           });
 
@@ -410,7 +433,7 @@ async function processTaskQueueBatch() {
             await prisma.savedResponses.update({
               where: { attemptId: payload.attemptId },
               data: { status: "ERROR" },
-            });
+            }).catch(() => {});
           }
         }
       }

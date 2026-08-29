@@ -213,21 +213,42 @@ export async function submitSingleAnswer(
 export async function finishExamSession(sesiId: number) {
   const session = await prisma.sesiUjianSiswa.findUnique({
     where: { id: sesiId },
-    include: { jawabanSiswa: true },
+    include: {
+      jawabanSiswa: true,
+      jadwalUjian: {
+        include: {
+          ujian: {
+            include: {
+              templateKompetensi: {
+                where: { isEnabled: true },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!session) return;
+
+  const enabledComp = session.jadwalUjian?.ujian?.templateKompetensi || [];
+  const totalQuestions =
+    enabledComp.length > 0
+      ? enabledComp.reduce((sum, tk) => sum + tk.jumlahSoal, 0)
+      : session.jadwalUjian?.ujian?.jumlahSoal || session.jawabanSiswa.length || 10;
 
   let totalPoin = 0;
   session.jawabanSiswa.forEach((j) => {
     if (j.nilaiPoin) totalPoin += j.nilaiPoin;
   });
-  const avgScore =
-    session.jawabanSiswa.length > 0
-      ? totalPoin / session.jawabanSiswa.length
+
+  const maxTotalPoin = totalQuestions * 100;
+  const finalScore =
+    maxTotalPoin > 0
+      ? Math.round((totalPoin / maxTotalPoin) * 100 * 100) / 100
       : 0;
 
-  await siswaDB.finishSession(sesiId, avgScore);
+  await siswaDB.finishSession(sesiId, finalScore);
 }
 
 async function _findNextQuestion(
@@ -286,6 +307,7 @@ async function _findNextQuestion(
       options: bestQuestion.opsiJawaban,
       difficulty: bestQuestion.difficulty,
       bloomLevel: bestQuestion.bloomLevel,
+      linkGambarSoal: bestQuestion.linkGambarSoal || null,
     };
   }
 
@@ -320,5 +342,6 @@ async function _findNextQuestion(
     options: bestQuestion.opsiJawaban,
     difficulty: bestQuestion.difficulty,
     bloomLevel: bestQuestion.bloomLevel,
+    linkGambarSoal: bestQuestion.linkGambarSoal || null,
   };
 }

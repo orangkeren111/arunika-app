@@ -120,7 +120,7 @@ export default function AttemptReviewPage({
             Total Skor
           </p>
           <p className="text-3xl font-bold text-[var(--primary)]">
-            {attempt.score !== null ? attempt.score : "0"}
+            {attempt.score !== null ? `${attempt.score} / 100` : "0 / 100"}
           </p>
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import React, { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Trash2, Upload } from "lucide-react";
+import { ArrowLeft, Plus, X, Trash2, Upload, Loader2 } from "lucide-react";
 import { useSoalViewModel } from "./GuruSoalViewModel";
 import { MathRenderer } from "@/src/components/MathRenderer";
 import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
@@ -10,6 +10,7 @@ import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
 type TipeSoal = "MCQ" | "ESSAY";
 
 import { useParams } from "next/navigation";
+
 
 export default function BankSoalClientPage({
   id: propId,
@@ -27,6 +28,8 @@ export default function BankSoalClientPage({
     soalList,
     kompetensiList,
     loading,
+    isGeneratingSoal,
+    checkGenerationStatus,
     handleAddSoal,
     handleEditSoal,
     handleDeleteSoal,
@@ -40,6 +43,11 @@ export default function BankSoalClientPage({
   // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  // --- GENERATE SOAL MODAL STATE ---
+  const [isGenerateModalOpen, setIsGenerateModalOpen] = useState(false);
+  const [jumlahSoalGen, setJumlahSoalGen] = useState<number>(10);
+  const [isSubmittingGen, setIsSubmittingGen] = useState(false);
 
   // --- UPLOAD PDF MODAL STATE ---
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
@@ -224,7 +232,10 @@ export default function BankSoalClientPage({
             <Plus size={16} /> Pilihan Ganda
           </button>
           <button
-            onClick={() => handleGenerateQuestion()}
+            onClick={async () => {
+              await checkGenerationStatus();
+              setIsGenerateModalOpen(true);
+            }}
             className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:opacity-90 transition flex items-center gap-2 font-medium"
           >
             <Plus size={16} /> Generate Soal
@@ -409,6 +420,21 @@ export default function BankSoalClientPage({
                   placeholder="Ketikkan teks pertanyaan di sini... Gunakan $...$ untuk matematika inline atau $$...$$ untuk matematika block."
                   className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition resize-y font-mono text-xs"
                 />
+                {/* Live Preview Soal */}
+                <div className="mt-2 p-3 bg-[var(--muted)]/50 rounded-lg border border-[var(--border)]">
+                  <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mb-1">
+                    Pratinjau Tampilan Soal (LaTeX Preview)
+                  </span>
+                  <div className="text-xs text-[var(--foreground)] min-h-[1.5rem] leading-relaxed">
+                    {teksSoal.trim() ? (
+                      <MathRenderer text={teksSoal} />
+                    ) : (
+                      <span className="italic text-[var(--muted-foreground)]">
+                        (Belum ada teks pertanyaan)
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
 
               {/* Kompetensi & Gambar Link */}
@@ -562,6 +588,26 @@ export default function BankSoalClientPage({
                   >
                     <Plus size={16} /> Tambah Opsi Lainnya
                   </button>
+
+                  {/* Live Preview MCQ Options */}
+                  <div className="mt-3 p-3 bg-[var(--muted)]/50 rounded-lg border border-[var(--border)] space-y-1">
+                    <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mb-1">
+                      Pratinjau Opsi Jawaban untuk Siswa (LaTeX Preview)
+                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                      {opsiJawaban.map((opsi, idx) => (
+                        <div
+                          key={idx}
+                          className={`p-2 rounded-lg border flex items-center gap-2 ${jawabanBenarIndex === idx ? "bg-green-500/10 border-green-500/30 text-green-700 font-bold" : "bg-[var(--card)] border-[var(--border)] text-[var(--foreground)]"}`}
+                        >
+                          <span className="font-mono text-[10px] text-[var(--muted-foreground)] w-4">
+                            {String.fromCharCode(65 + idx)}.
+                          </span>
+                          <MathRenderer text={opsi || "(Kosong)"} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -578,6 +624,21 @@ export default function BankSoalClientPage({
                     placeholder="Ketikkan kunci / acuan jawaban benar untuk essay ini (akan digunakan AI sebagai referensi penilaian)..."
                     className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition text-xs"
                   />
+                  {/* Live Preview Essay Answer */}
+                  <div className="mt-2 p-3 bg-[var(--muted)]/50 rounded-lg border border-[var(--border)]">
+                    <span className="text-[10px] font-bold text-[var(--muted-foreground)] uppercase tracking-wider block mb-1">
+                      Pratinjau Kunci Jawaban Essay (LaTeX Preview)
+                    </span>
+                    <div className="text-xs text-[var(--foreground)] min-h-[1.5rem] leading-relaxed">
+                      {jawabanBenarEssay.trim() ? (
+                        <MathRenderer text={jawabanBenarEssay} />
+                      ) : (
+                        <span className="italic text-[var(--muted-foreground)]">
+                          (Belum ada kunci jawaban)
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
@@ -680,6 +741,85 @@ export default function BankSoalClientPage({
                 className="px-4 py-2 rounded-lg text-sm bg-[var(--primary)] text-[var(--primary-foreground)] font-medium hover:opacity-90 disabled:opacity-50"
               >
                 {isUploadingPdf ? "Mengunggah..." : "Upload & Proses AI"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* --- MODAL GENERATE SOAL AI --- */}
+      {isGenerateModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="bg-[var(--card)] border border-[var(--border)] rounded-xl w-full max-w-md p-6 space-y-4 shadow-xl">
+            <div className="flex justify-between items-center pb-2 border-b border-[var(--border)]">
+              <h3 className="text-lg font-bold text-[var(--foreground)]">
+                Generate Soal Otomatis (AI)
+              </h3>
+              <button
+                onClick={() => setIsGenerateModalOpen(false)}
+                className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              >
+                <X size={20} />
+              </button>
+            </div>
+            
+            <p className="text-sm text-[var(--muted-foreground)]">
+              AI akan secara otomatis membuat bank soal pilihan ganda dan essay sesuai indikator & taksonomi Bloom pada bab ini.
+            </p>
+
+            {isGeneratingSoal && (
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 rounded-lg text-xs font-medium flex items-center gap-2">
+                <Loader2 className="animate-spin shrink-0" size={16} />
+                <span>Pembuatan soal sedang berjalan di latar belakang...</span>
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Jumlah Soal yang Ingin Dibuat
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={50}
+                  value={jumlahSoalGen}
+                  onChange={(e) => setJumlahSoalGen(Number(e.target.value))}
+                  disabled={isGeneratingSoal || isSubmittingGen}
+                  className="w-full p-2.5 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none disabled:opacity-50"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setIsGenerateModalOpen(false)}
+                className="px-4 py-2 rounded-lg text-sm text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+              >
+                Batal
+              </button>
+              <button
+                disabled={isGeneratingSoal || isSubmittingGen}
+                onClick={async () => {
+                  setIsSubmittingGen(true);
+                  try {
+                    await handleGenerateQuestion(jumlahSoalGen);
+                    setIsGenerateModalOpen(false);
+                  } catch (err) {
+                    alert("Gagal memulai pembuatan soal.");
+                  } finally {
+                    setIsSubmittingGen(false);
+                  }
+                }}
+                className="px-4 py-2 rounded-lg text-sm bg-green-600 text-white font-medium hover:opacity-90 disabled:opacity-50 flex items-center gap-2"
+              >
+                {isGeneratingSoal || isSubmittingGen ? (
+                  <>
+                    <Loader2 className="animate-spin" size={16} />
+                    <span>creating soal...</span>
+                  </>
+                ) : (
+                  "Mulai Generate Soal"
+                )}
               </button>
             </div>
           </div>

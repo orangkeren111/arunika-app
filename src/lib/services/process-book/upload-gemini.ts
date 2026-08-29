@@ -245,11 +245,6 @@ export async function processPdfWithGemini(
     if (error.status) console.error("[Gemini Error] Status:", error.status);
     if (error.stack) console.error("[Gemini Error] Stack:", error.stack);
     if (error.error) console.error("[Gemini Error] Inner Error Object:", JSON.stringify(error.error, null, 2));
-
-    await prisma.generationJob.update({
-      where: { id: jobId },
-      data: { status: "FAILED", errorMessage: error.message || String(error) },
-    });
     throw error;
   } finally {
     // 5. Clean up Google's servers regardless of success/failure

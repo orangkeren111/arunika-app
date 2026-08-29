@@ -2,7 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FileCheck2, Clock } from 'lucide-react';
+import { FileCheck2, Clock, Play, FileText } from 'lucide-react';
 import { useSiswaHistory } from './SiswaHistoryViewModel';
 
 export default function HistoryPage() {
@@ -23,7 +23,7 @@ export default function HistoryPage() {
               <th className="p-4 font-medium">Tanggal Selesai</th>
               <th className="p-4 font-medium text-center">Status</th>
               <th className="p-4 font-medium text-center">Nilai</th>
-              <th className="p-4 font-medium text-right">Detail</th>
+              <th className="p-4 font-medium text-right">Aksi</th>
             </tr>
           </thead>
           <tbody>
@@ -49,9 +49,20 @@ export default function HistoryPage() {
                   {item.score !== null ? item.score : '-'}
                 </td>
                 <td className="p-4 text-right">
-                  <Link href={`/siswa/history/${item.attemptId}`} className="text-sm text-[var(--secondary)] font-medium hover:underline">
-                    Lihat Hasil
-                  </Link>
+                  <div className="flex items-center justify-end gap-2">
+                    <Link
+                      href={`/siswa/history/${item.attemptId}`}
+                      className="text-xs md:text-sm bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[var(--accent)] transition font-bold"
+                    >
+                      <FileText size={14} /> Lihat Hasil
+                    </Link>
+                    <Link
+                      href={`/siswa/ujian/${item.jadwalId}/quiz/lobby`}
+                      className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:opacity-90 transition font-bold shadow-sm"
+                    >
+                      <Play size={14} /> Lobby Quiz
+                    </Link>
+                  </div>
                 </td>
               </tr>
             ))}

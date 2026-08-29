@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useQuizLobbyViewModel } from "./QuizLobbyViewModel";
 import { HelpCircle, ChevronRight, Play, RefreshCw, Trophy, Users, ShieldAlert, X, Sparkles } from "lucide-react";
+import { MathRenderer } from "@/src/components/MathRenderer";
 
 export default function QuizLobbyClient({
   jadwalId,
@@ -241,15 +242,15 @@ export default function QuizLobbyClient({
                   const isCorrect = userAns === q.correctAnswer;
                   return (
                     <div key={q.id} className="pt-3 first:pt-0 space-y-1.5">
-                      <p className="font-bold text-xs md:text-sm text-[#8B5A2B]">
-                        {idx + 1}. {q.text}
-                      </p>
+                      <div className="font-bold text-xs md:text-sm text-[#8B5A2B]">
+                        {idx + 1}. <MathRenderer text={q.text} />
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium">
                         <div className={`p-2.5 rounded-xl border ${isCorrect ? "bg-green-50 border-green-300 text-green-800" : "bg-red-50 border-red-300 text-red-800"}`}>
-                          Jawabanmu: {userAns || "(Tidak dijawab)"}
+                          <strong>Jawabanmu:</strong> <MathRenderer text={userAns || "(Tidak dijawab)"} />
                         </div>
                         <div className="p-2.5 rounded-xl bg-green-50 border border-green-300 text-green-800">
-                          Kunci Jawaban: {q.correctAnswer}
+                          <strong>Kunci Jawaban:</strong> <MathRenderer text={q.correctAnswer} />
                         </div>
                       </div>
                     </div>
@@ -268,7 +269,9 @@ export default function QuizLobbyClient({
             /* Playing Lobby Game */
             currentQ && (
               <div className="space-y-5">
-                <p className="text-base md:text-lg font-bold leading-relaxed text-gray-800">{currentQ.text}</p>
+                <div className="text-base md:text-lg font-bold leading-relaxed text-gray-800">
+                  <MathRenderer text={currentQ.text} />
+                </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {currentQ.options.map((opt, optIdx) => {
@@ -291,7 +294,9 @@ export default function QuizLobbyClient({
                         >
                           {letter}
                         </span>
-                        <span className="leading-snug">{opt}</span>
+                        <div className="leading-snug">
+                          <MathRenderer text={opt} />
+                        </div>
                       </button>
                     );
                   })}
@@ -325,7 +330,9 @@ export default function QuizLobbyClient({
             </button>
             <span className="text-3xl">🌿</span>
             <h3 className="text-xl font-black text-[#6B8E23]">Trivia Pemanasan Capy!</h3>
-            <p className="text-sm font-bold text-gray-800 leading-snug">{currentQ.text}</p>
+            <div className="text-sm font-bold text-gray-800 leading-snug">
+              <MathRenderer text={currentQ.text} />
+            </div>
 
             <div className="flex flex-col gap-2 pt-2">
               {currentQ.options.map((opt) => (
@@ -346,7 +353,7 @@ export default function QuizLobbyClient({
                   }}
                   className="btn-capy bg-[#FDF5E6] border-2 border-[#D2B48C] text-[#8B5A2B] font-bold p-3 rounded-xl text-xs md:text-sm text-left hover:bg-[#A2CDB0]/40 transition"
                 >
-                  {opt}
+                  <MathRenderer text={opt} />
                 </button>
               ))}
             </div>

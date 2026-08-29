@@ -23,7 +23,7 @@ export function MathRenderer({ text, className = "" }: MathRendererProps) {
   const parts = text.split(regex);
 
   return (
-    <span className={`inline-wrap ${className}`}>
+    <span className={`inline-wrap whitespace-pre-wrap ${className}`}>
       {parts.map((part, index) => {
         if (!part) return null;
 

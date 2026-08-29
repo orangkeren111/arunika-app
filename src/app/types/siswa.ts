@@ -23,6 +23,7 @@ export interface ExamQuestion {
   type: "MCQ" | "ESSAY";
   text: string;
   options?: string[];
+  linkGambarSoal?: string | null;
 }
 
 export interface ExamHistoryDetail {

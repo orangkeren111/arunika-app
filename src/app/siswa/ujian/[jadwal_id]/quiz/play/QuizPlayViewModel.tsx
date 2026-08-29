@@ -13,6 +13,7 @@ interface Question {
   text: string;
   options: string[];
   correctAnswer: string;
+  linkGambarSoal?: string | null;
 }
 
 export function useQuizPlayViewModel(
@@ -222,6 +223,7 @@ export function useQuizPlayViewModel(
         id: q.id,
         text: q.text,
         options: q.options,
+        linkGambarSoal: q.linkGambarSoal || null,
         studentAnswer,
         correctAnswer: q.correctAnswer,
         isCorrect,
@@ -259,10 +261,18 @@ export function useQuizPlayViewModel(
 
     if (result.conceptUnderstood) {
       setLevelCompleted(true);
+      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, true);
+
+      // If playing a specific targeted competency, complete game when mastered
+      if (targetCompetencyId) {
+        setGameOutcome("WIN");
+        setIsGameOver(true);
+        setEvaluating(false);
+        return;
+      }
+
       const nextLevel = session.currentLevel + 1;
       const finishedAll = nextLevel > competencies.length;
-
-      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, true);
 
       if (finishedAll) {
         await quizRepository.finishOrFailSession(
@@ -305,6 +315,11 @@ export function useQuizPlayViewModel(
   };
 
   const handleProceedToNextLevel = async () => {
+    if (targetCompetencyId) {
+      setGameOutcome("WIN");
+      setIsGameOver(true);
+      return;
+    }
     setLoading(true);
     const updatedDetail = await quizRepository.getQuizSessionDetail(sessionId);
     if (!updatedDetail) {

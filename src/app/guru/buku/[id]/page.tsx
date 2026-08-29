@@ -31,7 +31,6 @@ export default function BabPage({
     handleEditBab,
     handleDeleteBab,
     handleUploadBook,
-    handleViewBook,
   } = useBabViewModel(resolvedParams.id);
 
   // State untuk modal Bab
@@ -133,12 +132,6 @@ export default function BabPage({
           >
             <FileSpreadsheet size={18} /> Export Excel
           </Link>
-          <button
-            onClick={handleViewBook}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-[var(--primary)] text-[var(--primary)] px-3 py-2 rounded-lg hover:bg-[var(--primary)] hover:bg-opacity-10 transition text-sm md:text-base whitespace-nowrap"
-          >
-            <FileText size={18} /> Lihat PDF
-          </button>
           <button
             onClick={() => setIsUploadModalOpen(true)}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--foreground)] bg-[var(--card)] px-3 py-2 rounded-lg hover:bg-[var(--muted)] transition text-sm md:text-base whitespace-nowrap"
@@ -314,7 +307,7 @@ export default function BabPage({
                 <input
                   type="number"
                   min={1}
-                  max={50}
+                  max={30}
                   value={jumlahSoal}
                   onChange={(e) => setJumlahSoal(Number(e.target.value))}
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"

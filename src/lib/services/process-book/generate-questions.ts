@@ -87,25 +87,37 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
 
     let rawText = result.text.replace(/```json|```/g, "").trim();
 
+    const sanitizeJsonLatex = (str: string) => {
+      // Convert formfeed (\f) followed by letters back to \\f (e.g., \frac)
+      let cleaned = str.replace(/\f([a-zA-Z]+)/g, "\\\\f$1");
+      // Escape any backslash that is not a valid JSON escape sequence
+      return cleaned.replace(/\\(?![\\"\/bfnrtu])/g, "\\\\");
+    };
+
     let parsedResponse: any = {};
     try {
       // First attempt: direct JSON parse
       parsedResponse = JSON.parse(rawText);
     } catch {
       try {
-        // Second attempt: extract JSON substring matching outermost braces { ... }
-        const startIdx = rawText.indexOf("{");
-        const endIdx = rawText.lastIndexOf("}");
-        if (startIdx !== -1 && endIdx > startIdx) {
-          const jsonSub = rawText.slice(startIdx, endIdx + 1);
-          parsedResponse = JSON.parse(jsonSub);
-        } else {
-          throw new Error("No valid JSON object bounds found in model output.");
+        // Second attempt: parse sanitized text with double-escaped LaTeX backslashes
+        parsedResponse = JSON.parse(sanitizeJsonLatex(rawText));
+      } catch {
+        try {
+          // Third attempt: extract JSON substring matching outermost braces { ... }
+          const startIdx = rawText.indexOf("{");
+          const endIdx = rawText.lastIndexOf("}");
+          if (startIdx !== -1 && endIdx > startIdx) {
+            const jsonSub = rawText.slice(startIdx, endIdx + 1);
+            parsedResponse = JSON.parse(sanitizeJsonLatex(jsonSub));
+          } else {
+            throw new Error("No valid JSON object bounds found in model output.");
+          }
+        } catch (parseErr: any) {
+          console.error(`[Question Generator Error] Failed parsing JSON for Bab ID ${babId}, Competency ID ${comp.id}`);
+          console.error(`[Question Generator Error] Raw LLM Output:\n${result.text}`);
+          throw new Error(`LLM output invalid JSON: ${parseErr.message}`);
         }
-      } catch (parseErr: any) {
-        console.error(`[Question Generator Error] Failed parsing JSON for Bab ID ${babId}, Competency ID ${comp.id}`);
-        console.error(`[Question Generator Error] Raw LLM Output:\n${result.text}`);
-        throw new Error(`LLM output invalid JSON: ${parseErr.message}`);
       }
     }
 
@@ -124,6 +136,7 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
         type: q.tipeSoal || "MCQ",
         opsiJawaban: q.options || null,
         jawabanBenarMcq: q.options && q.correctIndex !== undefined ? q.options[q.correctIndex] : null,
+        jawabanBenarEssay: q.explanation || q.jawabanBenarEssay || null,
         difficulty: Number(q.difficulty ?? 5),
         bloomLevel: q.bloomLevel || "C1",
         linkGambarSoal: q.linkGambarSoal || null,

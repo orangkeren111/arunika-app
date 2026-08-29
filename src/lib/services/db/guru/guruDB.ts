@@ -373,6 +373,17 @@ export async function getAttemptDetail(attemptId: number) {
     where: { id: attemptId },
     include: {
       siswa: true,
+      jadwalUjian: {
+        include: {
+          ujian: {
+            include: {
+              templateKompetensi: {
+                where: { isEnabled: true },
+              },
+            },
+          },
+        },
+      },
       jawabanSiswa: {
         include: {
           soalAsli: {
@@ -833,5 +844,40 @@ export async function confirmCaptionValidation(
     return true;
   });
 }
+
+export async function getSoalGenerationStatus(babId: number) {
+  const [activeTasks, activeJobs] = await Promise.all([
+    prisma.taskQueue.findMany({
+      where: {
+        type: "generate_soal",
+        status: { in: ["pending", "processing"] },
+      },
+      select: { payload: true },
+    }),
+    prisma.generationJob.findMany({
+      where: {
+        babId,
+        status: {
+          in: [
+            "PENDING",
+            "PROCESSING_PDF",
+            "EXTRACTING_IMAGES",
+            "CAPTIONING_IMAGES",
+            "WAITING_CAPTION_VALIDATION",
+            "GENERATING_QUESTIONS",
+          ],
+        },
+      },
+    }),
+  ]);
+
+  const hasTask = activeTasks.some((t: any) => {
+    const p = t.payload as any;
+    return p?.babId === babId || p?.babId === String(babId) || p?.babId === Number(babId);
+  });
+
+  return { isGenerating: hasTask || activeJobs.length > 0 };
+}
+
 
 

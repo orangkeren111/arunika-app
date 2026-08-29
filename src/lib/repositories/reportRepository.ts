@@ -32,6 +32,11 @@ export const reportRepository = {
       };
     });
 
+    // Calculate total questions in the exam across all enabled competencies or exam question count
+    const totalExamQuestions = activeCompetencies.length > 0
+      ? activeCompetencies.reduce((sum, tk) => sum + tk.jumlahSoal, 0)
+      : (attemptDetail?.jadwalUjian?.ujian?.jumlahSoal || rawAnswers.length);
+
     let correctCount = 0;
     const questions = rawAnswers.map((ans) => {
       if (ans.isCorrect) correctCount++;
@@ -56,9 +61,10 @@ export const reportRepository = {
       studentName: student.name || "Unknown Student",
       className,
       teacherName,
+      jadwalId: attempt.jadwalUjianId?.toString(),
       overallScore: {
         correct: correctCount,
-        total: rawAnswers.length,
+        total: totalExamQuestions,
       },
       overviewText: aiFeedback.overviewText ?? "",
       weaknessText: aiFeedback.weaknessText ?? "",

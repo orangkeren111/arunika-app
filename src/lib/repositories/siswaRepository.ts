@@ -175,6 +175,7 @@ export const siswaRepository = {
     answers: Record<string, string>,
     siswaId: number = 6,
     sesiId?: number,
+    isFinish: boolean = false,
   ) => {
     // 1. Ensure we have the active Session ID
     let currentSesiId = sesiId;
@@ -189,10 +190,26 @@ export const siswaRepository = {
 
     const soalIds = Object.keys(answers);
 
-    // 2. If frontend sends empty answers, safely resume/fetch current session state without terminating
-    if (soalIds.length === 0) {
+    // 2. If an answer was sent (even when finishing), process & grade it first
+    if (soalIds.length > 0) {
+      const latestSoalId = parseInt(soalIds[soalIds.length - 1]);
+      const jawabanText = answers[latestSoalId.toString()];
+      const result = await examService.submitSingleAnswer(
+        currentSesiId,
+        jadwalId,
+        latestSoalId,
+        jawabanText,
+      );
+
+      if (result.isFinished) {
+        return { finished: true, finalElo: result.newElo };
+      }
+    }
+
+    // 3. If frontend sends empty answers OR isFinish is true, finish exam session
+    if (soalIds.length === 0 || isFinish) {
       const sessionState = await examService.startExamSession(jadwalId, siswaId);
-      if (!sessionState.nextQuestion) {
+      if (!sessionState.nextQuestion || isFinish) {
         await examService.finishExamSession(currentSesiId);
         await enqueueStudentReport(currentSesiId);
         return { finished: true };
@@ -204,27 +221,11 @@ export const siswaRepository = {
       };
     }
 
-    // 3. Extract the most recent answer (Real-Time processing)
-    const latestSoalId = parseInt(soalIds[soalIds.length - 1]);
-    const jawabanText = answers[latestSoalId.toString()];
-
-    // 4. Push to DDA Engine (Auto-grades, updates ELO, finds next question)
-    const result = await examService.submitSingleAnswer(
-      currentSesiId,
-      jadwalId,
-      latestSoalId,
-      jawabanText,
-    );
-
-    // 5. Return outcome to frontend
-    if (result.isFinished) {
-      return { finished: true, finalElo: result.newElo };
-    }
-
+    const sessionState = await examService.startExamSession(jadwalId, siswaId);
     return {
       finished: false,
-      newElo: result.newElo,
-      nextQuestion: result.nextQuestion,
+      newElo: sessionState.currentElo,
+      nextQuestion: sessionState.nextQuestion,
     };
   },
 

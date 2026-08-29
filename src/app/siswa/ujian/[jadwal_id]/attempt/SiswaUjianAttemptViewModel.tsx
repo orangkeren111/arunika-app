@@ -17,6 +17,8 @@ export function useExamAttempt(jadwalId: string) {
   const [isFinished, setIsFinished] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [warnings, setWarnings] = useState(0);
+  const [showWarningModal, setShowWarningModal] = useState(false);
+  const [warningMessage, setWarningMessage] = useState("");
 
   const { data: session, status } = useSession();
 
@@ -26,13 +28,20 @@ export function useExamAttempt(jadwalId: string) {
 
     const handleBlur = () => {
       setWarnings((prev) => {
+        if (prev >= 3) return prev;
         const nextWarnings = prev + 1;
         if (nextWarnings >= 3) {
-          alert("Anda telah keluar dari halaman ujian sebanyak 3 kali. Ujian Anda otomatis selesai dan dikumpulkan.");
+          setWarningMessage(
+            "Anda telah keluar dari halaman ujian sebanyak 3 kali. Ujian Anda otomatis selesai dan dikumpulkan."
+          );
+          setShowWarningModal(true);
           handleSubmitExam();
           return 3;
         } else {
-          alert(`Peringatan! Dilarang membuka tab lain atau keluar dari halaman ujian. Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`);
+          setWarningMessage(
+            `Peringatan! Dilarang membuka tab lain atau keluar dari halaman ujian. Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`
+          );
+          setShowWarningModal(true);
           return nextWarnings;
         }
       });
@@ -136,10 +145,14 @@ export function useExamAttempt(jadwalId: string) {
     setIsSubmitting(true);
 
     try {
+      const currentAnswer = currentQ ? { [currentQ.id]: answers[currentQ.id] || "" } : {};
+
       await siswaRepository.submitExamAttempt(
         jadwalId,
-        {},
+        currentAnswer,
         Number(session.user.id),
+        undefined,
+        true, // isFinish boolean flag sent to backend
       );
       setIsFinished(true);
       setCurrentQ(null);
@@ -148,9 +161,7 @@ export function useExamAttempt(jadwalId: string) {
     } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const formatTime = (seconds: number) => {
+  };  const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
       .toString()
       .padStart(2, "0");
@@ -167,6 +178,9 @@ export function useExamAttempt(jadwalId: string) {
     nextQuestion,
     handleSubmitExam,
     warnings,
+    showWarningModal,
+    warningMessage,
+    dismissWarningModal: () => setShowWarningModal(false),
     timeLeft: formatTime(timeLeft),
     isFinished: isFinished || timeLeft === 0,
     loading: loading || isSubmitting,

@@ -17,6 +17,7 @@ export interface ReportProps {
   studentName: string;
   className: string;
   teacherName: string;
+  jadwalId?: string;
   overallScore: { correct: number; total: number };
   overviewText: string;
   weaknessText: string;

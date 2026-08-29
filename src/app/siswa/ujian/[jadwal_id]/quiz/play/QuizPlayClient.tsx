@@ -85,7 +85,9 @@ export default function QuizPlayClient({
               />
               <h1 className="text-2xl sm:text-3xl font-black text-[#6B8E23]">Luar Biasa, Selesai!</h1>
               <div className="p-4 bg-[#A2CDB0]/30 rounded-2xl border-2 border-[#6B8E23]/30 text-xs sm:text-sm text-[#8B5A2B] font-bold">
-                🦫 "Selamat, Kawan! Kamu telah menguasai seluruh kompetensi kuis di room ini dengan gemilang! Capy sangat bangga!"
+                🦫 {competencyId && currentComp
+                  ? `"Selamat, Kawan! Kamu telah menguasai kompetensi '${currentComp.name}' dengan gemilang! Capy sangat bangga!"`
+                  : `"Selamat, Kawan! Kamu telah menguasai seluruh kompetensi kuis di room ini dengan gemilang! Capy sangat bangga!"`}
               </div>
             </>
           ) : gameOutcome === "AFK" ? (
@@ -244,6 +246,15 @@ export default function QuizPlayClient({
                         </span>
                       )}
                     </div>
+                    {item.linkGambarSoal && (
+                      <div className="my-1.5 flex justify-center bg-[#FDF5E6] p-2 rounded-xl border border-[#D2B48C]">
+                        <img
+                          src={item.linkGambarSoal}
+                          alt="Gambar Soal"
+                          className="max-h-40 rounded-lg object-contain"
+                        />
+                      </div>
+                    )}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-medium">
                       <div className={`p-2.5 rounded-xl border ${item.isCorrect ? "bg-green-50 border-green-200 text-green-900" : "bg-red-50 border-red-200 text-red-900"}`}>
                         <strong>Jawabanmu:</strong> <MathRenderer text={item.studentAnswer || "(Kosong)"} />
@@ -268,6 +279,17 @@ export default function QuizPlayClient({
                     Soal {currentQIdx + 1} / {activeQuestions.length}
                   </span>
                 </div>
+
+                {/* Question Image (if present) */}
+                {currentQ.linkGambarSoal && (
+                  <div className="w-full flex justify-center bg-[#FDF5E6] p-3 rounded-2xl border-2 border-[#D2B48C]">
+                    <img
+                      src={currentQ.linkGambarSoal}
+                      alt="Gambar Soal"
+                      className="max-h-72 max-w-full rounded-xl object-contain shadow-md"
+                    />
+                  </div>
+                )}
 
                 <div className="text-base sm:text-lg font-bold leading-relaxed text-gray-800">
                   <MathRenderer text={currentQ.text} />

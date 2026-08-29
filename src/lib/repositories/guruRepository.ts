@@ -416,8 +416,11 @@ export const guruRepository = {
   uploadAndGenerateBookPdf: async (formData: FormData) => {
     return await initiatePdfExtraction(formData);
   },
-  retryGenerateSoal: async (babId: number) => {
-    return await enqueueGenerateQuestions(babId);
+  retryGenerateSoal: async (babId: number, totalJumlahSoal: number = 10) => {
+    return await enqueueGenerateQuestions(babId, totalJumlahSoal);
+  },
+  getSoalGenerationStatus: async (babId: number) => {
+    return await guruDB.getSoalGenerationStatus(babId);
   },
 
   getKelas: async (sekolah_id: number, guru_id: number): Promise<Kelas[]> => {
@@ -597,16 +600,26 @@ export const guruRepository = {
     // 2. Fetch ALL answers for this attempt to calculate the accurate final score
     const allAnswers = await guruDB.getAttemptDetail(attemptIdNum);
 
-    const newTotalScore =
+    const activeCompetencies = allAnswers?.jadwalUjian?.ujian?.templateKompetensi || [];
+    const totalExamQuestions = activeCompetencies.length > 0
+      ? activeCompetencies.reduce((sum: number, tk: any) => sum + tk.jumlahSoal, 0)
+      : (allAnswers?.jadwalUjian?.ujian?.jumlahSoal || allAnswers?.jawabanSiswa.length || 10);
+
+    const totalPoinEarned =
       allAnswers?.jawabanSiswa.reduce(
         (sum, ans) => sum + (ans.nilaiPoin || 0),
         0,
       ) ?? 0;
 
+    const maxTotalPoin = totalExamQuestions * 100;
+    const finalScaledScore = maxTotalPoin > 0
+      ? Math.round((totalPoinEarned / maxTotalPoin) * 100 * 100) / 100
+      : 0;
+
     // 3. Update the final score on the attempt record
     const updated = await guruDB.updateAttemptScore(
       attemptIdNum,
-      newTotalScore,
+      finalScaledScore,
     );
 
     // 4. Return the DTO expected by the frontend

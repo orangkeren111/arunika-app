@@ -42,15 +42,6 @@ export function useBabViewModel(bookId: string) {
     await guruRepository.uploadAndGenerateBookPdf(formData);
   };
 
-  const handleViewBook = async () => {
-    const url = await guruRepository.getBukuPdfUrl(bookId);
-    if (url) {
-      window.open(url, "_blank");
-    } else {
-      alert("PDF file not found. Please upload a PDF first.");
-    }
-  };
-
   return {
     buku,
     babList,
@@ -59,6 +50,5 @@ export function useBabViewModel(bookId: string) {
     handleEditBab,
     handleDeleteBab,
     handleUploadBook,
-    handleViewBook,
   };
 }

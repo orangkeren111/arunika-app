@@ -35,6 +35,9 @@ export default function ExamAttemptPage({
     loading,
     isFinished,
     warnings,
+    showWarningModal,
+    warningMessage,
+    dismissWarningModal,
   } = useExamAttempt(resolvedParams.jadwal_id);
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -136,9 +139,20 @@ export default function ExamAttemptPage({
               </span>
             </div>
 
-            {/* Question Text */}
-            <div className="text-base md:text-lg text-slate-100 leading-relaxed mb-8 prose prose-invert max-w-none font-medium bg-slate-900/30 p-5 rounded-2xl border border-white/10 backdrop-blur-md">
-              <MathRenderer text={currentQ?.text || ""} />
+            {/* Question Text & Optional Image */}
+            <div className="text-base md:text-lg text-slate-100 leading-relaxed mb-8 prose prose-invert max-w-none font-medium bg-slate-900/30 p-5 rounded-2xl border border-white/10 backdrop-blur-md flex flex-col items-start gap-4">
+              {currentQ?.linkGambarSoal && (
+                <div className="w-full flex justify-center bg-slate-950/40 p-3 rounded-xl border border-white/10">
+                  <img
+                    src={currentQ.linkGambarSoal}
+                    alt="Gambar Soal"
+                    className="max-h-72 max-w-full rounded-lg object-contain shadow-md"
+                  />
+                </div>
+              )}
+              <div className="w-full">
+                <MathRenderer text={currentQ?.text || ""} />
+              </div>
             </div>
 
             {/* Answer Options */}
@@ -248,6 +262,33 @@ export default function ExamAttemptPage({
                 ) : (
                   "Ya, Kumpulkan"
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Warning Modal overlay (Liquid Glass) */}
+      {showWarningModal && (
+        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-xl flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-900/90 border border-amber-500/30 rounded-3xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(245,158,11,0.2)] text-center space-y-6 relative backdrop-blur-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center mx-auto shadow-inner">
+              <ShieldAlert size={32} />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-100">Peringatan Pelanggaran</h3>
+              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                {warningMessage}
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={dismissWarningModal}
+                className="w-full px-6 py-3 rounded-2xl font-extrabold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 transition shadow-[0_0_20px_rgba(245,158,11,0.3)] border border-amber-400/30 cursor-pointer active:scale-95"
+              >
+                Saya Mengerti
               </button>
             </div>
           </div>

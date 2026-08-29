@@ -14,7 +14,18 @@ export function useSoalViewModel(babId: string) {
   const [soalList, setSoalList] = useState<Soal[]>([]);
   const [kompetensiList, setKompetensiList] = useState<Kompetensi[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isGeneratingSoal, setIsGeneratingSoal] = useState(false);
   
+  const checkGenerationStatus = async () => {
+    if (!babId || isNaN(Number(babId))) return;
+    try {
+      const res = await guruRepository.getSoalGenerationStatus(Number(babId));
+      setIsGeneratingSoal(res.isGenerating);
+    } catch (err) {
+      console.error("Error checking generation status:", err);
+    }
+  };
+
   const fetchSoal = () => {
     if (!babId || isNaN(Number(babId))) {
       setLoading(false);
@@ -24,11 +35,13 @@ export function useSoalViewModel(babId: string) {
     Promise.all([
       guruRepository.getSoalList(babId),
       getKompetensiBab(Number(babId)),
+      guruRepository.getSoalGenerationStatus(Number(babId)).catch(() => ({ isGenerating: false })),
     ])
-      .then(([res, kompRes]) => {
+      .then(([res, kompRes, statusRes]) => {
         setBab(res.bab);
         setSoalList(res.soalList);
         setKompetensiList(kompRes);
+        setIsGeneratingSoal(statusRes.isGenerating);
         setLoading(false);
       })
       .catch((err) => {
@@ -41,8 +54,9 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   }, [babId]);
 
-  const handleGenerateQuestion = async () => {
-    await guruRepository.retryGenerateSoal(Number(babId));
+  const handleGenerateQuestion = async (jumlahSoal: number = 10) => {
+    await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
+    await checkGenerationStatus();
     fetchSoal();
   };
   const handleAddSoal = async (
@@ -103,6 +117,7 @@ export function useSoalViewModel(babId: string) {
     formData.append("pdfFile", file);
     formData.append("jumlahSoal", jumlahSoal.toString());
     await guruRepository.uploadAndGenerateBookPdf(formData);
+    await checkGenerationStatus();
   };
 
   return {
@@ -110,6 +125,8 @@ export function useSoalViewModel(babId: string) {
     soalList,
     kompetensiList,
     loading,
+    isGeneratingSoal,
+    checkGenerationStatus,
     handleAddSoal,
     handleEditSoal,
     handleDeleteSoal,

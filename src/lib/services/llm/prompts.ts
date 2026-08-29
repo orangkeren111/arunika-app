@@ -13,6 +13,12 @@ ${chapterContent}
 Based on the following chapter summary and chapter title, generate ${(jumlahSoal) / 4} questions for EACH Bloom's Taxonomy level category (C1 to C4), total ${jumlahSoal} questions. 
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex).
 
+IMPORTANT FOR MATHEMATICAL & CHEMICAL FORMULAS (LaTeX & JSON ESCAPING):
+- Whenever generating questions, options, or explanations containing mathematical equations, formulas, fractions, powers, roots, variables, or chemical equations/compounds (e.g. H2O, CO2, reactions):
+- You MUST use LaTeX syntax enclosed in $...$ for inline math/chemistry (e.g., $x^2 + y^2 = z^2$, $\\text{H}_2\\text{O}$, $2\\text{H}_2 + \\text{O}_2 \\rightarrow 2\\text{H}_2\\text{O}$, $\\frac{a}{b}$, $\\sqrt{x}$) or $$...$$ for block math.
+- CRITICAL JSON ESCAPING RULE: Because your response MUST be valid JSON, EVERY backslash '\\' in LaTeX syntax MUST be double-escaped as '\\\\' in the output string (e.g., write "\\\\frac{x + 2}{5}" NOT "\\frac{x + 2}{5}", write "\\\\text{H}_2\\\\text{O}" NOT "\\text{H}_2\\text{O}", write "\\\\sqrt{x}" NOT "\\sqrt{x}"). Single backslashes like \\f or \\t inside LaTeX will cause JSON parser errors!
+- Never output raw LaTeX commands without $...$ or $$...$$ delimiters.
+
 You MUST return the output purely as a JSON array matching this structure (e.g):
 [{
   "bloomLevel": "C1",
@@ -39,6 +45,12 @@ ${summary}
   ) => `
 Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various type, mostly MCQ but a sprinkle of ESSAY (optimal is 5:1).
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex) and each question having their own Bloom's Taxonomy levels (C1 to C6).
+
+IMPORTANT FOR MATHEMATICAL & CHEMICAL FORMULAS (LaTeX & JSON ESCAPING):
+- Whenever generating questions, options, or explanations containing mathematical equations, formulas, fractions, powers, roots, variables, or chemical equations/compounds (e.g. H2O, CO2, chemical reactions):
+- You MUST use LaTeX syntax enclosed in $...$ for inline math/chemistry (e.g., $x^2 + y^2 = z^2$, $\\text{H}_2\\text{O}$, $2\\text{H}_2 + \\text{O}_2 \\rightarrow 2\\text{H}_2\\text{O}$, $\\frac{a}{b}$, $\\sqrt{x}$) or $$...$$ for block math.
+- CRITICAL JSON ESCAPING RULE: Because your response MUST be valid JSON, EVERY backslash '\\' in LaTeX syntax MUST be double-escaped as '\\\\' in the output string (e.g., write "\\\\frac{x + 2}{5}" NOT "\\frac{x + 2}{5}", write "\\\\text{H}_2\\\\text{O}" NOT "\\text{H}_2\\text{O}", write "\\\\sqrt{x}" NOT "\\sqrt{x}"). Single backslashes like \\f or \\t inside LaTeX will cause JSON parser errors!
+- Never output raw LaTeX commands without $...$ or $$...$$ delimiters.
 
 Competency Code: ${kompetensiCode}
 Competency Description: ${kompetensiText}
@@ -100,5 +112,7 @@ Do not include any markdown formatting like \`\`\`json.
 
 Student Data:
 ${historicalData}
+
+Please return the values in INDONESIAN language
 `,
 };
