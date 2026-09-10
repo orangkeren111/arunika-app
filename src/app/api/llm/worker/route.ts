@@ -52,7 +52,6 @@ export async function GET() {
     await Promise.allSettled([
       processGenerationStateMachine(), // 1. Book PDF & Question Generation
       processTaskQueueBatch(),          // 2. Report Generation & TaskQueue
-      processPendingBookImages(),       // 3. Book Image Vision AI Captioning
     ]);
 
     return NextResponse.json({ message: "Sweep completed successfully" });
@@ -113,11 +112,13 @@ async function processGenerationStateMachine() {
     if (job.status === "PENDING" || job.status === "PROCESSING_PDF") {
       const result = await processPdfWithGemini(job.id, job.fileUrl ?? "");
 
-      // Advance to EXTRACTING_IMAGES state
+      // Check if bab_id is present in the result to determine the next state
+      const nextStatus = job.babId != null ? "GENERATING_QUESTIONS" : "EXTRACTING_IMAGES";
+
       await prisma.generationJob.update({
         where: { id: job.id },
         data: {
-          status: "EXTRACTING_IMAGES",
+          status: nextStatus,
           tokensSpent: { increment: result.tokens },
           updatedAt: new Date(),
         },
@@ -433,7 +434,7 @@ async function processTaskQueueBatch() {
             await prisma.savedResponses.update({
               where: { attemptId: payload.attemptId },
               data: { status: "ERROR" },
-            }).catch(() => {});
+            }).catch(() => { });
           }
         }
       }

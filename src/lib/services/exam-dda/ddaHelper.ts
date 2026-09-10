@@ -44,17 +44,17 @@ export const DDAHelper = {
     return Math.max(0, Math.round(newElo));
   },
 
-  determineTargetBloomLevel: (
-    questionsAnswered: number,
-    criteria?: { reqC1: number; reqC2: number; reqC3: number; reqC4: number },
-  ): string => {
-    const c1 = criteria?.reqC1 ?? 10;
-    const c2 = criteria?.reqC2 ?? 10;
-    const c3 = criteria?.reqC3 ?? 10;
+  // determineTargetBloomLevel: (
+  //   questionsAnswered: number,
+  //   criteria?: { reqC1: number; reqC2: number; reqC3: number; reqC4: number },
+  // ): string => {
+  //   const c1 = criteria?.reqC1 ?? 10;
+  //   const c2 = criteria?.reqC2 ?? 10;
+  //   const c3 = criteria?.reqC3 ?? 10;
 
-    if (questionsAnswered < c1) return "C1";
-    if (questionsAnswered < c1 + c2) return "C2";
-    if (questionsAnswered < c1 + c2 + c3) return "C3";
-    return "C4";
-  },
+  //   if (questionsAnswered < c1) return "C1";
+  //   if (questionsAnswered < c1 + c2) return "C2";
+  //   if (questionsAnswered < c1 + c2 + c3) return "C3";
+  //   return "C4";
+  // },
 };

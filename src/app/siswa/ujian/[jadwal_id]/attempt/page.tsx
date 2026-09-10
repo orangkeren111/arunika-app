@@ -167,18 +167,16 @@ export default function ExamAttemptPage({
                       <label
                         key={idx}
                         onClick={() => handleAnswer(currentQ.id, opt)}
-                        className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 backdrop-blur-md relative overflow-hidden ${
-                          isSelected
-                            ? "bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)] text-white"
-                            : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-slate-400/40 text-slate-200"
-                        }`}
+                        className={`flex items-center gap-4 p-4 md:p-5 rounded-2xl border-2 cursor-pointer transition-all duration-300 backdrop-blur-md relative overflow-hidden ${isSelected
+                          ? "bg-gradient-to-r from-blue-600/30 to-indigo-600/30 border-blue-400 shadow-[0_0_20px_rgba(59,130,246,0.3)] text-white"
+                          : "bg-white/5 border-white/10 hover:bg-white/10 hover:border-slate-400/40 text-slate-200"
+                          }`}
                       >
                         <div
-                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs transition-all duration-300 shrink-0 ${
-                            isSelected
-                              ? "bg-blue-500 text-white shadow-md"
-                              : "bg-slate-800/80 text-slate-400 border border-white/10"
-                          }`}
+                          className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs transition-all duration-300 shrink-0 ${isSelected
+                            ? "bg-blue-500 text-white shadow-md"
+                            : "bg-slate-800/80 text-slate-400 border border-white/10"
+                            }`}
                         >
                           {optionLetter}
                         </div>
@@ -192,12 +190,17 @@ export default function ExamAttemptPage({
               )}
 
               {currentQ?.type === "ESSAY" && (
-                <textarea
+                <><textarea
                   value={answers[currentQ.id] || ""}
+                  maxLength={1000}
                   onChange={(e) => handleAnswer(currentQ.id, e.target.value)}
-                  placeholder="Ketik jawaban Anda secara detail di sini..."
+                  placeholder="Ketik jawaban Anda secara detail di sini (maks 1000 karakter)..."
                   className="w-full h-56 p-5 bg-slate-900/40 border-2 border-white/15 focus:border-blue-400 rounded-2xl text-slate-100 placeholder-slate-500 focus:outline-none resize-none transition-colors text-base md:text-lg backdrop-blur-md shadow-inner"
                 ></textarea>
+                  <span className="text-xs text-muted-foreground">
+                    {answers[currentQ.id].length}/1000 karakter
+                  </span>
+                </>
               )}
             </div>
 

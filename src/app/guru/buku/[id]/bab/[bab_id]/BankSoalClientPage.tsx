@@ -9,7 +9,7 @@ import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
 
 type TipeSoal = "MCQ" | "ESSAY";
 
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 
 
 export default function BankSoalClientPage({
@@ -65,6 +65,8 @@ export default function BankSoalClientPage({
   const [jawabanBenarEssay, setJawabanBenarEssay] = useState<string>("");
   const [kompetensiBabId, setKompetensiBabId] = useState<string>("");
   const [linkGambarSoal, setLinkGambarSoal] = useState<string>("");
+  const router = useRouter();
+  console.log("");
 
   // --- HANDLERS ---
   const openModal = (type: TipeSoal, soalToEdit?: any) => {
@@ -731,6 +733,7 @@ export default function BankSoalClientPage({
                       setIsUploadModalOpen(false);
                       setSelectedPdfFile(null);
                       alert("PDF berhasil diunggah! AI sedang memproses bab di latar belakang.");
+                      router.push(`/guru/buku/${id}`);
                     } catch (err) {
                       alert("Gagal mengunggah PDF.");
                     } finally {

@@ -56,10 +56,6 @@ Competency Code: ${kompetensiCode}
 Competency Description: ${kompetensiText}
 Chapter Title: ${judulBab}
 
-${goodQuestions.length > 0 ? `AVOID generating questions similar to these existing GOOD questions:\n${goodQuestions.map((q, i) => `- ${q}`).join("\n")}` : ""}
-
-${badQuestions.length > 0 ? `DO NOT generate questions similar to these BAD/REJECTED questions (the teacher rejected these, so learn from this feedback to generate better ones):\n${badQuestions.map((q, i) => `- ${q}`).join("\n")}` : ""}
-
 You MUST return the output purely as a JSON object with a key "questions" containing a JSON array of objects matching this structure:
 If tipeSoal is MCQ then
 [{
@@ -84,6 +80,13 @@ else if tipeSoal is ESSAY then
 Do not include any markdown formatting like \`\`\`json.
 `,
 };
+/*
+if good and bad soal is needed:
+${goodQuestions.length > 0 ? `AVOID generating questions similar to these existing GOOD questions:\n${goodQuestions.map((q, i) => `- ${q}`).join("\n")}` : ""}
+
+${badQuestions.length > 0 ? `DO NOT generate questions similar to these BAD/REJECTED questions (the teacher rejected these, so learn from this feedback to generate better ones):\n${badQuestions.map((q, i) => `- ${q}`).join("\n")}` : ""}
+
+*/
 
 export const REPORT_PROMPTS = {
   analysis: (historicalData: string) => `

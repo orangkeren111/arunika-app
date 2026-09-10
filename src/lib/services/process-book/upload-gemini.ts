@@ -68,8 +68,6 @@ export async function processPdfWithGemini(
     });
     const bookTitle = job.buku.judul;
 
-    console.log("[Gemini] API Key mask:", process.env.GEMINI_API_KEY ? `${process.env.GEMINI_API_KEY.slice(0, 6)}...${process.env.GEMINI_API_KEY.slice(-4)}` : "MISSING");
-
     // 2. Upload to Gemini File API
     console.log("[Gemini] Uploading file to Gemini File API:", tempFilePath);
     const uploadedFile = await ai.files.upload({
@@ -89,7 +87,7 @@ export async function processPdfWithGemini(
 
     // 3. Extract Chapters/Bab Goals and Competencies via Gemini
     console.log("[Gemini] Requesting content generation using gemini-3.6-flash...");
-    
+
     if (job.babId && job.bab) {
       // Single Bab Processing
       const response = await ai.models.generateContent({

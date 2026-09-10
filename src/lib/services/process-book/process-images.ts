@@ -117,7 +117,7 @@ Jika tidak relevan: { "action": "DELETE", "reason": "Alasan singkat (misal: logo
             rawResponseText = result.text;
           } catch (visionErr: any) {
             console.warn(`[Image Processor] Vision AI call failed for image ${img.id}:`, visionErr?.message || visionErr);
-            // Fallback to Gemini 1.5 Flash if available
+            // Fallback 
             if (process.env.GEMINI_API_KEY) {
               try {
                 const fallbackResult = await generateText({
