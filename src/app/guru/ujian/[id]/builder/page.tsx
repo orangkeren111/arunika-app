@@ -1,9 +1,9 @@
 "use client";
 
 import { use } from "react";
+import { ArrowLeft, CheckSquare, Square } from "lucide-react";
+import { useFormUjianViewModel } from "./GuruFormUjianViewModel";
 import Link from "next/link";
-import { ArrowLeft, MoveLeft, CheckSquare, Square } from "lucide-react";
-import { useFormUjianViewModel } from "./GuruFormUjianViewModel"; // Adjust path as needed
 
 export default function ExamBuilderPage({
   params,
@@ -13,6 +13,7 @@ export default function ExamBuilderPage({
   const resolvedParams = use(params);
 
   const {
+    isOwner,
     template,
     setTemplate,
     babList,
@@ -22,241 +23,357 @@ export default function ExamBuilderPage({
     activeBabs,
     handleToggleBab,
     selectedQuestions,
-    handleRemoveQuestion,
     handleSaveTemplate,
     templateKompetensi,
     setTemplateKompetensi,
     availableSoalCounts,
   } = useFormUjianViewModel(resolvedParams.id);
 
-  const derivedTotalQuestions = templateKompetensi.reduce((sum, tk) => sum + (tk.isEnabled ? tk.jumlahSoal : 0), 0);
-  return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[var(--foreground)]">
-          Exam Builder: {template?.title || "Ujian Baru"}
-        </h1>
-        <p className="text-[var(--muted-foreground)] mt-1">
-          Lengkapi detail ujian dan pilih bab dari kiri untuk menambahkan soal.
-        </p>
-      </div>
+  const derivedTotalQuestions = templateKompetensi.reduce(
+    (sum, tk) => sum + (tk.isEnabled ? tk.jumlahSoal : 0),
+    0,
+  );
 
-      {/* --- FORM PENGATURAN UJIAN --- */}
-      <div className="bg-[var(--card)] rounded-xl border border-[var(--border)] p-5 space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-          <div>
-            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              Judul Ujian
-            </label>
-            <input
-              type="text"
-              value={template?.title || ""}
-              onChange={(e) =>
+  return (<div className="flex flex-col gap-6 pb-6">
+    {/* HEADER */} <div>
+      <Link href="/guru/ujian" className="flex items-center gap-2 w-fit mb-4">
+        <ArrowLeft className="h-5 w-5 text-[var(--muted-foreground)]" />
+        Kembali
+      </Link>
+      <h1 className="text-2xl font-bold text-[var(--foreground)]">
+        Exam Builder: {template?.title || "Ujian Baru"} </h1> <p className="mt-1 text-sm text-[var(--muted-foreground)]">
+        Lengkapi detail ujian dan pilih bab untuk menentukan soal yang
+        digunakan. </p> </div>
+
+    {/* FORM PENGATURAN UJIAN */}
+    <div className="rounded-xl border border-[var(--border)] bg-[var(--card)] p-4 sm:p-5">
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-4">
+        {/* Judul */}
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-[var(--foreground)]">
+            Judul Ujian
+          </label>
+
+          <input
+            type="text"
+            value={template?.title || ""}
+            onChange={(e) =>
+              setTemplate((prev) =>
+                prev ? { ...prev, title: e.target.value } : undefined,
+              )
+            }
+            placeholder="Contoh: Ujian Tengah Semester"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] p-2.5 text-sm text-[var(--foreground)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--primary)]"
+          />
+        </div>
+
+        {/* Durasi */}
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-[var(--foreground)]">
+            Durasi (Menit)
+          </label>
+
+          <input
+            type="number"
+            min="1"
+            value={template?.durasiMenit || ""}
+            onChange={(e) =>
+              setTemplate((prev) =>
+                prev
+                  ? { ...prev, durasiMenit: Number(e.target.value) }
+                  : undefined,
+              )
+            }
+            placeholder="Contoh: 90"
+            className="w-full rounded-lg border border-[var(--border)] bg-[var(--background)] p-2.5 text-sm text-[var(--foreground)] outline-none transition-shadow focus:ring-2 focus:ring-[var(--primary)]"
+          />
+        </div>
+
+        {/* Tipe Ujian */}
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-[var(--foreground)]">
+            Tipe Ujian (Metode)
+          </label>
+
+          <div className="flex items-center gap-1 rounded-lg border border-[var(--border)] bg-[var(--background)] p-1">
+            <button
+              type="button"
+              onClick={() =>
                 setTemplate((prev) =>
-                  prev ? { ...prev, title: e.target.value } : undefined,
+                  prev ? { ...prev, isAdaptive: true } : undefined,
                 )
               }
-              placeholder="Contoh: Ujian Tengah Semester"
-              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
-            />
-          </div>
+              className={`flex-1 rounded-md px-2 py-2 text-xs font-bold transition ${template?.isAdaptive !== false
+                ? "bg-[var(--primary)] text-white shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+            >
+              Adaptif (DDA)
+            </button>
 
-          <div>
-            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              Durasi (Menit)
-            </label>
-            <input
-              type="number"
-              min="1"
-              value={template?.durasiMenit || ""}
-              onChange={(e) =>
+            <button
+              type="button"
+              onClick={() =>
                 setTemplate((prev) =>
-                  prev
-                    ? { ...prev, durasiMenit: Number(e.target.value) }
-                    : undefined,
+                  prev ? { ...prev, isAdaptive: false } : undefined,
                 )
               }
-              placeholder="Contoh: 90"
-              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)] transition-shadow"
-            />
+              className={`flex-1 rounded-md px-2 py-2 text-xs font-bold transition ${template?.isAdaptive === false
+                ? "bg-[var(--secondary)] text-white shadow-sm"
+                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+                }`}
+            >
+              Non-Adaptif
+            </button>
           </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              Tipe Ujian (Metode)
-            </label>
-            <div className="flex items-center gap-2 p-1 border border-[var(--border)] rounded-lg bg-[var(--background)]">
-              <button
-                type="button"
-                onClick={() => setTemplate((prev) => prev ? { ...prev, isAdaptive: true } : undefined)}
-                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition ${
-                  template?.isAdaptive !== false
-                    ? "bg-[var(--primary)] text-white shadow-sm"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                Adaptif (DDA)
-              </button>
-              <button
-                type="button"
-                onClick={() => setTemplate((prev) => prev ? { ...prev, isAdaptive: false } : undefined)}
-                className={`flex-1 py-1.5 px-3 rounded-md text-xs font-bold transition ${
-                  template?.isAdaptive === false
-                    ? "bg-[var(--secondary)] text-white shadow-sm"
-                    : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-                }`}
-              >
-                Non-Adaptif (Acak)
-              </button>
-            </div>
-            <p className="text-[10px] text-[var(--muted-foreground)] mt-1">
-              {template?.isAdaptive !== false
-                ? "Adaptif: Membutuhkan N + 5 soal cadangan per kompetensi."
-                : "Non-Adaptif: Memilih N soal secara acak."}
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-[var(--foreground)] mb-2">
-              Jumlah Soal Target (Otomatis)
-            </label>
-            <input
-              type="number"
-              readOnly
-              value={derivedTotalQuestions}
-              placeholder="0"
-              className="w-full p-2.5 text-sm border border-[var(--border)] rounded-lg bg-[var(--muted)] text-[var(--foreground)] outline-none cursor-not-allowed"
-            />
-            <p className="text-xs text-[var(--muted-foreground)] mt-1.5">
-              Soal terpilih saat ini: {selectedQuestions?.length || 0}
+          {/* Adaptive explanation */}
+          <div className="mt-2 rounded-lg bg-[var(--muted)] p-2.5">
+            <p className="text-[11px] leading-relaxed text-[var(--muted-foreground)]">
+              {template?.isAdaptive !== false ? (
+                <>
+                  <span className="font-semibold text-[var(--foreground)]">
+                    Mengapa N+5?
+                  </span>{" "}
+                  Sistem adaptif membutuhkan beberapa soal cadangan agar DDA
+                  dapat menyesuaikan tingkat kesulitan berdasarkan performa
+                  siswa. Lima soal tambahan memberi sistem ruang untuk
+                  memilih soal berikutnya tanpa kehabisan kandidat.
+                </>
+              ) : (
+                <>
+                  <span className="font-semibold text-[var(--foreground)]">
+                    Mode acak.
+                  </span>{" "}
+                  Sistem akan memilih sejumlah N soal secara acak tanpa
+                  melakukan penyesuaian tingkat kesulitan secara dinamis.
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="border-t border-[var(--border)] pt-4 space-y-3">
+        {/* Total Soal */}
+        <div>
+          <label className="mb-2 block text-sm font-semibold text-[var(--foreground)]">
+            Jumlah Soal Target
+          </label>
+
+          <input
+            type="number"
+            readOnly
+            value={derivedTotalQuestions}
+            className="w-full cursor-not-allowed rounded-lg border border-[var(--border)] bg-[var(--muted)] p-2.5 text-sm text-[var(--foreground)] outline-none"
+          />
+
+          <p className="mt-1.5 text-xs text-[var(--muted-foreground)]">
+            Soal terpilih: {selectedQuestions?.length || 0}
+          </p>
+        </div>
+      </div>
+
+      {/* KOMPETENSI */}
+      <div className="mt-6 border-t border-[var(--border)] pt-5">
+        <div className="mb-3">
           <h3 className="text-sm font-bold text-[var(--foreground)]">
             Kriteria Jumlah Soal per Kompetensi Bab
           </h3>
-          {templateKompetensi.length === 0 ? (
-            <p className="text-xs text-[var(--muted-foreground)]">
-              Pilih bab terlebih dahulu untuk memuat kompetensi yang dapat diatur.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] text-xs uppercase text-[var(--muted-foreground)]">
-                    <th className="pb-2 font-semibold w-12">Aktif</th>
-                    <th className="pb-2 font-semibold">Kode</th>
-                    <th className="pb-2 font-semibold">Isi Kompetensi</th>
-                    <th className="pb-2 font-semibold w-32">Jumlah Soal</th>
-                    <th className="pb-2 font-semibold w-32">Total Poin (Essay)</th>
-                    <th className="pb-2 font-semibold w-24">Tersedia</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {templateKompetensi.map((tk, idx) => {
-                    const available = availableSoalCounts.find((x) => x.kompetensiBabId === tk.kompetensiBabId)?.count ?? 0;
-                    const isAdaptiveMode = template?.isAdaptive !== false;
-                    const required = isAdaptiveMode ? tk.jumlahSoal + 5 : tk.jumlahSoal;
-                    const isSufficient = available >= required;
 
-                    return (
-                      <tr key={tk.kompetensiBabId} className="hover:bg-[var(--muted)]/20">
-                        <td className="py-2.5">
-                          <input
-                            type="checkbox"
-                            checked={tk.isEnabled}
-                            onChange={(e) => {
-                              const newArr = [...templateKompetensi];
-                              newArr[idx].isEnabled = e.target.checked;
-                              setTemplateKompetensi(newArr);
-                            }}
-                            className="w-4 h-4 cursor-pointer"
-                          />
-                        </td>
-                        <td className="py-2.5 font-mono font-bold text-[var(--primary)]">{tk.nomerKompetensi}</td>
-                        <td className="py-2.5 text-[var(--muted-foreground)] truncate max-w-xs">{tk.isiKompetensi}</td>
-                        <td className="py-2.5">
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!tk.isEnabled}
-                            value={tk.jumlahSoal}
-                            onChange={(e) => {
-                              const newArr = [...templateKompetensi];
-                              newArr[idx].jumlahSoal = Number(e.target.value);
-                              setTemplateKompetensi(newArr);
-                            }}
-                            className="w-20 p-1.5 text-xs border border-[var(--border)] rounded bg-[var(--background)] disabled:opacity-50"
-                          />
-                        </td>
-                        <td className="py-2.5">
-                          <input
-                            type="number"
-                            min="0"
-                            disabled={!tk.isEnabled}
-                            value={tk.totalPoint}
-                            onChange={(e) => {
-                              const newArr = [...templateKompetensi];
-                              newArr[idx].totalPoint = Number(e.target.value);
-                              setTemplateKompetensi(newArr);
-                            }}
-                            className="w-20 p-1.5 text-xs border border-[var(--border)] rounded bg-[var(--background)] disabled:opacity-50"
-                          />
-                        </td>
-                        <td className="py-2.5">
-                          <span className={`px-2 py-1 rounded text-xs font-semibold ${
-                            !tk.isEnabled
-                              ? "bg-[var(--muted)] text-[var(--muted-foreground)]"
-                              : isSufficient
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+            Aktifkan kompetensi dan tentukan jumlah soal yang ingin
+            digunakan.
+          </p>
+        </div>
+
+        {templateKompetensi.length === 0 ? (
+          <div className="rounded-lg bg-[var(--muted)] p-4 text-center">
+            <p className="text-xs text-[var(--muted-foreground)]">
+              Pilih bab terlebih dahulu untuk memuat kompetensi yang dapat
+              diatur.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-[var(--border)]">
+            <table className="w-full min-w-[720px] border-collapse text-sm">
+              <thead>
+                <tr className="border-b border-[var(--border)] bg-[var(--muted)] text-left text-xs uppercase text-[var(--muted-foreground)]">
+                  <th className="px-3 py-2.5 font-semibold">Aktif</th>
+                  <th className="px-3 py-2.5 font-semibold">Kode</th>
+                  <th className="px-3 py-2.5 font-semibold">
+                    Isi Kompetensi
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold">Jumlah Soal</th>
+                  <th className="px-3 py-2.5 font-semibold">
+                    Total Poin (Essay)
+                  </th>
+                  <th className="px-3 py-2.5 font-semibold">Tersedia</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-[var(--border)]">
+                {templateKompetensi.map((tk, idx) => {
+                  const available =
+                    availableSoalCounts.find(
+                      (x) => x.kompetensiBabId === tk.kompetensiBabId,
+                    )?.count ?? 0;
+
+                  const isAdaptiveMode =
+                    template?.isAdaptive !== false;
+
+                  const required = isAdaptiveMode
+                    ? tk.jumlahSoal + 5
+                    : tk.jumlahSoal;
+
+                  const isSufficient = available >= required;
+
+                  return (
+                    <tr
+                      key={tk.kompetensiBabId}
+                      className="transition-colors hover:bg-[var(--muted)]/20"
+                    >
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="checkbox"
+                          checked={tk.isEnabled}
+                          onChange={(e) => {
+                            const newArr = [...templateKompetensi];
+                            newArr[idx].isEnabled = e.target.checked;
+                            setTemplateKompetensi(newArr);
+                          }}
+                          className="h-4 w-4 cursor-pointer"
+                        />
+                      </td>
+
+                      <td className="px-3 py-2.5 font-mono font-bold text-[var(--primary)]">
+                        {tk.nomerKompetensi}
+                      </td>
+
+                      <td className="max-w-xs truncate px-3 py-2.5 text-[var(--muted-foreground)]">
+                        {tk.isiKompetensi}
+                      </td>
+
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min="0"
+                          disabled={!tk.isEnabled}
+                          value={tk.jumlahSoal}
+                          onChange={(e) => {
+                            const newArr = [...templateKompetensi];
+                            newArr[idx].jumlahSoal = Number(
+                              e.target.value,
+                            );
+                            setTemplateKompetensi(newArr);
+                          }}
+                          className="w-20 rounded border border-[var(--border)] bg-[var(--background)] p-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </td>
+
+                      <td className="px-3 py-2.5">
+                        <input
+                          type="number"
+                          min="0"
+                          disabled={!tk.isEnabled}
+                          value={tk.totalPoint}
+                          onChange={(e) => {
+                            const newArr = [...templateKompetensi];
+                            newArr[idx].totalPoint = Number(
+                              e.target.value,
+                            );
+                            setTemplateKompetensi(newArr);
+                          }}
+                          className="w-20 rounded border border-[var(--border)] bg-[var(--background)] p-1.5 text-xs disabled:cursor-not-allowed disabled:opacity-50"
+                        />
+                      </td>
+
+                      <td className="px-3 py-2.5">
+                        <span
+                          className={`inline-flex whitespace-nowrap rounded px-2 py-1 text-xs font-semibold ${!tk.isEnabled
+                            ? "bg-[var(--muted)] text-[var(--muted-foreground)]"
+                            : isSufficient
                               ? "bg-green-500/10 text-green-600"
                               : "bg-red-500/10 text-red-500"
-                          }`}>
-                            {available} / {required} {isAdaptiveMode ? "(N+5)" : "(N)"}
-                          </span>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* --- END FORM PENGATURAN UJIAN --- */}
-
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-2 gap-6 min-h-0">
-        {/* Kiri: Bank Soal (Daftar Bab) */}
-        <div className="flex flex-col bg-[var(--card)] rounded-xl border border-[var(--border)] overflow-hidden">
-          <div className="p-4 border-b border-[var(--border)] bg-[var(--muted)]">
-            <h3 className="font-semibold text-[var(--foreground)]">
-              Sumber Soal (Pilih Buku & Bab)
-            </h3>
-            <select
-              value={selectedBuku}
-              onChange={(e) => setSelectedBuku(e.target.value)}
-              className="mt-4 w-full p-2 text-sm border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
-            >
-              <option value="" disabled>
-                -- Pilih Buku --
-              </option>
-              {bukuList?.map((buku) => (
-                <option key={buku.id} value={buku.id}>
-                  {buku.title}
-                </option>
-              ))}
-            </select>
+                            }`}
+                        >
+                          {available} / {required}{" "}
+                          {isAdaptiveMode ? "(N+5)" : "(N)"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
+        )}
+      </div>
 
-          <div className="p-4 overflow-y-auto flex-1 space-y-3">
+      {/* SAVE ACTION */}
+      <div className="mt-6 flex flex-col gap-3 border-t border-[var(--border)] pt-5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[var(--foreground)]">
+            Siap menyimpan template?
+          </p>
+          <p className="text-xs text-[var(--muted-foreground)]">
+            Pastikan jumlah soal dan sumber soal sudah sesuai.
+          </p>
+        </div>
+
+        <button
+          onClick={handleSaveTemplate}
+          disabled={
+            (selectedQuestions?.length === 0 ||
+              !template?.title ||
+              !template?.durasiMenit ||
+              !derivedTotalQuestions) ||
+            !isOwner
+          }
+          className="w-full rounded-lg bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-foreground)] shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+        >
+          Simpan Template Ujian
+        </button>
+      </div>
+    </div>
+
+    {/* QUESTION WORKSPACE */}
+    <div className="grid min-h-0 grid-cols-1 gap-6 lg:grid-cols-2">
+      {/* SUMBER SOAL */}
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--card)]">
+        <div className="shrink-0 border-b border-[var(--border)] bg-[var(--muted)] p-4">
+          <h3 className="font-semibold text-[var(--foreground)]">
+            Sumber Soal
+          </h3>
+
+          <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+            Pilih buku dan bab yang menjadi sumber soal ujian.
+          </p>
+
+          <select
+            value={selectedBuku}
+            onChange={(e) => setSelectedBuku(e.target.value)}
+            className="mt-3 w-full rounded-lg border border-[var(--border)] bg-[var(--background)] p-2.5 text-sm text-[var(--foreground)] outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          >
+            <option value="" disabled>
+              -- Pilih Buku --
+            </option>
+
+            {bukuList?.map((buku) => (
+              <option key={buku.id} value={buku.id}>
+                {buku.title}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        {/* INDEPENDENT SCROLL */}
+        <div className="max-h-[420px] flex-1 overflow-y-auto p-4 sm:max-h-[520px] lg:max-h-[600px]">
+          <div className="space-y-3">
             {!selectedBuku ? (
-              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
+              <p className="mt-4 text-center text-sm text-[var(--muted-foreground)]">
                 Silakan pilih buku terlebih dahulu untuk melihat daftar bab.
               </p>
             ) : babList?.length === 0 ? (
-              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
+              <p className="mt-4 text-center text-sm text-[var(--muted-foreground)]">
                 Tidak ada bab tersedia di buku ini.
               </p>
             ) : (
@@ -264,19 +381,20 @@ export default function ExamBuilderPage({
                 const isSelected = activeBabs.includes(bab.id);
 
                 return (
-                  <div
+                  <button
                     key={bab.id}
+                    type="button"
                     onClick={() => handleToggleBab(bab.id)}
-                    className={`p-4 border rounded-lg cursor-pointer flex items-center gap-3 transition-all duration-200 ${isSelected
-                      ? "bg-[var(--primary)]/10 border-[var(--primary)]"
-                      : "bg-[var(--background)] border-[var(--border)] hover:border-[var(--primary)]/50"
+                    className={`flex w-full items-center gap-3 rounded-lg border p-4 text-left transition-all ${isSelected
+                      ? "border-[var(--primary)] bg-[var(--primary)]/10"
+                      : "border-[var(--border)] bg-[var(--background)] hover:border-[var(--primary)]/50"
                       }`}
                   >
                     <div
                       className={
                         isSelected
-                          ? "text-[var(--primary)]"
-                          : "text-[var(--muted-foreground)]"
+                          ? "shrink-0 text-[var(--primary)]"
+                          : "shrink-0 text-[var(--muted-foreground)]"
                       }
                     >
                       {isSelected ? (
@@ -285,6 +403,7 @@ export default function ExamBuilderPage({
                         <Square size={20} />
                       )}
                     </div>
+
                     <span
                       className={`font-medium ${isSelected
                         ? "text-[var(--primary)]"
@@ -293,68 +412,73 @@ export default function ExamBuilderPage({
                     >
                       {bab.title}
                     </span>
-                  </div>
+                  </button>
                 );
               })
             )}
           </div>
         </div>
+      </div>
 
-        {/* Kanan: Komposisi Ujian */}
-        <div className="flex flex-col bg-[var(--card)] rounded-xl border border-[var(--primary)] overflow-hidden">
-          <div className="p-4 border-b border-[var(--border)] bg-[#7FA88F10] flex justify-between items-center">
-            <h3 className="font-semibold text-[var(--primary)]">
-              Soal Terpilih untuk Ujian
-            </h3>
+      {/* SOAL TERPILIH */}
+      <div className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-[var(--primary)] bg-[var(--card)]">
+        <div className="shrink-0 border-b border-[var(--border)] bg-[var(--primary)]/5 p-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-semibold text-[var(--primary)]">
+                Soal Terpilih untuk Ujian
+              </h3>
+
+              <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                Daftar soal yang akan digunakan dalam template.
+              </p>
+            </div>
+
             <span
-              className={`text-xs font-bold px-2 py-1 rounded-full ${template?.questionCount &&
-                selectedQuestions?.length > template.questionCount
-                ? "bg-red-500 text-white" // Warn if selected questions exceed the target
-                : "bg-[var(--primary)] text-[var(--primary-foreground)]"
+              className={`w-fit rounded-full px-2.5 py-1 text-xs font-bold ${selectedQuestions?.length &&
+                selectedQuestions.length > derivedTotalQuestions
+                ? "bg-[var(--primary)] text-[var(--primary-foreground)]"
+                : "bg-red-500 text-white"
                 }`}
             >
               {selectedQuestions?.length || 0} /{" "}
               {derivedTotalQuestions || "?"} Soal
             </span>
           </div>
-          <div className="p-4 overflow-y-auto flex-1 space-y-3">
+        </div>
+
+        {/* INDEPENDENT SCROLL */}
+        <div className="max-h-[420px] flex-1 overflow-y-auto p-4 sm:max-h-[520px] lg:max-h-[600px]">
+          <div className="space-y-3">
             {selectedQuestions?.length === 0 ? (
-              <p className="text-sm text-center text-[var(--muted-foreground)] mt-4">
-                Belum ada soal yang dipilih. Centang bab di sebelah kiri untuk
-                menambahkan soal.
-              </p>
+              <div className="rounded-lg border border-dashed border-[var(--border)] p-6 text-center">
+                <p className="text-sm text-[var(--muted-foreground)]">
+                  Belum ada soal yang dipilih.
+                </p>
+
+                <p className="mt-1 text-xs text-[var(--muted-foreground)]">
+                  Centang bab di sebelah kiri untuk menambahkan soal.
+                </p>
+              </div>
             ) : (
-              selectedQuestions?.map((soal, index) => (
+              selectedQuestions.map((soal, index) => (
                 <div
                   key={soal.id}
-                  className="p-3 border border-[var(--border)] bg-[var(--background)] rounded-lg flex gap-3 items-start transition-colors group"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--background)] p-3"
                 >
-                  <div className="flex-1">
-                    <p className="text-sm text-[var(--foreground)] line-clamp-2">
-                      <span className="font-semibold mr-1">{index + 1}.</span>
-                      {soal.text}
-                    </p>
-                  </div>
+                  <p className="text-sm leading-relaxed text-[var(--foreground)]">
+                    <span className="mr-1 font-semibold">
+                      {index + 1}.
+                    </span>
+                    {soal.text}
+                  </p>
                 </div>
               ))
             )}
           </div>
-          <div className="p-4 border-t border-[var(--border)] bg-[var(--muted)]">
-            <button
-              onClick={handleSaveTemplate}
-              disabled={
-                selectedQuestions?.length === 0 ||
-                !template?.title ||
-                !template?.durasiMenit ||
-                !derivedTotalQuestions
-              }
-              className="w-full bg-[var(--primary)] text-[var(--primary-foreground)] py-2.5 rounded-lg font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition shadow-sm"
-            >
-              Simpan Template Ujian
-            </button>
-          </div>
         </div>
       </div>
     </div>
+  </div>
   );
 }

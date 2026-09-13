@@ -10,11 +10,13 @@ export function useUjianViewModel() {
   const { data: session, status } = useSession();
 
   useEffect(() => {
-    guruRepository.getTemplates(Number(session?.user.id ?? 0)).then((res) => {
-      setTemplates(res);
-      setLoading(false);
-    });
-  }, []);
+    if (Number(session?.user.id)) {
+      guruRepository.getTemplates(Number(session?.user.id ?? 0)).then((res) => {
+        setTemplates(res);
+        setLoading(false);
+      });
+    }
+  }, [session]);
 
   return {
     templates,

@@ -1,5 +1,6 @@
 import { StatusUjian, TipeSoal } from "@prisma/client";
 import * as guruDB from "../services/db/guru/guruDB";
+import * as classDashboardDB from "../services/db/guru/classDashboardDB";
 import { initiatePdfExtraction } from "../services/process-book/initiate-extractor";
 import { Bab, Kelas, Soal, UjianTemplate } from "@/src/app/types/guru";
 import { generateQuestionsWithGroq, enqueueGenerateQuestions } from "../services/process-book/generate-questions";
@@ -35,6 +36,14 @@ export const guruRepository = {
       throw new Error("Gagal mengambil statistik dashboard.");
     }
   },
+  getClassDashboard: async (kelasId: string) => {
+    try {
+      return await classDashboardDB.getClassDashboard(Number(kelasId));
+    } catch (error) {
+      console.error("Error fetching class dashboard:", error);
+      throw new Error("Gagal mengambil dashboard kelas.");
+    }
+  },
 
   // --- VALIDATION PIPELINE ---
   getBooksNeedingValidation: async (guruId: number = 1) => {
@@ -49,6 +58,31 @@ export const guruRepository = {
       jobId: b.jobs?.[0]?.id || null,
     }));
   },
+  getTodayExams: async (guruId: number) => {
+    const exams = await guruDB.getTodayExams(guruId);
+
+    return exams.map((exam: any) => ({
+      id: exam.id,
+      ujianName: exam.judulJadwal || exam.ujian?.judulUjian || "Ujian",
+      kelasId: exam.kelasId,
+      kelasName: exam.kelas?.namaKelas || "Kelas",
+      status: exam.status,
+      startTime: exam.waktuMulaiAktif,
+      endTime: exam.waktuSelesaiAktif,
+      studentCount: exam.kelas?._count?.members || 0,
+    }));
+  },
+
+  getRecentlyModifiedClasses: async (guruId: number) => {
+    const classes = await guruDB.getRecentlyModifiedClasses(guruId);
+
+    return classes.map((kelas: any) => ({
+      id: kelas.id,
+      name: kelas.namaKelas || "Kelas",
+      studentCount: kelas._count?.members || 0,
+    }));
+  },
+
 
   getExtractionValidationData: async (bukuId: string) => {
     return await guruDB.getExtractionValidationData(parseInt(bukuId));
@@ -78,18 +112,42 @@ export const guruRepository = {
     return await guruDB.confirmCaptionValidation(parseInt(bukuId), updatedCaptions, deletedImageIds, newImages);
   },
 
-  // --- BUKU ---
-  getBukuList: async (guruId: number = 1) => {
-    const rawBuku = await guruDB.getBukuList(guruId);
+  getBukuOptions: async (guruId: number = 1) => {
+    const result = await guruDB.getBukuOptions(guruId);
 
-    return rawBuku.map((b: any) => ({
-      id: b.id.toString(),
-      judul: b.judul,
-      title: b.judul, // Kompatibilitas properti mock frontend
-      description: "",
-      chapterCount: b._count?.bab || 0,
-      jobStatus: b.jobs?.[0]?.status || null,
+    return result.map((buku) => ({
+      id: buku.id.toString(),
+      title: buku.judul,
     }));
+  },
+
+  // --- BUKU ---
+  getBukuList: async (
+    guruId: number = 1,
+    page: number = 1,
+    limit: number = 10,
+    search: string = "",
+    activeFilter: string = "ALL",
+  ) => {
+    const result = await guruDB.getBukuList(
+      guruId,
+      page,
+      limit,
+      search,
+      activeFilter,
+    );
+
+    return {
+      ...result,
+      data: result.data.map((b: any) => ({
+        id: b.id.toString(),
+        judul: b.judul,
+        title: b.judul,
+        description: "",
+        chapterCount: b._count?.bab || 0,
+        jobStatus: b.jobs?.[0]?.status || null,
+      })),
+    };
   },
 
   addBuku: async (buku: any, guruId: number = 2) => {
@@ -209,10 +267,19 @@ export const guruRepository = {
   // --- SOAL ---
   getSoalList: async (
     babId: string,
+    bloomLevel?: string,
+    type?: TipeSoal,
   ): Promise<{ bab: Bab | null; soalList: Soal[] }> => {
-    const rawSoal = await guruDB.getSoalList(parseInt(babId));
+    const rawSoal = await guruDB.getSoalList(
+      parseInt(babId),
+      bloomLevel,
+      type,
+    );
+
     const rawBab = await guruDB.getBabDetail(parseInt(babId));
+
     if (!rawBab) return { bab: null, soalList: [] };
+
     return {
       bab: {
         id: rawBab.id.toString(),
@@ -309,6 +376,7 @@ export const guruRepository = {
       templates.map((t: any) => ({
         id: t.id.toString(),
         title: t.judulUjian,
+        guruName: t.guruName,
         judulUjian: t.judulUjian,
         durasiMenit: t.durasiMenit,
         questionCount: t.totalSoal || 0,
@@ -327,6 +395,7 @@ export const guruRepository = {
     return {
       id: template.id.toString(),
       title: template.judulUjian,
+      guruId: template.guruId.toString(),
       judulUjian: template.judulUjian,
       durasiMenit: template.durasiMenit,
       isAdaptive: template.isAdaptive,
@@ -423,8 +492,25 @@ export const guruRepository = {
     return await guruDB.getSoalGenerationStatus(babId);
   },
 
-  getKelas: async (sekolah_id: number, guru_id: number): Promise<Kelas[]> => {
-    const kelasList = await guruDB.getKelas(sekolah_id, guru_id);
+  getKelas: async (
+    sekolah_id: number,
+    guru_id: number,
+    search: string = "",
+    orderBy:
+      | "name_asc"
+      | "name_desc"
+      | "students_desc"
+      | "students_asc" = "name_asc",
+    status: "all" | "active" | "retired" = "active"
+  ): Promise<Kelas[]> => {
+    const kelasList = await guruDB.getKelas(
+      sekolah_id,
+      guru_id,
+      search,
+      orderBy,
+      status
+    );
+
     return kelasList.map((k) => ({
       id: k.id,
       name: k.namaKelas,
@@ -432,6 +518,7 @@ export const guruRepository = {
       teacherId: k.teacherId,
       teacherName: k.teacher.name,
       studentCount: k._count.members,
+      isRetired: k.isRetired,
     })) as unknown as Kelas[];
   },
 

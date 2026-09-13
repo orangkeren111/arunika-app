@@ -2,7 +2,20 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Plus, BookOpen, Pencil, Trash2, X, AlertCircle, ArrowRight, CheckCircle2, Clock } from "lucide-react";
+import {
+  Plus,
+  BookOpen,
+  Pencil,
+  Trash2,
+  X,
+  AlertCircle,
+  ArrowRight,
+  CheckCircle2,
+  Clock,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { useBukuViewModel } from "./GuruBukuViewModel";
 
 export default function BukuPage() {
@@ -10,6 +23,14 @@ export default function BukuPage() {
     filteredBukuList,
     activeFilter,
     setActiveFilter,
+
+    search,
+    setSearch,
+
+    page,
+    setPage,
+    pagination,
+
     handleAddBuku,
     handleEditBuku,
     handleDeleteBuku,
@@ -84,15 +105,29 @@ export default function BukuPage() {
           <button
             key={tab.id}
             onClick={() => setActiveFilter(tab.id as any)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${
-              activeFilter === tab.id
-                ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
-                : "bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]"
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition whitespace-nowrap ${activeFilter === tab.id
+              ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-sm"
+              : "bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--muted)] border border-[var(--border)]"
+              }`}
           >
             {tab.label}
           </button>
         ))}
+        {/* SEARCH */}
+        <div className="relative max-w-md">
+          <Search
+            size={18}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]"
+          />
+
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Cari buku..."
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm text-[var(--foreground)] placeholder:text-[var(--muted-foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)]"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -133,11 +168,10 @@ export default function BukuPage() {
           return (
             <div
               key={buku.id}
-              className={`bg-[var(--card)] p-6 rounded-xl border transition shadow-sm flex flex-col justify-between h-full group relative ${
-                isNeedsValidation
-                  ? "border-amber-500/80 shadow-amber-500/5 ring-1 ring-amber-500/20"
-                  : "border-[var(--border)] hover:border-[var(--primary)]"
-              }`}
+              className={`bg-[var(--card)] p-6 rounded-xl border transition shadow-sm flex flex-col justify-between h-full group relative ${isNeedsValidation
+                ? "border-amber-500/80 shadow-amber-500/5 ring-1 ring-amber-500/20"
+                : "border-[var(--border)] hover:border-[var(--primary)]"
+                }`}
             >
               <div>
                 {/* Header Item & Action Buttons */}
@@ -219,6 +253,45 @@ export default function BukuPage() {
             </div>
           );
         })}
+        {pagination.totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4">
+            <p className="text-sm text-[var(--muted-foreground)]">
+              Menampilkan{" "}
+              {Math.min(
+                (page - 1) * pagination.limit + 1,
+                pagination.total
+              )}
+              {" - "}
+              {Math.min(page * pagination.limit, pagination.total)}
+              {" dari "}
+              {pagination.total} buku
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setPage((prev) => prev - 1)}
+                disabled={page === 1}
+                className="p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Halaman sebelumnya"
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <span className="px-4 py-2 text-sm font-medium text-[var(--foreground)]">
+                Halaman {page} dari {pagination.totalPages}
+              </span>
+
+              <button
+                onClick={() => setPage((prev) => prev + 1)}
+                disabled={page === pagination.totalPages}
+                className="p-2 rounded-lg border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)] disabled:opacity-40 disabled:cursor-not-allowed transition"
+                aria-label="Halaman berikutnya"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal Tambah/Edit Buku */}

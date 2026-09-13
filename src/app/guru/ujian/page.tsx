@@ -39,6 +39,9 @@ export default function UjianListPage() {
             <p className="text-sm text-[var(--muted-foreground)] mb-4">
               Total Soal: {template.questionCount}
             </p>
+            <p className="text-sm text-[var(--muted-foreground)] mb-4">
+              Dibuat oleh: {template.guruName}
+            </p>
             {/* <p className="text-xs text-[var(--muted-foreground)] mb-6 flex-grow">Dibuat pada: {template.createdAt}</p> */}
             <Link
               href={`/guru/ujian/${template.id}/builder`}

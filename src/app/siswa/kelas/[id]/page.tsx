@@ -54,8 +54,8 @@ export default function KelasDetailPage({ params }: { params: Promise<{ id: stri
                     </Link>
                   </>
                 ) : (
-                  <Link href={`/siswa/ujian/${exam.jadwalId}/quiz/lobby`} className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded flex items-center gap-1 hover:opacity-90 transition font-bold">
-                    <Play size={14} /> Lobby
+                  <Link href={`/siswa/ujian/${exam.jadwalId}/lobby`} className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded flex items-center gap-1 hover:opacity-90 transition font-bold">
+                    <Play size={14} /> Mulai Ujian
                   </Link>
                 )}
               </div>

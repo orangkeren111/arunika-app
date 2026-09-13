@@ -7,6 +7,7 @@ import { useReactToPrint } from "react-to-print";
 import { useRouter } from "next/navigation";
 import { ReportTemplate } from "@/src/components/ReportTemplate";
 import { useStudentReportViewModel } from "./SiswaHistoryDetailViewModel";
+import { PrintReportTemplate } from "@/src/components/PrintableTemplate";
 
 export default function StudentReportPage({
   params,
@@ -18,8 +19,10 @@ export default function StudentReportPage({
   const resolvedParams = use(params);
   const { reportData } = useStudentReportViewModel(resolvedParams.attempt_id);
 
+  const printRef = useRef<HTMLDivElement>(null);
+
   const handlePrint = useReactToPrint({
-    contentRef: componentRef,
+    contentRef: printRef,
     documentTitle: `${reportData?.studentName}_Quiz_Report`,
   });
 
@@ -52,8 +55,11 @@ export default function StudentReportPage({
       </div>
 
       {/* The Printable Area */}
-      <div ref={componentRef} className="print:p-0">
+      <div ref={componentRef} className="print:hidden">
         {reportData && <ReportTemplate {...reportData} />}
+      </div>
+      <div ref={printRef} className="hidden print:block">
+        {reportData && <PrintReportTemplate {...reportData} />}
       </div>
     </div>
   );

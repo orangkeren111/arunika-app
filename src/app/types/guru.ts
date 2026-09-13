@@ -13,6 +13,11 @@ export interface Bab {
   questionCount: number;
 }
 
+export interface BukuOption {
+  id: string;
+  title: string;
+}
+
 export interface Soal {
   id: string;
   babId: string;
@@ -51,6 +56,9 @@ export interface UjianTemplate {
   reqC2?: number;
   reqC3?: number;
   reqC4?: number;
+  guruId?: number;
+  guruName?: string;
+
 }
 
 export interface TipeUjian {
@@ -87,3 +95,14 @@ export interface AttemptReport {
   aiSummary?: string;
   answers?: any[];
 }
+
+export interface StudentPerformance {
+  scores: number[];
+  bloom: Map<
+    string,
+    {
+      correct: number;
+      total: number;
+    }
+  >;
+};

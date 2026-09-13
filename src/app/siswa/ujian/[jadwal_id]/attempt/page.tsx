@@ -198,7 +198,7 @@ export default function ExamAttemptPage({
                   className="w-full h-56 p-5 bg-slate-900/40 border-2 border-white/15 focus:border-blue-400 rounded-2xl text-slate-100 placeholder-slate-500 focus:outline-none resize-none transition-colors text-base md:text-lg backdrop-blur-md shadow-inner"
                 ></textarea>
                   <span className="text-xs text-muted-foreground">
-                    {answers[currentQ.id].length}/1000 karakter
+                    {answers[currentQ.id]?.length}/1000 karakter
                   </span>
                 </>
               )}

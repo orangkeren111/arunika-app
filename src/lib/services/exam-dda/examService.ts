@@ -2,6 +2,7 @@
 
 import prisma from "../db/prisma";
 import * as siswaDB from "../db/siswa/siswaDB";
+import { enqueueStudentReport } from "../report/generator";
 import { DDAHelper } from "./ddaHelper";
 import { TipeSoal } from "@prisma/client";
 
@@ -158,6 +159,7 @@ export async function submitSingleAnswer(
   const newAnsweredCount = attemptNumber;
   if (totalQuestionsLimit > 0 && newAnsweredCount >= totalQuestionsLimit) {
     await finishExamSession(sesiId);
+    await enqueueStudentReport(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
 
@@ -200,6 +202,7 @@ export async function submitSingleAnswer(
   if (!nextQuestion) {
     // If no more valid questions exist to serve, finish session gracefully
     await finishExamSession(sesiId);
+    await enqueueStudentReport(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
 

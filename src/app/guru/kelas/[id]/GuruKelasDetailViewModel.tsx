@@ -6,7 +6,7 @@ import { StatusUjian } from "@prisma/client";
 
 export function useKelasDetailViewModel(kelasId: string) {
   const { data: session, status } = useSession();
-  
+
   // --- Class Detail States ---
   const [classDetail, setClassDetail] = useState<any>(null);
   const [loadingClass, setLoadingClass] = useState(true);
@@ -19,12 +19,16 @@ export function useKelasDetailViewModel(kelasId: string) {
   const [gradesReport, setGradesReport] = useState<any[]>([]);
   const [loadingGrades, setLoadingGrades] = useState(true);
 
+  // -- Dashboard states --
+  const [classDashboard, setClassDashboard] = useState<any>(null);
+  const [loadingDashboard, setLoadingDashboard] = useState(true);
+
   // --- Scheduling states (Form) ---
   const [selectedTemplate, setSelectedTemplate] = useState("");
   const [selectedTipe, setSelectedTipe] = useState("");
   const [waktuMulai, setWaktuMulai] = useState("");
   const [waktuSelesai, setWaktuSelesai] = useState("");
-  
+
   const [templateList, setTemplateList] = useState<UjianTemplate[]>([]);
   const [tipeList, setTipeList] = useState<TipeUjian[]>([]);
 
@@ -47,6 +51,13 @@ export function useKelasDetailViewModel(kelasId: string) {
     const list = await guruRepository.getExamsByKelas(kelasId);
     setExams(list);
     setLoadingExams(false);
+  };
+  const fetchClassDashboard = async () => {
+    if (status !== "authenticated" || !kelasId) return;
+    setLoadingDashboard(true);
+    const dashboard = await guruRepository.getClassDashboard(kelasId);
+    setClassDashboard(dashboard);
+    setLoadingDashboard(false);
   };
 
   const fetchGrades = async () => {
@@ -72,6 +83,7 @@ export function useKelasDetailViewModel(kelasId: string) {
     fetchExams();
     fetchGrades();
     fetchFormMetadata();
+    fetchClassDashboard()
   }, [kelasId, session, status]);
 
   const [judulJadwal, setJudulJadwal] = useState("");
@@ -128,6 +140,8 @@ export function useKelasDetailViewModel(kelasId: string) {
     loadingClass,
     exams,
     loadingExams,
+    classDashboard,
+    loadingDashboard,
     gradesReport,
     loadingGrades,
     templateList,

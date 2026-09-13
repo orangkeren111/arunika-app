@@ -38,6 +38,10 @@ export default function BankSoalClientPage({
     handleRejectSoal,
     handleUploadImage,
     handleUploadBabPdf,
+    selectedType,
+    setSelectedType,
+    selectedBloomLevel,
+    setSelectedBloomLevel
   } = useSoalViewModel(babId);
 
   // --- MODAL STATE ---
@@ -243,6 +247,31 @@ export default function BankSoalClientPage({
             <Plus size={16} /> Generate Soal
           </button>
         </div>
+      </div>
+      <div className="flex flex-wrap gap-3">
+        <select
+          value={selectedBloomLevel}
+          onChange={(e) => setSelectedBloomLevel(e.target.value)}
+          className="rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+        >
+          <option value="">Semua Bloom Level</option>
+          <option value="C1">C1</option>
+          <option value="C2">C2</option>
+          <option value="C3">C3</option>
+          <option value="C4">C4</option>
+          <option value="C5">C5</option>
+          <option value="C6">C6</option>
+        </select>
+
+        <select
+          value={selectedType || ""}
+          onChange={(e) => setSelectedType(e.target.value as TipeSoal | "")}
+          className="rounded-lg border border-border bg-background px-3 py-2 text-foreground"
+        >
+          <option value="">Semua Tipe</option>
+          <option value="MCQ">MCQ</option>
+          <option value="ESSAY">ESSAY</option>
+        </select>
       </div>
 
       {/* --- LIST SOAL --- */}
@@ -709,7 +738,7 @@ export default function BankSoalClientPage({
                 <input
                   type="number"
                   min={1}
-                  max={50}
+                  max={30}
                   value={jumlahSoalPdf}
                   onChange={(e) => setJumlahSoalPdf(Number(e.target.value))}
                   className="w-full p-2.5 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none"
@@ -784,7 +813,7 @@ export default function BankSoalClientPage({
                 <input
                   type="number"
                   min={1}
-                  max={50}
+                  max={30}
                   value={jumlahSoalGen}
                   onChange={(e) => setJumlahSoalGen(Number(e.target.value))}
                   disabled={isGeneratingSoal || isSubmittingGen}

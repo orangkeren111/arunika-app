@@ -5,41 +5,136 @@ import prisma from "../prisma";
 export async function getJadwalAktif(siswaId: number) {
   return await prisma.jadwalUjian.findMany({
     where: {
-      kelas: { members: { some: { userId: siswaId } } },
-      status: { in: [StatusUjian.SCHEDULED, StatusUjian.ONGOING] },
+      kelas: {
+        members: {
+          some: {
+            userId: siswaId,
+          },
+        },
+      },
+      status: {
+        in: [StatusUjian.SCHEDULED, StatusUjian.ONGOING],
+      },
+      waktuMulaiAktif: {
+        lte: new Date(),
+      },
+      waktuSelesaiAktif: {
+        gte: new Date(),
+      },
     },
     include: {
       ujian: true,
       kelas: true,
       tipeUjian: true,
     },
-    orderBy: { waktuMulaiAktif: "asc" },
+    orderBy: {
+      waktuMulaiAktif: "asc",
+    },
   });
 }
 
-export async function getRiwayatUjian(siswaId: number) {
-  return await prisma.sesiUjianSiswa.findMany({
-    where: { siswaId },
+export async function getRiwayatUjian(
+  siswaId: number,
+  options?: {
+    search?: string;
+    startDate?: string;
+    endDate?: string;
+    page?: number;
+    pageSize?: number;
+    limit?: number;
+  },
+) {
+  const search = options?.search?.trim();
+
+  const where = {
+    siswaId,
+
+    ...(search && {
+      jadwalUjian: {
+        ujian: {
+          judulUjian: {
+            contains: search,
+            mode: "insensitive" as const,
+          },
+        },
+      },
+    }),
+
+    ...(options?.startDate || options?.endDate
+      ? {
+        waktuSelesai: {
+          ...(options.startDate && {
+            gte: new Date(`${options.startDate}T00:00:00`),
+          }),
+
+          ...(options.endDate && {
+            lte: new Date(`${options.endDate}T23:59:59.999`),
+          }),
+        },
+      }
+      : {}),
+  };
+
+  const query = {
+    where,
+
     include: {
       jadwalUjian: {
-        include: { ujian: true },
+        include: {
+          ujian: true,
+        },
       },
       aiLogs: true,
     },
-    orderBy: { waktuMulai: "desc" },
-  });
+
+    orderBy: {
+      waktuMulai: "desc" as const,
+    },
+  };
+
+  if (options?.limit) {
+    const data = await prisma.sesiUjianSiswa.findMany({
+      ...query,
+      take: options.limit,
+    });
+
+    return {
+      data,
+      total: data.length,
+      totalPages: 1,
+    };
+  }
+
+  const page = options?.page ?? 1;
+  const pageSize = options?.pageSize ?? 10;
+  const skip = (page - 1) * pageSize;
+
+  const [data, total] = await Promise.all([
+    prisma.sesiUjianSiswa.findMany({
+      ...query,
+      skip,
+      take: pageSize,
+    }),
+
+    prisma.sesiUjianSiswa.count({
+      where,
+    }),
+  ]);
+
+  return {
+    data,
+    total,
+    totalPages: Math.ceil(total / pageSize),
+  };
 }
 
 // --- KELAS ---
 export async function getKelasList(siswaId: number) {
   return await prisma.kelas.findMany({
-    where: { members: { some: { userId: siswaId } } },
+    where: { members: { some: { userId: siswaId } }, isRetired: false },
     include: {
       _count: { select: { members: { where: { user: { role: "SISWA" } } } } },
-      members: {
-        where: { user: { role: "GURU" } },
-        include: { user: true },
-      },
+      teacher: true,
     },
   });
 }
@@ -49,10 +144,7 @@ export async function getKelasDetail(kelasId: number) {
     where: { id: kelasId },
     include: {
       _count: { select: { members: { where: { user: { role: "SISWA" } } } } },
-      members: {
-        where: { user: { role: "GURU" } },
-        include: { user: true },
-      },
+      teacher: true
     },
   });
 }

@@ -1,7 +1,9 @@
 import { guruRepository } from "@/src/lib/repositories/guruRepository";
 import { Bab, Soal } from "@/src/app/types/guru";
 import { useEffect, useState } from "react";
-import { getKompetensiBab } from "./kompetensi/actions";
+import { getKompetensiBab } from "../../../../../../lib/services/db/guru/kompetensiDB";
+import { fetchWithRetry } from "@/src/lib/utils/retryFunction";
+import { TipeSoal } from "@prisma/client";
 
 interface Kompetensi {
   id: number;
@@ -15,7 +17,9 @@ export function useSoalViewModel(babId: string) {
   const [kompetensiList, setKompetensiList] = useState<Kompetensi[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGeneratingSoal, setIsGeneratingSoal] = useState(false);
-  
+  const [selectedBloomLevel, setSelectedBloomLevel] = useState<string>("");
+  const [selectedType, setSelectedType] = useState<TipeSoal | "">("");
+
   const checkGenerationStatus = async () => {
     if (!babId || isNaN(Number(babId))) return;
     try {
@@ -25,16 +29,27 @@ export function useSoalViewModel(babId: string) {
       console.error("Error checking generation status:", err);
     }
   };
-
   const fetchSoal = () => {
     if (!babId || isNaN(Number(babId))) {
       return;
     }
+
     setLoading(true);
+
     Promise.all([
-      guruRepository.getSoalList(babId),
-      getKompetensiBab(Number(babId)),
-      guruRepository.getSoalGenerationStatus(Number(babId)).catch(() => ({ isGenerating: false })),
+      fetchWithRetry(() =>
+        guruRepository.getSoalList(
+          babId,
+          selectedBloomLevel || undefined,
+          selectedType || undefined,
+        )
+      ),
+      fetchWithRetry(() => getKompetensiBab(Number(babId))),
+      fetchWithRetry(() =>
+        guruRepository
+          .getSoalGenerationStatus(Number(babId))
+          .catch(() => ({ isGenerating: false }))
+      ),
     ])
       .then(([res, kompRes, statusRes]) => {
         setBab(res.bab);
@@ -51,7 +66,7 @@ export function useSoalViewModel(babId: string) {
 
   useEffect(() => {
     fetchSoal();
-  }, [babId]);
+  }, [babId, selectedBloomLevel, selectedType]);
 
   const handleGenerateQuestion = async (jumlahSoal: number = 10) => {
     await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
@@ -134,5 +149,9 @@ export function useSoalViewModel(babId: string) {
     handleRejectSoal,
     handleUploadImage,
     handleUploadBabPdf,
+    selectedType,
+    setSelectedType,
+    selectedBloomLevel,
+    setSelectedBloomLevel,
   };
 }

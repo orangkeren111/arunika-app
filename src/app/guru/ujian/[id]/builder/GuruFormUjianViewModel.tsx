@@ -2,6 +2,7 @@ import { guruRepository } from "@/src/lib/repositories/guruRepository";
 import {
   Bab,
   Buku,
+  BukuOption,
   Soal,
   UjianTemplate,
 } from "@/src/app/types/guru";
@@ -25,9 +26,8 @@ export function useFormUjianViewModel(id: string) {
   const [activeBabs, setActiveBabs] = useState<string[]>([]);
   const [selectedQuestions, setSelectedQuestions] = useState<Soal[]>([]);
   const [babList, setBabList] = useState<Bab[]>([]);
-  const [bukuList, setBukuList] = useState<Buku[]>([]);
-
-  // New competency builder states
+  const [bukuList, setBukuList] = useState<BukuOption[]>([]);
+  const [isOwner, setIsOwner] = useState<boolean>(false);
   const [templateKompetensi, setTemplateKompetensi] = useState<TemplateKompetensiItem[]>([]);
   const [availableSoalCounts, setAvailableSoalCounts] = useState<{ kompetensiBabId: number | null; count: number }[]>([]);
 
@@ -52,6 +52,11 @@ export function useFormUjianViewModel(id: string) {
           setLoading(false);
           return;
         }
+
+        console.log("User: " + Number(session?.user?.id));
+        console.log("Template: " + Number(res.guruId));
+
+        setIsOwner(Number(session?.user?.id) === Number(res.guruId));
 
         setTemplate({
           id: res.id ?? "",
@@ -90,11 +95,15 @@ export function useFormUjianViewModel(id: string) {
       });
     }
 
-    guruRepository.getBukuList(Number(session?.user?.id ?? 0)).then((res) => {
-      setBukuList(res);
-      setLoading(false);
-    });
-  }, [id]);
+    guruRepository
+      .getBukuOptions(Number(session?.user?.id ?? 0))
+      .then((res) => {
+        setBukuList(res);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, [id, session]);
 
   // Load Bab List for selected book
   useEffect(() => {
@@ -233,6 +242,7 @@ export function useFormUjianViewModel(id: string) {
   };
 
   return {
+    isOwner,
     template,
     setTemplate,
     loading,

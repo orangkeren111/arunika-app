@@ -1,6 +1,7 @@
 "use server";
 import { Prisma, StatusUjian, TipeSoal } from "@prisma/client";
 import prisma from "../prisma";
+import fs from "fs/promises";
 
 // --- DASHBOARD ---
 export async function getActiveExamsCount(guruId: number) {
@@ -31,19 +32,125 @@ export async function getRecentClassesCount(guruId: number) {
   return uniqueClasses.length;
 }
 
-// --- BUKU ---
-export async function getBukuList(guruId: number) {
+export async function getBukuOptions(guruId: number) {
   return await prisma.buku.findMany({
-    where: { guruId },
-    include: {
-      _count: { select: { bab: true } },
-      jobs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
+    where: {
+      guruId,
     },
-    orderBy: { id: "desc" },
+    select: {
+      id: true,
+      judul: true,
+    },
+    orderBy: {
+      id: "desc",
+    },
   });
+}
+
+// --- BUKU ---
+export async function getBukuList(
+  guruId: number,
+  page: number = 1,
+  limit: number = 10,
+  search: string = "",
+  activeFilter: string = "ALL",
+) {
+  const skip = (page - 1) * limit;
+
+  const where: Prisma.BukuWhereInput = {
+    guruId,
+
+    // SEARCH
+    ...(search
+      ? {
+        judul: {
+          contains: search,
+          mode: "insensitive" as const,
+        },
+      }
+      : {}),
+
+    // FILTER
+    ...(activeFilter === "NEED_VALIDATION"
+      ? {
+        jobs: {
+          some: {
+            status: {
+              in: [
+                "WAITING_EXTRACTION_VALIDATION",
+                "WAITING_CAPTION_VALIDATION",
+              ],
+            },
+          },
+        },
+      }
+      : {}),
+
+    ...(activeFilter === "PROCESSING"
+      ? {
+        jobs: {
+          some: {
+            status: {
+              in: [
+                "PENDING",
+                "PROCESSING_PDF",
+                "EXTRACTING_IMAGES",
+                "CAPTIONING_IMAGES",
+                "GENERATING_QUESTIONS",
+              ],
+            },
+          },
+        },
+      }
+      : {}),
+
+    ...(activeFilter === "DONE"
+      ? {
+        OR: [
+          {
+            jobs: {
+              some: {
+                status: "DONE",
+              },
+            },
+          },
+          {
+            jobs: {
+              none: {},
+            },
+          },
+        ],
+      }
+      : {}),
+  };
+
+  const [data, total] = await Promise.all([
+    prisma.buku.findMany({
+      where,
+      include: {
+        _count: {
+          select: { bab: true },
+        },
+        jobs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { id: "desc" },
+      skip,
+      take: limit,
+    }),
+
+    prisma.buku.count({ where }),
+  ]);
+
+  return {
+    data,
+    total,
+    page,
+    limit,
+    totalPages: Math.ceil(total / limit),
+  };
 }
 
 export async function createBuku(guruId: number, judul: string) {
@@ -121,11 +228,23 @@ export async function createBab(bukuId: number, judulBab: string) {
 }
 
 // --- SOAL ---
-export async function getSoalList(babId: number) {
+export async function getSoalList(
+  babId: number,
+  bloomLevel?: string,
+  type?: TipeSoal,
+) {
   return await prisma.bankSoal.findMany({
-    where: { babId },
-    include: { bab: true },
-    orderBy: { id: "asc" },
+    where: {
+      babId,
+      ...(bloomLevel ? { bloomLevel: bloomLevel } : {}),
+      ...(type ? { type: type } : {}),
+    },
+    include: {
+      bab: true,
+    },
+    orderBy: {
+      id: "asc",
+    },
   });
 }
 
@@ -143,15 +262,39 @@ export async function updateSoal(id: number, data: Prisma.BankSoalUpdateInput) {
 
 // --- TEMPLATES UJIAN ---
 export async function getUjianTemplates(guruId: number) {
+  const guru = await prisma.user.findUnique({
+    where: { id: guruId },
+    select: {
+      sekolahId: true,
+      name: true,
+    },
+  });
+
+  if (!guru) {
+    throw new Error("Guru tidak ditemukan");
+  }
+
   const templates = await prisma.ujian.findMany({
-    where: { guruId },
+    where: {
+      guru: {
+        sekolahId: guru.sekolahId,
+      },
+    },
     include: {
+      guru: {
+        select: {
+          name: true,
+        },
+      },
       ujianBab: {
         include: {
           bab: {
             include: {
-              // Ganti 'bankSoal' dengan nama relasi yang sesuai di schema.prisma kamu (misal: 'soal' atau 'questions')
-              _count: { select: { soal: true } },
+              _count: {
+                select: {
+                  soal: true,
+                },
+              },
             },
           },
         },
@@ -159,16 +302,15 @@ export async function getUjianTemplates(guruId: number) {
     },
   });
 
-  // Mapping data untuk menambahkan properti totalSoal
   return templates.map((template) => {
-    // Menjumlahkan count soal dari setiap bab yang terhubung
     const totalSoal = template.ujianBab.reduce((sum, item) => {
       return sum + (item.bab?._count?.soal || 0);
     }, 0);
 
     return {
       ...template,
-      totalSoal, // Sekarang kamu punya total soal per template ujian di sini
+      totalSoal,
+      guruName: template.guru.name,
     };
   });
 }
@@ -293,7 +435,13 @@ export async function upsertTemplateBabSafe(
     return true;
   });
 }
-export async function getKelas(sekolah_id: number, guru_id: number) {
+export async function getKelas(
+  sekolah_id: number,
+  guru_id: number,
+  search?: string,
+  orderBy: "name_asc" | "name_desc" | "students_desc" | "students_asc" = "name_asc",
+  status: "all" | "active" | "retired" = "active"
+) {
   return await prisma.kelas.findMany({
     include: {
       _count: { select: { members: true } },
@@ -302,8 +450,27 @@ export async function getKelas(sekolah_id: number, guru_id: number) {
     where: {
       sekolahId: sekolah_id,
       teacherId: guru_id,
+
+      ...(status === "active" ? { isRetired: false } : {}),
+      ...(status === "retired" ? { isRetired: true } : {}),
+
+      ...(search?.trim()
+        ? {
+          namaKelas: {
+            contains: search.trim(),
+            mode: "insensitive",
+          },
+        }
+        : {}),
     },
-    orderBy: { id: "asc" },
+    orderBy:
+      orderBy === "name_asc"
+        ? { namaKelas: "asc" }
+        : orderBy === "name_desc"
+          ? { namaKelas: "desc" }
+          : orderBy === "students_desc"
+            ? { members: { _count: "desc" } }
+            : { members: { _count: "asc" } },
   });
 }
 
@@ -626,14 +793,14 @@ export async function getKompetensiForBabs(babIds: number[]) {
 export async function getAvailableSoalCounts(babIds: number[]) {
   const result = await prisma.bankSoal.groupBy({
     by: ["kompetensiBabId"],
-    where: { 
+    where: {
       babId: { in: babIds },
       isAccepted: true,
       isRejected: false,
     },
     _count: { id: true },
   });
-  
+
   return result.map((r) => ({
     kompetensiBabId: r.kompetensiBabId,
     count: r._count.id,
@@ -664,6 +831,80 @@ export async function getBooksNeedingValidation(guruId: number) {
     orderBy: { id: "desc" },
   });
 }
+export async function getTodayExams(guruId: number) {
+  const now = new Date();
+
+  const startOfDay = new Date(now);
+  startOfDay.setHours(0, 0, 0, 0);
+
+  const endOfDay = new Date(now);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return await prisma.jadwalUjian.findMany({
+    where: {
+      ujian: { guruId },
+      OR: [
+        {
+          waktuMulaiAktif: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        {
+          waktuSelesaiAktif: {
+            gte: startOfDay,
+            lte: endOfDay,
+          },
+        },
+        {
+          AND: [
+            { waktuMulaiAktif: { lte: startOfDay } },
+            { waktuSelesaiAktif: { gte: endOfDay } },
+          ],
+        },
+      ],
+    },
+    include: {
+      ujian: true,
+      kelas: {
+        include: {
+          _count: {
+            select: {
+              members: true,
+            },
+          },
+        },
+      },
+    },
+    orderBy: {
+      id: "asc",
+    },
+  });
+}
+
+export async function getRecentlyModifiedClasses(guruId: number) {
+  return await prisma.kelas.findMany({
+    where: {
+      jadwalUjian: {
+        some: {
+          ujian: {
+            guruId,
+          },
+        },
+      },
+      teacherId: guruId
+    },
+    include: {
+      _count: {
+        select: {
+          members: true,
+        },
+      },
+    },
+    take: 5
+  });
+}
+
 
 export async function getExtractionValidationData(bukuId: number) {
   const buku = await prisma.buku.findUnique({
@@ -788,7 +1029,10 @@ export async function confirmCaptionValidation(
   deletedImageIds: number[],
   newImages: Array<{ imagePath: string; caption: string; babId?: number | null; pageNumber?: number; contextText?: string }>
 ) {
-  return await prisma.$transaction(async (tx) => {
+  // Store file paths outside the transaction to clean up after commit
+  let filesToDelete: string[] = [];
+
+  await prisma.$transaction(async (tx) => {
     // 1. Update existing captions
     for (const item of updatedCaptions) {
       await tx.bukuImage.update({
@@ -802,7 +1046,7 @@ export async function confirmCaptionValidation(
       });
     }
 
-    // 2. Discard/delete discarded image IDs
+    // 2. Mark specified image IDs as discarded (if any passed)
     if (deletedImageIds.length > 0) {
       await tx.bukuImage.updateMany({
         where: { id: { in: deletedImageIds } },
@@ -841,8 +1085,35 @@ export async function confirmCaptionValidation(
       });
     }
 
-    return true;
+    // 5. Query all unkept images for this book to get file paths for physical deletion
+    const unkeptImages = await tx.bukuImage.findMany({
+      where: { bukuId, isKept: false },
+      select: { id: true, imagePath: true },
+    });
+
+    filesToDelete = unkeptImages.map((img) => img.imagePath);
+
+    // 6. Delete all unkept images from database
+    if (unkeptImages.length > 0) {
+      await tx.bukuImage.deleteMany({
+        where: { id: { in: unkeptImages.map((img) => img.id) } },
+      });
+    }
   });
+
+  // 7. Delete physical files after transaction succeeds (prevents premature file deletion if DB rolls back)
+  await Promise.all(
+    filesToDelete.map(async (filePath) => {
+      try {
+        await fs.unlink(filePath);
+      } catch (err) {
+        // Log errors without throwing so one missing file won't break execution flow
+        console.error(`Failed to delete file at ${filePath}:`, err);
+      }
+    })
+  );
+
+  return true;
 }
 
 export async function getSoalGenerationStatus(babId: number) {

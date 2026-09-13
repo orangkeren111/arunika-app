@@ -45,6 +45,7 @@ export const reportRepository = {
         id: ans.id.toString(),
         prompt: ans.teksSoal,
         studentAnswer: ans.jawabanSiswa || "No answer provided",
+        catatanKoreksi: ans.catatanKoreksi || "",
         isCorrect: ans.isCorrect || false,
       };
     });
@@ -52,12 +53,14 @@ export const reportRepository = {
     // Extract relations safely
     const attempt = rawAnswers[0].attempt;
     const student = attempt.siswa;
-    const schoolName = student.sekolah?.namaSekolah || "Arunika Academy";
-    const className = attempt.jadwalUjian?.kelas?.namaKelas || "Umum";
-    const teacherName = attempt.jadwalUjian?.kelas?.teacher?.name || "Guru Arunika";
+    const testTitle = attempt.jadwalUjian.judulJadwal || "Unknown Test";
+    const schoolName = student.sekolah?.namaSekolah || "Unknown School";
+    const className = attempt.jadwalUjian?.kelas?.namaKelas || "Unknown Class";
+    const teacherName = attempt.jadwalUjian?.kelas?.teacher?.name || "Unknown Teacher";
 
     return {
       schoolName,
+      testTitle: testTitle,
       studentName: student.name || "Unknown Student",
       className,
       teacherName,

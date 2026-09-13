@@ -139,9 +139,12 @@
 }
 
 @keyframes capyBounce {
-  0%, 100% {
+
+  0%,
+  100% {
     transform: translateY(0);
   }
+
   50% {
     transform: translateY(-8px);
   }
@@ -162,14 +165,90 @@
 }
 
 @keyframes pulseCorrect {
-  0% { transform: scale(1); }
-  50% { transform: scale(1.03); }
-  100% { transform: scale(1); }
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.03);
+  }
+
+  100% {
+    transform: scale(1);
+  }
 }
 
 @keyframes shakeWrong {
-  0%, 100% { transform: translateX(0); }
-  25% { transform: translateX(-5px); }
-  50% { transform: translateX(5px); }
-  75% { transform: translateX(-5px); }
+
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+
+  25% {
+    transform: translateX(-5px);
+  }
+
+  50% {
+    transform: translateX(5px);
+  }
+
+  75% {
+    transform: translateX(-5px);
+  }
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+
+  html,
+  body {
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .print-report {
+    width: 100%;
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-section {
+    break-inside: avoid;
+  }
+
+  .print-review {
+    break-before: auto;
+  }
+
+  .print-question-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .print-report table {
+    page-break-inside: auto;
+  }
+
+  .print-report thead {
+    display: table-header-group;
+  }
+
+  .print-report tfoot {
+    display: table-footer-group;
+  }
+
+  .print-report img {
+    break-inside: avoid;
+  }
 }

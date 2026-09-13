@@ -10,10 +10,13 @@ export interface QuestionDetail {
   prompt: string;
   studentAnswer: string;
   isCorrect: boolean;
+  catatanKoreksi: string;
+  linkGambarSoal?: string;
 }
 
 export interface ReportProps {
   schoolName: string;
+  testTitle: string;
   studentName: string;
   className: string;
   teacherName: string;

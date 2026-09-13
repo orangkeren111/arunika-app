@@ -6,58 +6,129 @@ import { enqueueStudentReport } from "../services/report/generator";
 export const siswaRepository = {
   // --- DASHBOARD ---
   getDashboardData: async (siswaId: number = 55) => {
-    // 6 adalah ID fallback untuk simulasi Siswa
     try {
-      const [activeJadwal, historyData] = await Promise.all([
+      const [activeJadwal, historyResult] = await Promise.all([
         siswaDB.getJadwalAktif(siswaId),
-        siswaDB.getRiwayatUjian(siswaId),
+
+        siswaDB.getRiwayatUjian(siswaId, {
+          page: 1,
+          pageSize: 1000,
+        }),
       ]);
 
       const upcoming = activeJadwal.map((j: any) => ({
         jadwalId: j.id.toString(),
-        title: j.ujian.judulUjian,
+        title: j.judulJadwal || j.ujian.judulUjian,
         className: j.kelas.namaKelas,
         startTime: j.waktuMulaiAktif?.toISOString() || "Unknown",
         durationMinutes: j.ujian.durasiMenit,
         type: j.tipeUjian.namaTipeUjian,
       }));
 
-      const history = historyData.map((h: any) => ({
-        attemptId: h.id.toString(),
-        jadwalId: h.jadwalUjianId.toString(),
-        title: h.jadwalUjian.ujian.judulUjian,
-        submittedAt: h.waktuSelesai
-          ? h.waktuSelesai.toISOString()
-          : "Belum Selesai",
-        score: h.nilaiAkhir,
-        status: h.nilaiAkhir !== null ? "Dinilai" : "Menunggu Koreksi",
-        feedback: h.jawabanSiswa?.[0]?.catatanKoreksi || null,
-        aiSummary: h.aiLogs?.[0]?.aiStatementSummary || null,
-      }));
+      const history = historyResult.data.map((h: any) => {
+        const isFinished = h.waktuSelesai !== null;
+        const isGraded = h.nilaiAkhir !== null && h.isChecked;
 
-      const gradedHistory = history.filter((h: any) => h.score !== null);
+        let status = "Menunggu Koreksi";
+
+        if (!isFinished) {
+          status = "Belum Selesai";
+        } else if (isGraded) {
+          status = "Dinilai";
+        }
+
+        return {
+          attemptId: h.id.toString(),
+          jadwalId: h.jadwalUjianId.toString(),
+
+          title: h.jadwalUjian.judulJadwal || h.jadwalUjian.ujian.judulUjian,
+
+          submittedAt: h.waktuSelesai
+            ? h.waktuSelesai.toISOString()
+            : null,
+
+          score:
+            h.nilaiAkhir !== null
+              ? Number(h.nilaiAkhir)
+              : null,
+
+          status,
+
+          feedback:
+            h.jawabanSiswa?.[0]?.catatanKoreksi || null,
+
+          aiSummary:
+            h.aiLogs?.[0]?.aiStatementSummary || null,
+        };
+      });
+
+      const gradedHistory = history.filter(
+        (h: any) => h.score !== null,
+      );
+
       const avgScore =
         gradedHistory.length > 0
           ? Math.round(
             gradedHistory.reduce(
-              (acc: number, curr: any) => acc + (curr.score || 0),
+              (acc: number, curr: any) =>
+                acc + curr.score,
               0,
             ) / gradedHistory.length,
           )
           : 0;
 
+      const recentScores = gradedHistory
+        .slice(0, 5)
+        .map((h: any) => h.score);
+
+      let scoreTrend = 0;
+
+      if (recentScores.length >= 2) {
+        const newest = recentScores[0];
+        const previousAverage =
+          recentScores.slice(1).reduce(
+            (sum: number, score: number) => sum + score,
+            0,
+          ) / (recentScores.length - 1);
+
+        scoreTrend = Math.round(newest - previousAverage);
+      }
+
+      const performanceHistory = gradedHistory
+        .slice(0, 5)
+        .reverse()
+        .map((h: any, index: number) => ({
+          id: h.attemptId,
+          title: h.title,
+          score: h.score,
+          label: `U${index + 1}`,
+        }));
+
       return {
         stats: {
-          active: activeJadwal.length,
+          active: upcoming.length,
           upcoming: upcoming.length,
           averageScore: avgScore,
         },
+
         upcoming,
-        recentHistory: history.slice(0, 2),
+
+        recentHistory: history.slice(0, 6),
+
+        performanceHistory,
+
+        learningInsight: {
+          averageScore: avgScore,
+          scoreTrend,
+          totalGraded: gradedHistory.length,
+        },
       };
     } catch (error) {
       console.error("Error getDashboardData:", error);
-      throw new Error("Gagal mengambil data dashboard siswa.");
+
+      throw new Error(
+        "Gagal mengambil data dashboard siswa.",
+      );
     }
   },
 
@@ -68,7 +139,7 @@ export const siswaRepository = {
       id: k.id.toString(),
       name: k.namaKelas,
       teacherName:
-        k.members.length > 0 ? k.members[0].user.name : "Belum Ditugaskan",
+        k.teacher?.name || "Belum Ditugaskan",
       studentCount: k._count?.members || 0,
     }));
   },
@@ -83,10 +154,7 @@ export const siswaRepository = {
       kelas: {
         id: rawKelas.id.toString(),
         name: rawKelas.namaKelas,
-        teacherName:
-          rawKelas.members.length > 0
-            ? rawKelas.members[0].user.name
-            : "Belum Ditugaskan",
+        teacherName: rawKelas.teacher?.name || "Belum Ditugaskan",
         studentCount: rawKelas._count?.members || 0,
       },
       exams: rawJadwal.map((j: any) => {
@@ -230,20 +298,46 @@ export const siswaRepository = {
   },
 
   // --- RIWAYAT ---
-  getHistoryList: async (siswaId: number = 6) => {
-    const rawData = await siswaDB.getRiwayatUjian(siswaId);
-    return rawData.map((h: any) => ({
-      attemptId: h.id.toString(),
-      jadwalId: h.jadwalUjianId.toString(),
-      title: h.jadwalUjian.ujian.judulUjian,
-      submittedAt: h.waktuSelesai
-        ? h.waktuSelesai.toISOString()
-        : "Belum Selesai",
-      score: h.nilaiAkhir,
-      status: h.nilaiAkhir !== null ? "Dinilai" : "Menunggu Koreksi",
-      feedback: h.jawabanSiswa?.[0]?.catatanKoreksi || null,
-      aiSummary: h.aiLogs?.[0]?.aiStatementSummary || null,
-    }));
+  getHistoryList: async (
+    siswaId: number = 6,
+    options?: {
+      search?: string;
+      startDate?: string;
+      endDate?: string;
+      page?: number;
+      pageSize?: number;
+    }
+  ) => {
+    const rawData = await siswaDB.getRiwayatUjian(siswaId, options);
+
+    return {
+      data: rawData.data.map((h: any) => ({
+        attemptId: h.id.toString(),
+
+        jadwalId: h.jadwalUjianId.toString(),
+
+        title: h.jadwalUjian.judulJadwal || h.jadwalUjian.ujian.judulUjian,
+
+        submittedAt: h.waktuSelesai
+          ? h.waktuSelesai.toISOString()
+          : "Belum Selesai",
+
+        score: h.nilaiAkhir,
+
+        status:
+          h.nilaiAkhir !== null && h.isChecked
+            ? "Dinilai"
+            : "Menunggu Koreksi",
+
+        feedback: h.jawabanSiswa?.[0]?.catatanKoreksi || null,
+
+        aiSummary:
+          h.aiLogs?.[0]?.aiStatementSummary || null,
+      })),
+
+      total: rawData.total,
+      totalPages: rawData.totalPages,
+    };
   },
 
   getHistoryDetail: async (attemptId: string) => {
