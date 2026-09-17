@@ -2,10 +2,11 @@
 
 import React, { use, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X, Trash2, Upload, Loader2 } from "lucide-react";
+import { ArrowLeft, Plus, X, Trash2, Upload, Loader2, Lock, ShieldAlert } from "lucide-react";
 import { useSoalViewModel } from "./GuruSoalViewModel";
 import { MathRenderer } from "@/src/components/MathRenderer";
 import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
+import { useCustomModal } from "@/src/components/CustomModal";
 
 type TipeSoal = "MCQ" | "ESSAY";
 
@@ -23,12 +24,16 @@ export default function BankSoalClientPage({
   const id = propId || (params?.id as string) || "";
   const babId = propBabId || (params?.bab_id as string) || "";
 
+  const { showAlert, showConfirm } = useCustomModal();
+
   const {
     bab,
     soalList,
     kompetensiList,
     loading,
     isGeneratingSoal,
+    isLockedByExam,
+    lockMessage,
     checkGenerationStatus,
     handleAddSoal,
     handleEditSoal,
@@ -41,7 +46,9 @@ export default function BankSoalClientPage({
     selectedType,
     setSelectedType,
     selectedBloomLevel,
-    setSelectedBloomLevel
+    setSelectedBloomLevel,
+    selectedTag,
+    setSelectedTag,
   } = useSoalViewModel(babId);
 
   // --- MODAL STATE ---
@@ -64,6 +71,7 @@ export default function BankSoalClientPage({
   const [teksSoal, setTeksSoal] = useState("");
   const [difficulty, setDifficulty] = useState(0);
   const [bloomLevel, setBloomLevel] = useState("");
+  const [tagsInput, setTagsInput] = useState("");
   const [opsiJawaban, setOpsiJawaban] = useState<string[]>(["", "", "", ""]); // Default 4 opsi
   const [jawabanBenarIndex, setJawabanBenarIndex] = useState<number>(0);
   const [jawabanBenarEssay, setJawabanBenarEssay] = useState<string>("");
@@ -80,6 +88,7 @@ export default function BankSoalClientPage({
       setTeksSoal(soalToEdit.text);
       setDifficulty(soalToEdit.difficulty || 1);
       setBloomLevel(soalToEdit.bloomLevel || "C1");
+      setTagsInput(Array.isArray(soalToEdit.tags) ? soalToEdit.tags.join(", ") : "");
       setKompetensiBabId(soalToEdit.kompetensiBabId || "");
       setLinkGambarSoal(soalToEdit.linkGambarSoal || "");
       setJawabanBenarEssay(soalToEdit.jawabanBenarEssay || "");
@@ -100,6 +109,7 @@ export default function BankSoalClientPage({
       setJawabanBenarEssay("");
       setDifficulty(1);
       setBloomLevel("C1");
+      setTagsInput("");
       setKompetensiBabId("");
       setLinkGambarSoal("");
     }
@@ -125,6 +135,11 @@ export default function BankSoalClientPage({
   };
 
   const handleSave = () => {
+    const parsedTags = tagsInput
+      .split(",")
+      .map((t) => t.trim())
+      .filter(Boolean);
+
     const payload = {
       teksSoal,
       type: formType,
@@ -135,6 +150,7 @@ export default function BankSoalClientPage({
       babId: Number(babId),
       difficulty: difficulty ? difficulty : 1,
       bloomLevel: bloomLevel ? bloomLevel : "C1",
+      tags: parsedTags,
     };
 
     if (editingId) {
@@ -144,6 +160,7 @@ export default function BankSoalClientPage({
         type: payload.type,
         difficulty: payload.difficulty,
         bloomLevel: payload.bloomLevel,
+        tags: payload.tags,
         text: payload.teksSoal,
         options: payload.opsiJawaban ?? [],
         correctAnswer: payload.jawabanBenarMcq ?? "",
@@ -162,6 +179,7 @@ export default function BankSoalClientPage({
         kompetensiBabId || null,
         linkGambarSoal || "",
         payload.jawabanBenarEssay ?? "",
+        payload.tags,
       );
     }
 
@@ -272,6 +290,14 @@ export default function BankSoalClientPage({
           <option value="MCQ">MCQ</option>
           <option value="ESSAY">ESSAY</option>
         </select>
+
+        <input
+          type="text"
+          value={selectedTag}
+          onChange={(e) => setSelectedTag(e.target.value)}
+          placeholder="Cari berdasarkan tag/topik..."
+          className="rounded-lg border border-border bg-background px-3 py-2 text-foreground text-sm flex-1 min-w-[200px]"
+        />
       </div>
 
       {/* --- LIST SOAL --- */}
@@ -305,6 +331,15 @@ export default function BankSoalClientPage({
                       kompetensiList.find(k => k.id.toString() === soal.kompetensiBabId)?.nomerKompetensi || soal.kompetensiBabId
                     }
                   </span>
+                )}
+                {soal.tags && soal.tags.length > 0 && (
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {soal.tags.map((t, tIdx) => (
+                      <span key={tIdx} className="text-[10px] bg-emerald-100 text-emerald-800 border border-emerald-300 px-2 py-0.5 rounded-full font-bold">
+                        #{t}
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
               <div className="flex gap-2 items-center">
@@ -466,6 +501,20 @@ export default function BankSoalClientPage({
                     )}
                   </div>
                 </div>
+              </div>
+
+              {/* Tags / Kata Kunci Input */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--muted-foreground)] mb-2">
+                  Tags / Kata Kunci Topik (Dipisahkan koma)
+                </label>
+                <input
+                  type="text"
+                  value={tagsInput}
+                  onChange={(e) => setTagsInput(e.target.value)}
+                  placeholder="contoh: fotosintesis, klorofil, sel"
+                  className="w-full p-3 rounded-lg border border-[var(--input)] bg-[var(--card)] text-[var(--card-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:outline-none transition text-sm font-medium"
+                />
               </div>
 
               {/* Kompetensi & Gambar Link */}

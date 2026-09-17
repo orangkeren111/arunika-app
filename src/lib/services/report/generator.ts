@@ -95,12 +95,7 @@ export async function enqueueStudentReport(attemptId: number) {
     },
   });
 
-  // 5. Fire and forget the worker trigger (so the user doesn't wait)
-  fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/llm/worker`, {
-    method: "POST",
-  }).catch(() => { });
-
-  // 6. Return deterministic data immediately (used for the UI before PDF is ready)
+  // 5. Return deterministic data immediately (used for the UI before PDF is ready)
   return {
     success: true,
     message: "Report generation queued.",

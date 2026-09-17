@@ -27,6 +27,13 @@ enum TipeSoal {
   ESSAY
 }
 
+enum Tingkat {
+  SD
+  SMP
+  SMA
+  Kuliah
+}
+
 enum StatusUjian {
   DRAFT
   SCHEDULED
@@ -54,9 +61,12 @@ model Sekolah {
   id          Int      @id @default(autoincrement())
   namaSekolah String   @map("nama_sekolah")
   alamat      String?  @db.Text
+  tingkat     Tingkat?
 
   users       User[]
   kelas       Kelas[]
+
+  isRetired Boolean @default(false) @map("is_retired")
 
   @@map("sekolah")
 }
@@ -207,6 +217,7 @@ model BankSoal {
 
   difficulty Int
   bloomLevel String?
+  tags       String[] @default([])
 
   kompetensiBabId  Int?     @map("kompetensi_bab_id")
   kompetensiBab    KompetensiBab? @relation(fields: [kompetensiBabId], references: [id], onDelete: SetNull)
@@ -444,6 +455,7 @@ model QuizSession {
   ujian           Ujian         @relation(fields: [ujianId], references: [id], onDelete: Cascade)
   currentLevel    Int           @default(1) @map("current_level")
   status          String        @default("WAITING")
+  sessionMode     String        @default("QUIZ_ACTIVE") @map("session_mode")
   lastActiveAt    DateTime      @default(now()) @map("last_active_at")
   createdAt       DateTime      @default(now()) @map("created_at")
   startedAt       DateTime?     @map("started_at")
@@ -453,3 +465,31 @@ model QuizSession {
   @@map("quiz_session")
 }
 
+model LlmApiKey {
+id            String      @id @default(cuid())
+provider      String
+name          String?     // Optional descriptive name (e.g. "Gemini Paid Key 1", "Groq Backup Key")
+key           String      // The actual API key string
+isActive      Boolean     @default(true)
+errorCount    Int         @default(0)
+cooldownUntil DateTime?   // Non-null value in the future indicates temporary rate-limit cooldown
+lastUsedAt    DateTime?
+createdAt     DateTime    @default(now())
+updatedAt     DateTime    @updatedAt
+
+@@index([provider, isActive])
+}
+
+model LlmTaskRouting {
+id          String      @id @default(cuid())
+taskType    String      // e.g. "fast_text", "smart_text", "vision", "prompt_guard", "generate_report", "quiz_agent"
+provider    String      // e.g. "GEMINI", "CLAUDE", "GROQ"
+modelName   String      // e.g. "gemini-3.5-flash-lite", "claude-3-5-sonnet-20240620", "llama-3.3-70b-versatile"
+priority    Int         @default(1) // 1 = Highest priority, 2 = 1st fallback, 3 = 2nd fallback...
+isActive    Boolean     @default(true)
+createdAt   DateTime    @default(now())
+updatedAt   DateTime    @updatedAt
+
+@@unique([taskType, priority])
+@@index([taskType, isActive])
+}

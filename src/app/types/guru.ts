@@ -25,6 +25,7 @@ export interface Soal {
   text: string;
   difficulty: number;
   bloomLevel?: string;
+  tags?: string[];
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
   jawabanBenarEssay?: string;
@@ -42,6 +43,7 @@ export interface SoalTemplate {
   text: string;
   difficulty: number;
   bloomLevel?: string;
+  tags?: string[];
   options?: string[]; // Untuk MCQ
   correctAnswer?: string;
 }
@@ -77,11 +79,17 @@ export interface Kelas {
 export interface JadwalUjian {
   id: string;
   templateId: string;
-  title?: string;
+  title: string;
   className: string;
   startTime: string;
-  type: string; // e.g., 'Ulangan Harian', 'Ujian Akhir'
   status: string;
+  type: string;
+
+  isGenerating?: boolean;
+  isReportReady?: boolean;
+  totalStudents?: number;
+  completedAiResponses?: number;
+  failedAiResponses?: number;
 }
 
 export interface AttemptReport {

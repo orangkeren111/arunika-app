@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   School,
+  Cpu,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -26,7 +27,9 @@ export default function SuperadminLayout({
 
   const menuItems = [
     { href: "/superadmin/dashboard", label: "Dashboard Sekolah", icon: School },
+    { href: "/superadmin/ai-models", label: "AI Models & Routing", icon: Cpu },
   ];
+
 
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
 

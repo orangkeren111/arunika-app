@@ -1,8 +1,7 @@
 import prisma from "../db/prisma";
 import fs from "fs/promises";
 import path from "path";
-import { generateText } from "ai";
-import { getVisionModel, getFallbackVisionModel, getSmartTextModel } from "../llm/providers";
+import { callSmartText, callVision } from "../llm/router";
 
 /**
  * Image Processing Worker / Agentic Quality Filter:
@@ -102,51 +101,25 @@ Jika tidak relevan: { "action": "DELETE", "reason": "Alasan singkat (misal: logo
         if (imageBuffer) {
           try {
             // Pass ACTUAL IMAGE to Vision AI model singleton
-            const result = await generateText({
-              model: getVisionModel(),
-              messages: [
-                {
-                  role: "user",
-                  content: [
-                    { type: "text", text: promptText },
-                    { type: "image", image: imageBuffer },
-                  ],
-                },
-              ],
-            });
+            const result = await callVision(promptText, imageBuffer);
             rawResponseText = result.text;
           } catch (visionErr: any) {
             console.warn(`[Image Processor] Vision AI call failed for image ${img.id}:`, visionErr?.message || visionErr);
             // Fallback 
-            if (process.env.GEMINI_API_KEY) {
-              try {
-                const fallbackResult = await generateText({
-                  model: getFallbackVisionModel(),
-                  messages: [
-                    {
-                      role: "user",
-                      content: [
-                        { type: "text", text: promptText },
-                        { type: "image", image: imageBuffer },
-                      ],
-                    },
-                  ],
-                });
-                rawResponseText = fallbackResult.text;
-              } catch (fallbackErr: any) {
-                console.warn(`[Image Processor] Gemini Vision fallback failed for image ${img.id}:`, fallbackErr?.message || fallbackErr);
-              }
+            try {
+              const fallbackResult = await callVision(promptText, imageBuffer)
+              rawResponseText = fallbackResult.text;
+            } catch (fallbackErr: any) {
+              console.warn(`[Image Processor] Gemini Vision fallback failed for image ${img.id}:`, fallbackErr?.message || fallbackErr);
             }
+
           }
         }
 
         // Text-only fallback if image call failed or image file was unreadable
         if (!rawResponseText && img.contextText && img.contextText.trim().length > 10) {
           try {
-            const result = await generateText({
-              model: getSmartTextModel(),
-              prompt: promptText,
-            });
+            const result = await callSmartText(promptText)
             rawResponseText = result.text;
           } catch (textErr: any) {
             console.warn(`[Image Processor] Text fallback failed for image ${img.id}:`, textErr?.message || textErr);

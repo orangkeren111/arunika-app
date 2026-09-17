@@ -202,7 +202,7 @@ export default function SiswaLayout({
               )}
             </button>
 
-            <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
+            <Link href="/profile" className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">
                   {session?.user?.name ?? ""}
@@ -211,7 +211,7 @@ export default function SiswaLayout({
               <div className="w-9 h-9 md:w-10 md:h-10 bg-[var(--secondary)] text-[var(--secondary-foreground)] rounded-full flex items-center justify-center font-bold">
                 <GraduationCap size={20} />
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 

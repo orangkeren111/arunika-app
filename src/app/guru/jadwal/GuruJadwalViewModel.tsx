@@ -12,6 +12,11 @@ export function useJadwalViewModel() {
   const [jadwalList, setJadwalList] = useState<JadwalUjian[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // --- Filter States ---
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [selectedKelasFilter, setSelectedKelasFilter] = useState("");
+
   // --- Form States ---
   const [judulJadwal, setJudulJadwal] = useState("");
   const [selectedTemplate, setSelectedTemplate] = useState("");
@@ -26,32 +31,38 @@ export function useJadwalViewModel() {
   const fetchJadwal = () => {
     const guruId = Number(session?.user?.id ?? 1);
     setLoading(true);
-    guruRepository.getJadwal(guruId).then((res) => {
-      setJadwalList(res);
-      setLoading(false);
-    });
+    guruRepository
+      .getJadwal(guruId, {
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
+        kelasId: selectedKelasFilter || undefined,
+      })
+      .then((res) => {
+        setJadwalList(res);
+        setLoading(false);
+      });
     guruRepository.getTemplates(guruId).then((res) => {
       setTemplateList(res);
-      setLoading(false);
     });
     guruRepository
-      .getKelas(
-        Number(session?.user?.sekolah_id ?? 1),
-        guruId,
-      )
+      .getKelas(Number(session?.user?.sekolah_id ?? 1), guruId)
       .then((res) => {
         setKelasList(res);
-        setLoading(false);
       });
     guruRepository.getTipeUjian().then((res) => {
       setTipeList(res);
-      setLoading(false);
     });
   };
 
   useEffect(() => {
     fetchJadwal();
-  }, [session?.user?.id]);
+  }, [session?.user?.id, startDate, endDate, selectedKelasFilter]);
+
+  const resetFilters = () => {
+    setStartDate("");
+    setEndDate("");
+    setSelectedKelasFilter("");
+  };
 
   const handleCreateJadwal = async () => {
     if (!selectedTemplate || !selectedKelas) {
@@ -79,6 +90,15 @@ export function useJadwalViewModel() {
   return {
     jadwalList,
     loading,
+    // Filters
+    startDate,
+    setStartDate,
+    endDate,
+    setEndDate,
+    selectedKelasFilter,
+    setSelectedKelasFilter,
+    resetFilters,
+    // Form
     judulJadwal,
     setJudulJadwal,
     selectedTemplate,

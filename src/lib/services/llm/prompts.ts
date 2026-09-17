@@ -66,7 +66,8 @@ If tipeSoal is MCQ then
   "correctIndex": 0,
   "tipeSoal": "MCQ",
   "linkGambarSoal": "string",
-  "explanation": "Because..."
+  "explanation": "Because...",
+  "tags": ["topic_keyword_1", "topic_keyword_2"]
 }]
 else if tipeSoal is ESSAY then
 [{
@@ -75,7 +76,8 @@ else if tipeSoal is ESSAY then
   "tipeSoal": "ESSAY",
   "linkGambarSoal": "string",  
   "soal": "Explain the process of photosynthesis and why it is crucial for ecosystems.",
-  "explanation": "Photosynthesis is..."
+  "explanation": "Photosynthesis is...",
+  "tags": ["topic_keyword_1", "topic_keyword_2"]
 }]
 Do not include any markdown formatting like \`\`\`json.
 `,

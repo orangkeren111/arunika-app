@@ -326,7 +326,7 @@ export default function ExamBuilderPage({
               !template?.title ||
               !template?.durasiMenit ||
               !derivedTotalQuestions) ||
-            !isOwner
+            (!isOwner && template?.id !== "new")
           }
           className="w-full rounded-lg bg-[var(--primary)] px-5 py-2.5 text-sm font-semibold text-[var(--primary-foreground)] shadow-sm transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
         >

@@ -2,6 +2,7 @@
 import { Prisma, StatusUjian, TipeSoal } from "@prisma/client";
 import prisma from "../prisma";
 import fs from "fs/promises";
+import path from "path";
 
 // --- DASHBOARD ---
 export async function getActiveExamsCount(guruId: number) {
@@ -232,12 +233,14 @@ export async function getSoalList(
   babId: number,
   bloomLevel?: string,
   type?: TipeSoal,
+  tag?: string,
 ) {
   return await prisma.bankSoal.findMany({
     where: {
       babId,
       ...(bloomLevel ? { bloomLevel: bloomLevel } : {}),
       ...(type ? { type: type } : {}),
+      ...(tag && tag.trim() !== "" ? { tags: { has: tag } } : {}),
     },
     include: {
       bab: true,
@@ -491,15 +494,42 @@ export async function getTipeUjian() {
 }
 
 // --- JADWAL UJIAN ---
-export async function getJadwal(guruId: number) {
+export async function getJadwal(
+  guruId: number,
+  filters?: { startDate?: string; endDate?: string; kelasId?: string }
+) {
   return await prisma.jadwalUjian.findMany({
-    where: { ujian: { guruId } },
+    where: {
+      ujian: { guruId },
+      ...(filters?.kelasId ? { kelasId: parseInt(filters.kelasId) } : {}),
+      ...(filters?.startDate || filters?.endDate
+        ? {
+          waktuMulaiAktif: {
+            ...(filters.startDate && { gte: new Date(`${filters.startDate}T00:00:00`) }),
+            ...(filters.endDate && { lte: new Date(`${filters.endDate}T23:59:59.999`) }),
+          },
+        }
+        : {}),
+    },
     include: {
       ujian: true,
       kelas: true,
       tipeUjian: true,
+      sesiSiswa: {
+        select: {
+          id: true,
+          isChecked: true,
+          aiLogs: {
+            select: {
+              status: true,
+            },
+          },
+        },
+      },
     },
-    orderBy: { id: "desc" },
+    orderBy: {
+      id: "desc",
+    },
   });
 }
 
@@ -613,7 +643,156 @@ export async function deleteBab(id: number) {
   });
 }
 
+export async function validateQuestionPoolRequirements(ujianId: number) {
+  const ujian = await prisma.ujian.findUnique({
+    where: { id: ujianId },
+    include: {
+      criteria: true,
+      templateKompetensi: {
+        where: { isEnabled: true },
+        include: { kompetensiBab: true },
+      },
+      ujianBab: {
+        include: {
+          bab: true,
+        },
+      },
+    },
+  });
+
+  if (!ujian) {
+    return { isValid: false, errors: ["Ujian tidak ditemukan."], availableCount: 0, requiredCount: 0 };
+  }
+
+  const babIds = ujian.ujianBab.map((ub) => ub.babId);
+  const questions = await prisma.bankSoal.findMany({
+    where: {
+      babId: { in: babIds },
+      isAccepted: true,
+      isRejected: false,
+    },
+  });
+
+  const errors: string[] = [];
+  const requiredTotal = ujian.jumlahSoal || 0;
+  const availableTotal = questions.length;
+
+  if (availableTotal < requiredTotal) {
+    errors.push(
+      `Jumlah total soal yang tersedia (${availableTotal}) kurang dari kebutuhan ujian (${requiredTotal}).`
+    );
+  }
+
+  // Validate Bloom taxonomy criteria if specified
+  if (ujian.criteria) {
+    const c1Count = questions.filter((q) => q.bloomLevel === "C1").length;
+    const c2Count = questions.filter((q) => q.bloomLevel === "C2").length;
+    const c3Count = questions.filter((q) => q.bloomLevel === "C3").length;
+    const c4Count = questions.filter((q) => (q.bloomLevel === "C4" || q.bloomLevel === "C5" || q.bloomLevel === "C6")).length;
+
+    if (c1Count < (ujian.criteria.reqC1 || 0)) {
+      errors.push(`Kebutuhan C1 (${ujian.criteria.reqC1}) tidak terpenuhi, tersedia: ${c1Count}.`);
+    }
+    if (c2Count < (ujian.criteria.reqC2 || 0)) {
+      errors.push(`Kebutuhan C2 (${ujian.criteria.reqC2}) tidak terpenuhi, tersedia: ${c2Count}.`);
+    }
+    if (c3Count < (ujian.criteria.reqC3 || 0)) {
+      errors.push(`Kebutuhan C3 (${ujian.criteria.reqC3}) tidak terpenuhi, tersedia: ${c3Count}.`);
+    }
+    if (c4Count < (ujian.criteria.reqC4 || 0)) {
+      errors.push(`Kebutuhan C4+ (${ujian.criteria.reqC4}) tidak terpenuhi, tersedia: ${c4Count}.`);
+    }
+  }
+
+  // Validate per-competency requirements if templateKompetensi configured
+  for (const tk of ujian.templateKompetensi) {
+    const reqCompCount = tk.jumlahSoal || 0;
+    if (reqCompCount > 0) {
+      const compQuestions = questions.filter(
+        (q) => q.kompetensiBabId === tk.kompetensiBabId
+      );
+      if (compQuestions.length < reqCompCount) {
+        errors.push(
+          `Kompetensi "${tk.kompetensiBab.nomerKompetensi}" butuh ${reqCompCount} soal, hanya tersedia ${compQuestions.length}.`
+        );
+      }
+    }
+  }
+
+  return {
+    isValid: errors.length === 0,
+    errors,
+    availableCount: availableTotal,
+    requiredCount: requiredTotal,
+  };
+}
+
+export async function getExamLockStatusForBab(babId: number) {
+  const now = new Date();
+  const activeJadwal = await prisma.jadwalUjian.findFirst({
+    where: {
+      ujian: {
+        ujianBab: {
+          some: { babId },
+        },
+      },
+      OR: [
+        { status: { in: [StatusUjian.ONGOING, StatusUjian.SCHEDULED] } },
+        { waktuMulaiAktif: { lte: now } },
+      ],
+    },
+    include: { ujian: true },
+  });
+
+  if (activeJadwal) {
+    return {
+      isLocked: true,
+      activeExamTitle: activeJadwal.judulJadwal || activeJadwal.ujian.judulUjian,
+      message: `Bab ini dikunci karena terhubung dengan Ujian aktif/terjadwal: "${activeJadwal.judulJadwal || activeJadwal.ujian.judulUjian}".`,
+    };
+  }
+
+  return { isLocked: false };
+}
+
+export async function getExamLockStatusForUjian(ujianId: number) {
+  const now = new Date();
+  const activeJadwal = await prisma.jadwalUjian.findFirst({
+    where: {
+      ujianId,
+      OR: [
+        { status: { in: [StatusUjian.ONGOING, StatusUjian.SCHEDULED] } },
+        { waktuMulaiAktif: { lte: now } },
+      ],
+    },
+  });
+
+  if (activeJadwal) {
+    return {
+      isLocked: true,
+      activeJadwalTitle: activeJadwal.judulJadwal || "Ujian Aktif",
+      message: `Konfigurasi Ujian dikunci karena sudah memasuki jadwal pelaksanaan (${activeJadwal.judulJadwal || "Ujian Aktif"}).`,
+    };
+  }
+
+  return { isLocked: false };
+}
+
 export async function deleteSoal(id: number) {
+  const soal = await prisma.bankSoal.findUnique({
+    where: { id },
+    select: { id: true, babId: true },
+  });
+
+  if (soal) {
+    const lockStatus = await getExamLockStatusForBab(soal.babId);
+    if (lockStatus.isLocked) {
+      throw new Error(
+        `Soal tidak dapat dihapus: ${lockStatus.message}`
+      );
+    }
+  }
+
   return await prisma.bankSoal.delete({
     where: { id },
   });
@@ -1091,7 +1270,14 @@ export async function confirmCaptionValidation(
       select: { id: true, imagePath: true },
     });
 
-    filesToDelete = unkeptImages.map((img) => img.imagePath);
+    filesToDelete = unkeptImages.map((img) => {
+
+      const cleanPath = img.imagePath.startsWith('/')
+        ? img.imagePath.slice(1)
+        : img.imagePath;
+
+      return path.join(process.cwd(), 'public', cleanPath);
+    });
 
     // 6. Delete all unkept images from database
     if (unkeptImages.length > 0) {
@@ -1149,6 +1335,61 @@ export async function getSoalGenerationStatus(babId: number) {
 
   return { isGenerating: hasTask || activeJobs.length > 0 };
 }
+
+export async function getBookAiProcessingStatus(bukuId: number) {
+  const [activeTasks, activeJobs] = await Promise.all([
+    prisma.taskQueue.findMany({
+      where: {
+        status: { in: ["pending", "processing"] },
+      },
+      select: { type: true, payload: true, status: true },
+    }),
+    prisma.generationJob.findMany({
+      where: {
+        bukuId,
+        status: {
+          in: [
+            "PENDING",
+            "PROCESSING_PDF",
+            "EXTRACTING_IMAGES",
+            "CAPTIONING_IMAGES",
+            "WAITING_CAPTION_VALIDATION",
+            "GENERATING_QUESTIONS",
+          ],
+        },
+      },
+      select: { status: true, fileName: true, errorMessage: true },
+    }),
+  ]);
+
+  const hasTask = activeTasks.some((t: any) => {
+    const p = t.payload as any;
+    return (
+      p?.bukuId === bukuId ||
+      p?.bukuId === String(bukuId) ||
+      p?.bukuId === Number(bukuId) ||
+      p?.bookId === bukuId ||
+      p?.bookId === String(bukuId) ||
+      p?.bookId === Number(bukuId)
+    );
+  });
+
+  const isProcessing = hasTask || activeJobs.length > 0;
+  let statusStage = "";
+  if (activeJobs.length > 0) {
+    statusStage = activeJobs[0].status;
+  } else if (hasTask) {
+    statusStage = "PROCESSING_TASK_QUEUE";
+  }
+
+  return {
+    isProcessing,
+    statusStage,
+    activeJobCount: activeJobs.length,
+    activeTaskCount: hasTask ? 1 : 0,
+  };
+}
+
 
 
 

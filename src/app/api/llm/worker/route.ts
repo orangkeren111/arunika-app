@@ -1,10 +1,9 @@
 import prisma from "@/src/lib/services/db/prisma";
 import {
-  executeLLMStrategy,
-  getAvailableModelForTask,
+  callPromptGuard,
+  callSmartText,
 } from "@/src/lib/services/llm/router";
-import { callPromptGuard } from "@/src/lib/services/llm/providers";
-import { generateQuestionsWithGroq } from "@/src/lib/services/process-book/generate-questions";
+import { generateQuestionsWithLLM } from "@/src/lib/services/process-book/generate-questions";
 import { processPdfWithGemini } from "@/src/lib/services/process-book/upload-gemini";
 import { extractAndStorePdfPageImages } from "@/src/lib/services/process-book/extract-pdf-images";
 import { processKurikulumExtract } from "@/src/lib/services/process-book/extract-kurikulum";
@@ -113,8 +112,28 @@ async function processGenerationStateMachine() {
       const result = await processPdfWithGemini(job.id, job.fileUrl ?? "");
 
       // Check if bab_id is present in the result to determine the next state
-      const nextStatus = job.babId != null ? "GENERATING_QUESTIONS" : "EXTRACTING_IMAGES";
+      const nextStatus = job.babId === null ? "EXTRACTING_IMAGES" : "GENERATING_QUESTIONS";
+      if (result.error) {
+        if (job.attempts >= 2) {
+          await prisma.generationJob.update({
+            where: { id: job.id },
+            data: {
+              status: "FAILED",
+              updatedAt: new Date(),
+            },
+          });
+          return;
+        }
 
+        await prisma.generationJob.update({
+          where: { id: job.id },
+          data: {
+            attempts: job.attempts + 1,
+            updatedAt: new Date(),
+          },
+        });
+        return;
+      }
       await prisma.generationJob.update({
         where: { id: job.id },
         data: {
@@ -178,7 +197,7 @@ async function processGenerationStateMachine() {
 
       if (job.babId) {
         // Single Bab generation
-        results = [await generateQuestionsWithGroq(job.babId, job.jumlahSoal)];
+        results = [await generateQuestionsWithLLM(job.babId, job.jumlahSoal)];
       } else {
         // Use nested relation to get babs tied to the buku for this job
         const babs = await prisma.bab.findMany({
@@ -206,7 +225,7 @@ async function processGenerationStateMachine() {
 
         // Execute Groq concurrently for massive speed
         results = await Promise.all(
-          babs.map((bab: any) => generateQuestionsWithGroq(bab.id, job.jumlahSoal)),
+          babs.map((bab: any) => generateQuestionsWithLLM(bab.id, job.jumlahSoal)),
         );
       }
 
@@ -313,18 +332,6 @@ async function processTaskQueueBatch() {
       try {
         const payload = task.payload as any; // Cast Json to object
 
-        // Dynamically assign provider based on current active jobs
-        const assignedProvider = await getAvailableModelForTask(task.type);
-        console.log(
-          `Executing Task ${task.id} (${task.type}) via ${assignedProvider}`,
-        );
-
-        // Update task with assigned provider so saturation check works
-        await prisma.taskQueue.update({
-          where: { id: task.id },
-          data: { provider: assignedProvider },
-        });
-
         let tokensSpent = 0;
         if (task.type === "generate_report") {
           // Step 1: Prompt Guard Verification (Run on untrusted student input text, truncated to safe 1500 chars limit)
@@ -346,11 +353,8 @@ async function processTaskQueueBatch() {
             throw new Error("Prompt guard rejected payload");
           }
 
-          // Step 2: Thinker LLM Execution
-          const result = await executeLLMStrategy(
-            assignedProvider,
-            payload.prompt,
-          );
+          // Step 2: Smart Text Execution
+          const result = await callSmartText(payload.prompt);
           tokensSpent += result.tokens;
           const parsedResult = JSON.parse(result.text);
 
@@ -386,7 +390,7 @@ async function processTaskQueueBatch() {
           const result = await processKurikulumExtract(payload.tempFilePath);
           tokensSpent = result.tokens;
         } else if (task.type === "generate_soal") {
-          const result = await generateQuestionsWithGroq(
+          const result = await generateQuestionsWithLLM(
             payload.babId,
             payload.totalJumlahSoal || 10
           );

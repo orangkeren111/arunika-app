@@ -1,35 +1,15 @@
 "use server";
 
-import { GoogleGenAI, Content, File as GeminiFile } from "@google/genai";
+import { Content, File as GeminiFile } from "@google/genai";
 import prisma from "../db/prisma";
-import fs from "fs/promises";
-import { fetch as undiciFetch } from "undici";
-
-let aiInstance: GoogleGenAI | null = null;
-function getAiClient() {
-  if (!aiInstance) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not defined in environment variables");
-    }
-    // Ensure undici fetch is used in Node environments
-    if (typeof globalThis.fetch !== 'function') {
-      // @ts-ignore
-      globalThis.fetch = undiciFetch;
-    }
-    aiInstance = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY
-    });
-  }
-  return aiInstance;
-}
-
+import { getGoogleGenAI } from "../llm/providers";
 // Poll until the uploaded file is ACTIVE (or FAILED / timeout)
 async function waitForFileActive(
   name: string,
   { timeoutMs = 60_000, intervalMs = 1500 } = {},
 ): Promise<GeminiFile> {
   const start = Date.now();
-  const ai = getAiClient();
+  const { ai, reportError } = await getGoogleGenAI();
   let file = await ai.files.get({ name });
 
   while (file.state === "PROCESSING") {
@@ -52,7 +32,7 @@ export async function processPdfWithGemini(
   tempFilePath: string,
 ) {
   let uploadedName: string | undefined;
-  const ai = getAiClient();
+  const { ai, reportError } = await getGoogleGenAI();
 
   try {
     // 1. Update job status
@@ -243,7 +223,7 @@ export async function processPdfWithGemini(
     if (error.status) console.error("[Gemini Error] Status:", error.status);
     if (error.stack) console.error("[Gemini Error] Stack:", error.stack);
     if (error.error) console.error("[Gemini Error] Inner Error Object:", JSON.stringify(error.error, null, 2));
-    throw error;
+    return { error: error.message };
   } finally {
     // 5. Clean up Google's servers regardless of success/failure
     if (uploadedName) {

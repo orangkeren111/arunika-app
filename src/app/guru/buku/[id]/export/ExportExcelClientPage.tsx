@@ -5,6 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft,
   FileSpreadsheet,
+  FileText,
   CheckSquare,
   Square,
   Filter,
@@ -30,11 +31,13 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
     selectedSoalIds,
     isAllCurrentBabSelected,
     loading,
+    exportingWord,
     toggleSoalSelection,
     toggleSelectAllCurrentBab,
     selectAllInBook,
     clearAllSelections,
     handleExportExcel,
+    handleExportWord,
   } = useExportExcelViewModel(bookId);
 
   if (loading) {
@@ -78,14 +81,34 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
           </p>
         </div>
 
-        <button
-          onClick={handleExportExcel}
-          disabled={stagedSoalList.length === 0}
-          className="w-full md:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
-        >
-          <FileSpreadsheet size={20} />
-          <span>Download Excel ({stagedSoalList.length} Soal)</span>
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
+          <button
+            onClick={handleExportExcel}
+            disabled={stagedSoalList.length === 0}
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white font-bold px-6 py-3 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+          >
+            <FileSpreadsheet size={20} />
+            <span>
+              Download Excel ({stagedSoalList.length} Soal)
+            </span>
+          </button>
+
+          <button
+            onClick={handleExportWord}
+            disabled={
+              stagedSoalList.length === 0 || exportingWord
+            }
+            className="w-full md:w-auto flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-3 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap cursor-pointer"
+          >
+            <FileText size={20} />
+
+            <span>
+              {exportingWord
+                ? "Generating Word..."
+                : `Download Word (${stagedSoalList.length} Soal)`}
+            </span>
+          </button>
+        </div>
       </div>
 
       {/* Main Dual-Pane Section */}
@@ -169,11 +192,10 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
                   <div
                     key={soal.id}
                     onClick={() => toggleSoalSelection(soal.id)}
-                    className={`p-4 rounded-2xl border transition cursor-pointer space-y-3 ${
-                      isSelected
-                        ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
-                        : "border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50"
-                    }`}
+                    className={`p-4 rounded-2xl border transition cursor-pointer space-y-3 ${isSelected
+                      ? "border-[var(--primary)] bg-[var(--primary)]/5 shadow-sm"
+                      : "border-[var(--border)] bg-[var(--card)] hover:border-[var(--primary)]/50"
+                      }`}
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
@@ -188,11 +210,10 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
                           Soal #{index + 1}
                         </span>
                         <span
-                          className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${
-                            soal.type === "MCQ"
-                              ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
-                              : "bg-purple-500/10 text-purple-600 border border-purple-500/20"
-                          }`}
+                          className={`text-xs px-2.5 py-0.5 rounded-full font-bold uppercase tracking-wider ${soal.type === "MCQ"
+                            ? "bg-blue-500/10 text-blue-600 border border-blue-500/20"
+                            : "bg-purple-500/10 text-purple-600 border border-purple-500/20"
+                            }`}
                         >
                           {soal.type === "MCQ" ? "Pilihan Ganda" : "Essay"}
                         </span>
@@ -218,11 +239,10 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
                         {soal.opsiJawaban.map((opt, i) => (
                           <div
                             key={i}
-                            className={`text-xs p-2 rounded-lg border ${
-                              opt === soal.jawabanBenarMcq
-                                ? "border-green-500/30 bg-green-500/10 text-green-700 font-semibold"
-                                : "border-[var(--border)] text-[var(--muted-foreground)] bg-[var(--card)]"
-                            }`}
+                            className={`text-xs p-2 rounded-lg border ${opt === soal.jawabanBenarMcq
+                              ? "border-green-500/30 bg-green-500/10 text-green-700 font-semibold"
+                              : "border-[var(--border)] text-[var(--muted-foreground)] bg-[var(--card)]"
+                              }`}
                           >
                             <span className="font-bold mr-1">
                               {String.fromCharCode(65 + i)}.
@@ -269,6 +289,21 @@ export default function ExportExcelClientPage({ bookId }: { bookId: string }) {
             >
               <FileSpreadsheet size={20} />
               <span>Generate & Download Excel (.xlsx)</span>
+            </button>
+            <button
+              onClick={handleExportWord}
+              disabled={
+                stagedSoalList.length === 0 || exportingWord
+              }
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            >
+              <FileText size={20} />
+
+              <span>
+                {exportingWord
+                  ? "Generating Word..."
+                  : "Generate & Download Word (.docx)"}
+              </span>
             </button>
 
             {/* Staged Questions Scrollable List */}

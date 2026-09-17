@@ -1,130 +1,291 @@
-import { generateText } from "ai";
+import { generateText, LanguageModel } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import prisma from "../db/prisma";
 import { GoogleGenAI } from "@google/genai";
+import { decryptApiKey, encryptApiKey } from "@/src/lib/utils/hasher";
 
-// Initialize SDK Instances (Singletons)
-export const googleGenAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
-export const DEFAULT_GEMINI_MODEL = process.env.QUIZ_AGENT_MODEL || "gemini-3.5-flash-lite";
 
-export const google = createGoogleGenerativeAI({ apiKey: process.env.GEMINI_API_KEY });
-export const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-export const groq = createOpenAI({
-  baseURL: "https://api.groq.com/openai/v1",
-  apiKey: process.env.GROQ_API_KEY,
-});
-export const openrouter = createOpenAI({
-  baseURL: "https://openrouter.ai/api/v1",
-  apiKey: process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY,
-  headers: {
-    "HTTP-Referer": "https://arunika.app",
-    "X-Title": "Arunika LMS",
-  },
-});
 
-export type LLMProvider = "gemini" | "claude" | "groq" | "openrouter";
-
-/**
- * Model Resolver Functions (Centralized Model Configuration)
- */
-export function getVisionModel() {
-  if (process.env.GROQ_API_KEY) {
-    return groq("qwen/qwen3.6-27b");
-  }
-  if (process.env.GEMINI_API_KEY) {
-    return google("models/gemini-3.5-flash-lite");
-  }
-  return groq("llama-3.2-11b-vision-preview");
+// In-Memory Key Cache with TTL (60 Seconds) to minimize database reads
+interface CachedKeys {
+  keys: Array<{ id: string; key: string }>;
+  fetchedAt: number;
 }
+const keyCache = new Map<String, CachedKeys>();
+const CACHE_TTL_MS = 60 * 1000;
 
-export function getFallbackVisionModel() {
-  if (process.env.GEMINI_API_KEY) {
-    return google("models/gemini-3.5-flash-lite");
-  }
-  return google("models/gemini-3.5-flash-lite");
-}
-
-export function getFastTextModel() {
-  return google("gemini-3.5-flash-lite");
-
-  const modelName = process.env.FAST_TEXT_MODEL || "llama-3.1-8b-instant";
-  if (process.env.GROQ_API_KEY) {
-    return groq(modelName);
-  }
-  return google("models/gemini-3.5-flash-lite");
-}
-
-export function getSmartTextModel() {
-  return google("gemini-3.5-flash-lite");
-
-  const modelName = process.env.SMART_TEXT_MODEL || "llama-3.3-70b-versatile";
-  if (process.env.GROQ_API_KEY) {
-    return groq(modelName);
-  }
-  if (process.env.ANTHROPIC_API_KEY) {
-    return anthropic("claude-3-5-sonnet-20240620");
+export function invalidateKeyCache(provider?: String) {
+  if (provider) {
+    keyCache.delete(provider);
+  } else {
+    keyCache.clear();
   }
 }
 
-export function getPromptGuardModel() {
-  if (process.env.GROQ_API_KEY) {
-    return groq("meta-llama/llama-prompt-guard-2-86m");
+/*
+
+Retrieves valid API keys for a provider(active and not in cooldown)
+  */
+async function getValidApiKeys(provider: String): Promise<Array<{ id: string; key: string }>> {
+  const now = Date.now();
+  const cached = keyCache.get(provider);
+
+  if (cached && now - cached.fetchedAt < CACHE_TTL_MS) {
+    return cached.keys;
   }
-  return google("models/gemini-3.5-flash-lite");
+
+  const keys = await prisma.llmApiKey.findMany({
+    where: {
+      provider: String(provider),
+      isActive: true,
+      OR: [
+        { cooldownUntil: null },
+        { cooldownUntil: { lte: new Date() } }
+      ]
+    },
+    select: { id: true, key: true },
+    orderBy: { lastUsedAt: "asc" } // Prefers least recently used keys (round-robin style)
+  });
+
+  // Decrypt all keys at once
+  const readyKeys = keys.map((item) => ({
+    id: item.id,
+    key: decryptApiKey(item.key),
+  }));
+
+  keyCache.set(provider, { keys: readyKeys, fetchedAt: now });
+  return readyKeys;
 }
 
-/**
- * Standardized Caller Functions
- */
-export async function callPromptGuard(
-  prompt: string,
-): Promise<{ safe: boolean; text: string; tokens: number }> {
+/*
+
+Places an API key on a temporary cooldown upon rate - limiting or server failure
+*/
+async function markKeyCooldown(keyId: string, durationMinutes = 5) {
+  const cooldownUntil = new Date(Date.now() + durationMinutes * 60 * 1000);
   try {
-    const { text, usage } = await generateText({
-      model: getPromptGuardModel(),
-      prompt: prompt,
+    await prisma.llmApiKey.update({
+      where: { id: keyId },
+      data: {
+        cooldownUntil,
+        errorCount: { increment: 1 }
+      }
     });
-    const isSafe = !text.toUpperCase().includes("UNSAFE") && !text.toUpperCase().includes("INJECTION") && !text.toUpperCase().includes("JAILBREAK");
-    return { safe: isSafe, text, tokens: usage?.totalTokens ?? 0 };
-  } catch (error) {
-    console.warn("Prompt guard check error, failing open safely:", error);
-    return { safe: true, text: "SAFE", tokens: 0 };
+    invalidateKeyCache();
+  } catch (err) {
+    console.error(`Failed to mark key ${keyId} on cooldown:`, err);
   }
 }
 
-export async function callGemini(
-  prompt: string,
-  system?: string,
-): Promise<{ text: string; tokens: number }> {
-  const { text, usage } = await generateText({
-    model: google("models/gemini-3.5-flash-lite"),
-    system,
-    prompt,
-  });
-  return { text, tokens: usage.totalTokens ?? 0 };
+/*
+
+Records key usage timestamp and resets error counts on success
+  */
+async function markKeySuccess(keyId: string) {
+  try {
+    await prisma.llmApiKey.update({
+      where: { id: keyId },
+      data: {
+        lastUsedAt: new Date(),
+        errorCount: 0,
+        cooldownUntil: null
+      }
+    });
+  } catch (err) {
+    console.error(`Failed to record key success for ${keyId}:`, err);
+  }
 }
 
-export async function callClaude(
-  prompt: string,
-  system?: string,
-): Promise<{ text: string; tokens: number }> {
-  const { text, usage } = await generateText({
-    model: anthropic("claude-3-5-sonnet-20240620"),
-    system,
-    prompt,
-  });
-  return { text, tokens: usage.totalTokens ?? 0 };
+/*
+
+Dynamically instantiates the appropriate AI SDK client model using a specific API key
+*/
+function createSdkModel(provider: String, apiKey: string, modelName: string): LanguageModel {
+  switch (provider) {
+    case "GEMINI": {
+      const google = createGoogleGenerativeAI({ apiKey });
+      return google(modelName);
+    }
+    case "ANTHROPIC": {
+      const anthropic = createAnthropic({ apiKey });
+      return anthropic(modelName);
+    }
+    case "GROQ": {
+      const groq = createOpenAI({
+        baseURL: "https://api.groq.com/openai/v1",
+        apiKey
+      });
+      return groq(modelName);
+    }
+    case "OPENROUTER": {
+      const openrouter = createOpenAI({
+        baseURL: "https://openrouter.ai/api/v1",
+        apiKey,
+        headers: {
+          "HTTP-Referer": "https://arunika.app",
+          "X-Title": "Arunika LMS"
+        }
+      });
+      return openrouter(modelName);
+    }
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
+  }
 }
 
-export async function callGroq(
-  prompt: string,
-  system?: string,
-): Promise<{ text: string; tokens: number }> {
-  const { text, usage } = await generateText({
-    model: getSmartTextModel(),
-    system,
-    prompt,
-  });
-  return { text, tokens: usage.totalTokens ?? 0 };
+export interface ModelCallPayload {
+  provider: String;
+  modelName: string;
+  prompt: string;
+  system?: string;
+  imageBuffer?: Buffer | Uint8Array | string;
+}
+
+export interface ModelCallResponse {
+  text: string;
+  tokens: number;
+  providerUsed: String;
+  modelUsed: string;
+}
+
+/*
+
+Low - level execution engine: Rotates through available API keys for a given provider.
+
+  Catches 429 / 5xx errors, triggers key cooldown, and tries the next available key.
+*/
+export async function executeModelCall(payload: ModelCallPayload): Promise<ModelCallResponse> {
+  const keys = await getValidApiKeys(payload.provider);
+
+  if (keys.length === 0) {
+    throw new Error(`No active API keys available for provider: ${payload.provider}`);
+  }
+
+  let lastError: any = null;
+
+  for (const { id: keyId, key } of keys) {
+    try {
+      const model = createSdkModel(payload.provider, key, payload.modelName);
+
+      let textResult: string;
+      let usageResult: any;
+
+      if (payload.imageBuffer) {
+        // Multimodal execution for Vision tasks
+        const { text, usage } = await generateText({
+          model,
+          system: payload.system,
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: payload.prompt },
+                {
+                  type: "image",
+                  image: payload.imageBuffer,
+                }
+              ]
+            }
+          ]
+        });
+        textResult = text;
+        usageResult = usage;
+      } else {
+        // Standard text execution
+        const { text, usage } = await generateText({
+          model,
+          system: payload.system,
+          prompt: payload.prompt
+        });
+        textResult = text;
+        usageResult = usage;
+      }
+
+      // Asynchronously record success
+      markKeySuccess(keyId).catch(() => { });
+
+      return {
+        text: textResult,
+        tokens: usageResult?.totalTokens ?? 0,
+        providerUsed: payload.provider,
+        modelUsed: payload.modelName
+      };
+    } catch (error: any) {
+      lastError = error;
+      const errorMessage = String(error?.message || error);
+      const statusCode = error?.status || error?.statusCode;
+
+      const isRateLimit = statusCode === 429 || errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota");
+      const isServerError = statusCode >= 500 && statusCode < 600;
+
+      if (isRateLimit || isServerError) {
+        console.warn(`[Key Failure] Provider ${payload.provider} (Key ID: ${keyId}) failed. Placing key on cooldown. Reason: ${errorMessage}`);
+        await markKeyCooldown(keyId, isRateLimit ? 10 : 2);
+        continue; // Try next key in the pool
+      }
+
+      // If it's a prompt format or client input error (400), don't retry other keys
+      throw error;
+    }
+  }
+
+  throw new Error(`All keys for provider ${payload.provider} failed. Last error: ${lastError?.message || lastError}`);
+}
+
+
+/**
+ * Instantiates and returns a GoogleGenAI SDK client powered by an active database API key.
+ * Includes a reportError helper so feature functions can report 429/5xx key errors back to the pool.
+ */
+export async function getGoogleGenAI(): Promise<{
+  ai: GoogleGenAI;
+  keyId: string;
+  reportError: (err: any) => Promise<void>;
+}> {
+  const keys = await getValidApiKeys("GEMINI");
+  if (keys.length === 0) {
+    throw new Error("No active GEMINI API keys available in database.");
+  }
+
+  const { id: keyId, key } = keys[0];
+  const ai = new GoogleGenAI({ apiKey: key });
+
+  return {
+    ai,
+    keyId,
+    reportError: async (err: any) => {
+      const errorMessage = String(err?.message || err);
+      const statusCode = err?.status || err?.statusCode;
+      const isRateLimit = statusCode === 429 || errorMessage.includes("429") || errorMessage.toLowerCase().includes("quota");
+      const isServerError = statusCode >= 500 && statusCode < 600;
+
+      if (isRateLimit || isServerError) {
+        await markKeyCooldown(keyId, isRateLimit ? 10 : 2);
+      }
+    }
+  };
+}
+
+/**
+ * Returns a Vercel AI SDK Google Generative AI LanguageModelV1 instance
+ * powered by an active database key.
+ */
+export async function getGeminiModel(modelName: string = "gemini-3.5-flash-lite"): Promise<{
+  model: LanguageModel;
+  keyId: string;
+}> {
+  const keys = await getValidApiKeys("GEMINI");
+  if (keys.length === 0) {
+    throw new Error("No active GEMINI API keys available in database.");
+  }
+
+  const { id: keyId, key } = keys[0];
+  const google = createGoogleGenerativeAI({ apiKey: key });
+
+  return {
+    model: google(modelName),
+    keyId
+  };
 }

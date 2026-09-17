@@ -1,16 +1,19 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   School,
   Plus,
   X,
   Edit2,
-  Trash2,
-  Users,
-  Award,
   MapPin,
   ArrowRight,
+  UserPlus,
+  Power,
+  BarChart2,
+  ShieldCheck,
+  ShieldAlert,
 } from "lucide-react";
 import { useSuperadminDashboardViewModel } from "./SuperadminDashboardViewModel";
 
@@ -25,7 +28,7 @@ export default function SuperadminDashboardPage() {
     viewSchoolMembers,
     handleCreateSchool,
     handleUpdateSchool,
-    handleDeleteSchool,
+    handleToggleSchoolStatus,
   } = useSuperadminDashboardViewModel();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,11 +38,22 @@ export default function SuperadminDashboardPage() {
   const [formData, setFormData] = useState({
     name: "",
     address: "",
+    tingkat: "",
+    adminName: "",
+    adminEmail: "",
+    adminPassword: "",
   });
 
   const openAddModal = () => {
     setModalMode("add");
-    setFormData({ name: "", address: "" });
+    setFormData({
+      name: "",
+      address: "",
+      tingkat: "",
+      adminName: "",
+      adminEmail: "",
+      adminPassword: "",
+    });
     setIsModalOpen(true);
   };
 
@@ -49,6 +63,10 @@ export default function SuperadminDashboardPage() {
     setFormData({
       name: school.name,
       address: school.address,
+      tingkat: school.tingkat,
+      adminName: "",
+      adminEmail: "",
+      adminPassword: "",
     });
     setIsModalOpen(true);
   };
@@ -56,13 +74,24 @@ export default function SuperadminDashboardPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
-    setFormData({ name: "", address: "" });
+    setFormData({
+      name: "",
+      address: "",
+      tingkat: "",
+      adminName: "",
+      adminEmail: "",
+      adminPassword: "",
+    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalMode === "add") {
-      handleCreateSchool(formData.name, formData.address);
+      handleCreateSchool(formData.name, formData.address, formData.tingkat, {
+        name: formData.adminName,
+        email: formData.adminEmail,
+        password: formData.adminPassword,
+      });
     } else if (modalMode === "edit" && editingId) {
       handleUpdateSchool(editingId, formData.name, formData.address);
     }
@@ -82,10 +111,10 @@ export default function SuperadminDashboardPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-extrabold text-[var(--foreground)] tracking-tight">
-            Dashboard Pengelolaan Sekolah
+            Pengelolaan Sekolah & Penyewa
           </h1>
           <p className="text-[var(--muted-foreground)] mt-1 text-sm md:text-base">
-            Pantau konsumsi token kecerdasan buatan (AI) dan kelola data penyewa (sekolah).
+            Pantau status sekolah, penggunaan AI token, dan kelola akun administrator.
           </p>
         </div>
 
@@ -93,7 +122,7 @@ export default function SuperadminDashboardPage() {
           onClick={openAddModal}
           className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition-all"
         >
-          <Plus size={18} /> Tambah Sekolah
+          <Plus size={18} /> Tambah Sekolah Baru
         </button>
       </div>
 
@@ -102,23 +131,51 @@ export default function SuperadminDashboardPage() {
         {schools.map((school) => (
           <div
             key={school.id}
-            className="bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] hover:border-[var(--primary)] transition shadow-sm flex flex-col justify-between h-full group relative"
+            className={`bg-[var(--card)] p-6 rounded-xl border transition shadow-sm flex flex-col justify-between h-full relative ${school.isRetired
+              ? "border-red-200 dark:border-red-900/40 bg-red-50/20 dark:bg-red-950/10"
+              : "border-[var(--border)] hover:border-[var(--primary)]"
+              }`}
           >
             <div className="space-y-4">
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-[var(--primary)]/10 text-[var(--primary)] rounded-lg">
+                  <div
+                    className={`p-3 rounded-lg ${school.isRetired
+                      ? "bg-red-100 text-red-600 dark:bg-red-900/40 dark:text-red-400"
+                      : "bg-[var(--primary)]/10 text-[var(--primary)]"
+                      }`}
+                  >
                     <School size={24} />
                   </div>
                   <div>
                     <h3 className="text-lg font-bold text-[var(--card-foreground)]">
                       {school.name}
                     </h3>
-                    <span className="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] mt-1">
+                    <span className="inline-flex items-center gap-1 text-xs text-[var(--muted-foreground)] mt-0.5">
                       <MapPin size={12} /> {school.address || "Tidak ada alamat"}
                     </span>
                   </div>
                 </div>
+
+                {/* Status Toggle Badge */}
+                <button
+                  onClick={() => handleToggleSchoolStatus(school.id.toString(), school.isRetired)}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${school.isRetired
+                    ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-950/80 dark:text-red-300 dark:border-red-800"
+                    : "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800"
+                    }`}
+                  title={school.isRetired ? "Klik untuk mengaktifkan" : "Klik untuk menonaktifkan"}
+                >
+                  {school.isRetired ? (
+                    <>
+                      <ShieldAlert size={13} /> Nonaktif
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck size={13} /> Aktif
+                    </>
+                  )}
+                </button>
               </div>
 
               {/* Token Spent Highlight */}
@@ -131,7 +188,7 @@ export default function SuperadminDashboardPage() {
                     {school.totalTokensSpent.toLocaleString("id-ID")}
                   </p>
                 </div>
-                <Award size={24} className="text-[var(--primary)] opacity-80" />
+                <BarChart2 size={24} className="text-[var(--primary)] opacity-80" />
               </div>
 
               {/* School Roster Statistics */}
@@ -148,28 +205,31 @@ export default function SuperadminDashboardPage() {
             </div>
 
             {/* Actions Card Footer */}
-            <div className="mt-6 border-t border-[var(--border)] pt-4 flex justify-between items-center">
-              <button
-                onClick={() => viewSchoolMembers(school)}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)] hover:underline"
+            <div className="mt-6 border-t border-[var(--border)] pt-4 flex justify-between items-center gap-2">
+              <Link
+                href={`/superadmin/schools/${school.id}`}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold bg-[var(--primary)] text-white px-3 py-1.5 rounded-md hover:opacity-90 transition shadow-sm"
               >
-                Lihat Anggota <ArrowRight size={14} />
-              </button>
+                Detail & Statistik <ArrowRight size={13} />
+              </Link>
 
-              <div className="flex gap-2">
+              <div className="flex items-center gap-1">
                 <button
                   onClick={() => openEditModal(school)}
                   className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--muted)] rounded transition"
-                  title="Edit Sekolah"
+                  title="Edit Informasi Sekolah"
                 >
                   <Edit2 size={16} />
                 </button>
                 <button
-                  onClick={() => handleDeleteSchool(school.id.toString())}
-                  className="p-1.5 text-[var(--muted-foreground)] hover:text-red-500 hover:bg-[var(--muted)] rounded transition"
-                  title="Hapus Sekolah"
+                  onClick={() => handleToggleSchoolStatus(school.id.toString(), school.isRetired)}
+                  className={`p-1.5 rounded transition ${school.isRetired
+                    ? "text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                    : "text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30"
+                    }`}
+                  title={school.isRetired ? "Aktifkan Sekolah" : "Nonaktifkan Sekolah"}
                 >
-                  <Trash2 size={16} />
+                  <Power size={16} />
                 </button>
               </div>
             </div>
@@ -180,7 +240,7 @@ export default function SuperadminDashboardPage() {
       {/* --- ADD / EDIT SCHOOL MODAL --- */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-[var(--card)] w-full max-w-md p-6 rounded-xl border border-[var(--border)] shadow-xl relative max-h-[90vh] overflow-y-auto">
+          <div className="bg-[var(--card)] w-full max-w-lg p-6 rounded-xl border border-[var(--border)] shadow-xl relative max-h-[90vh] overflow-y-auto">
             <button
               onClick={closeModal}
               className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
@@ -195,7 +255,7 @@ export default function SuperadminDashboardPage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
-                  Nama Sekolah
+                  Nama Sekolah <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -205,6 +265,17 @@ export default function SuperadminDashboardPage() {
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
                   required
                 />
+                <select
+                  value={formData.tingkat}
+                  onChange={(e) => setFormData({ ...formData, tingkat: e.target.value })}
+                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
+                  required
+                >
+                  <option value="SD">SD</option>
+                  <option value="SMP">SMP</option>
+                  <option value="SMA">SMA</option>
+                  <option value="Kuliah">Kuliah</option>
+                </select>
               </div>
 
               <div>
@@ -215,10 +286,63 @@ export default function SuperadminDashboardPage() {
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                   placeholder="Masukkan alamat lengkap sekolah..."
-                  rows={3}
+                  rows={2}
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)] resize-none"
                 />
               </div>
+
+              {/* Admin User Section for New School */}
+              {modalMode === "add" && (
+                <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
+                  <div className="flex items-center gap-2 text-sm font-bold text-[var(--primary)]">
+                    <UserPlus size={16} /> Akun Admin Sekolah Utama
+                  </div>
+                  <p className="text-xs text-[var(--muted-foreground)]">
+                    Tentukan administrator awal untuk mengelola sekolah ini.
+                  </p>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                      Nama Admin <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.adminName}
+                      onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                      placeholder="Nama lengkap admin"
+                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                      Email Admin <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="email"
+                      value={formData.adminEmail}
+                      onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                      placeholder="admin@sekolah.sch.id"
+                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                      Password Admin
+                    </label>
+                    <input
+                      type="password"
+                      value={formData.adminPassword}
+                      onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                      placeholder="Default: admin123"
+                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
                 <button
@@ -232,82 +356,10 @@ export default function SuperadminDashboardPage() {
                   type="submit"
                   className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition"
                 >
-                  Simpan
+                  {modalMode === "add" ? "Buat Sekolah & Admin" : "Simpan Perubahan"}
                 </button>
               </div>
             </form>
-          </div>
-        </div>
-      )}
-
-      {/* --- MEMBERS DETAILS LIST MODAL --- */}
-      {selectedSchool && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-[var(--card)] w-full max-w-xl p-6 rounded-xl border border-[var(--border)] shadow-xl relative max-h-[90vh] overflow-y-auto">
-            <button
-              onClick={() => setSelectedSchool(null)}
-              className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
-            >
-              <X size={20} />
-            </button>
-
-            <h3 className="text-xl font-bold mb-2 text-[var(--foreground)] pr-6">
-              Anggota Sekolah: {selectedSchool.name}
-            </h3>
-            <p className="text-xs text-[var(--muted-foreground)] mb-6">
-              Daftar guru, admin sekolah, dan siswa yang terdaftar di sekolah ini.
-            </p>
-
-            <div className="space-y-4">
-              {loadingMembers ? (
-                <p className="text-center text-sm text-[var(--muted-foreground)] p-4">Memuat anggota...</p>
-              ) : members.length === 0 ? (
-                <p className="text-center text-sm text-[var(--muted-foreground)] p-4">Belum ada anggota terdaftar di sekolah ini.</p>
-              ) : (
-                <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--background)] max-h-[50vh] overflow-y-auto">
-                  <table className="w-full text-left text-sm border-collapse">
-                    <thead className="bg-[var(--muted)] text-[var(--foreground)] border-b border-[var(--border)]">
-                      <tr>
-                        <th className="p-3 font-bold">Nama</th>
-                        <th className="p-3 font-bold">Email</th>
-                        <th className="p-3 font-bold text-center">Role</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-[var(--border)]">
-                      {members.map((member) => (
-                        <tr key={member.id} className="hover:bg-[var(--muted)]/20 transition-colors">
-                          <td className="p-3 font-medium text-[var(--card-foreground)]">{member.name}</td>
-                          <td className="p-3 text-[var(--muted-foreground)]">{member.email}</td>
-                          <td className="p-3 text-center">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded ${
-                                member.role === "ADMIN"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : member.role === "GURU"
-                                  ? "bg-purple-100 text-purple-800"
-                                  : "bg-green-100 text-green-800"
-                              }`}
-                            >
-                              {member.role}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div className="flex justify-end pt-6 border-t border-[var(--border)] mt-4">
-              <button
-                type="button"
-                onClick={() => setSelectedSchool(null)}
-                className="px-4 py-2 text-sm font-semibold text-[var(--primary-foreground)] bg-[var(--primary)] rounded-lg hover:opacity-90 transition"
-              >
-                Tutup
-              </button>
-            </div>
           </div>
         </div>
       )}

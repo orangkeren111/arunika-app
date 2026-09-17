@@ -281,16 +281,14 @@ export default function QuizLobbyClient({
                       <button
                         key={opt}
                         onClick={() => handleSelectAnswer(currentQ.id, opt)}
-                        className={`btn-capy p-3.5 md:p-4 text-left text-xs md:text-sm rounded-2xl border-2 transition-all flex items-center gap-3 ${
-                          selected
+                        className={`btn-capy p-3.5 md:p-4 text-left text-xs md:text-sm rounded-2xl border-2 transition-all flex items-center gap-3 ${selected
                             ? "bg-[#6B8E23] text-white border-[#556B2F] font-bold shadow-md"
                             : "bg-[#FDF5E6] border-[#D2B48C] text-[#8B5A2B] hover:bg-[#A2CDB0]/30"
-                        }`}
+                          }`}
                       >
                         <span
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
-                            selected ? "bg-white text-[#6B8E23]" : "bg-[#D2B48C] text-white"
-                          }`}
+                          className={`w-7 h-7 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${selected ? "bg-white text-[#6B8E23]" : "bg-[#D2B48C] text-white"
+                            }`}
                         >
                           {letter}
                         </span>
@@ -405,11 +403,10 @@ export default function QuizLobbyClient({
                     onClick={() => {
                       window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}&competencyId=${comp.id}`;
                     }}
-                    className={`btn-capy w-full p-3 border-2 rounded-2xl flex items-center justify-between transition cursor-pointer text-left ${
-                      comp.isCompleted
+                    className={`btn-capy w-full p-3 border-2 rounded-2xl flex items-center justify-between transition cursor-pointer text-left ${comp.isCompleted
                         ? "bg-green-50 border-green-300 hover:bg-green-100"
                         : "bg-[#FDF5E6] border-[#D2B48C] hover:bg-[#A2CDB0]/40"
-                    }`}
+                      }`}
                   >
                     <div>
                       <div className="flex items-center gap-2">
@@ -433,18 +430,6 @@ export default function QuizLobbyClient({
                 ))}
               </div>
             )}
-
-            <button
-              onClick={() => {
-                const targetCompId = competencies.length > 0 ? competencies[0].id : null;
-                const compQuery = targetCompId ? `&competencyId=${targetCompId}` : "";
-                window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}${compQuery}`;
-              }}
-              className="btn-capy w-full flex items-center justify-center gap-2 bg-[#6B8E23] hover:bg-[#58771c] text-white py-3.5 rounded-2xl text-base font-black shadow-lg"
-            >
-              <Play size={20} fill="white" />
-              Masuk ke Room Kuis Sekarang
-            </button>
           </div>
         </div>
       )}

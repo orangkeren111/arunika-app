@@ -1,10 +1,11 @@
 import { superadminRepository } from "@/src/lib/repositories/superadminRepository";
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
+import { Tingkat } from "../../types/admin";
 
 export function useSuperadminDashboardViewModel() {
   const { data: session, status } = useSession();
-  
+
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -25,8 +26,14 @@ export function useSuperadminDashboardViewModel() {
     fetchSchools();
   }, [session, status]);
 
-  const handleCreateSchool = async (name: string, address: string) => {
-    await superadminRepository.createSchool(name, address);
+  const handleCreateSchool = async (
+    name: string,
+    address: string,
+    tingkat: string,
+    adminData?: { name: string; email: string; password?: string }
+  ) => {
+    const tingkatEnum = tingkat as Tingkat;
+    await superadminRepository.createSchool(name, address, tingkatEnum, adminData);
     fetchSchools();
   };
 
@@ -35,9 +42,14 @@ export function useSuperadminDashboardViewModel() {
     fetchSchools();
   };
 
-  const handleDeleteSchool = async (id: string) => {
-    if (window.confirm("Apakah Anda yakin ingin menghapus sekolah ini? Semua data terkait (siswa, guru, kelas) akan ikut terhapus.")) {
-      await superadminRepository.deleteSchool(id);
+  const handleToggleSchoolStatus = async (id: string, currentIsRetired: boolean) => {
+    const actionText = currentIsRetired ? "mengaktifkan" : "menonaktifkan";
+    if (window.confirm(`Apakah Anda yakin ingin ${actionText} sekolah ini?`)) {
+      if (currentIsRetired) {
+        await superadminRepository.activateSchool(id);
+      } else {
+        await superadminRepository.deleteSchool(id);
+      }
       fetchSchools();
     }
   };
@@ -60,7 +72,7 @@ export function useSuperadminDashboardViewModel() {
     viewSchoolMembers,
     handleCreateSchool,
     handleUpdateSchool,
-    handleDeleteSchool,
+    handleToggleSchoolStatus,
     refresh: fetchSchools,
   };
 }

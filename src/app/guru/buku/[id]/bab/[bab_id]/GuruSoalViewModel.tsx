@@ -17,8 +17,12 @@ export function useSoalViewModel(babId: string) {
   const [kompetensiList, setKompetensiList] = useState<Kompetensi[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGeneratingSoal, setIsGeneratingSoal] = useState(false);
+  const [isLockedByExam, setIsLockedByExam] = useState(false);
+  const [lockMessage, setLockMessage] = useState("");
+
   const [selectedBloomLevel, setSelectedBloomLevel] = useState<string>("");
   const [selectedType, setSelectedType] = useState<TipeSoal | "">("");
+  const [selectedTag, setSelectedTag] = useState<string>("");
 
   const checkGenerationStatus = async () => {
     if (!babId || isNaN(Number(babId))) return;
@@ -29,6 +33,18 @@ export function useSoalViewModel(babId: string) {
       console.error("Error checking generation status:", err);
     }
   };
+
+  const checkExamLock = async () => {
+    if (!babId || isNaN(Number(babId))) return;
+    try {
+      const lockRes = await guruRepository.getExamLockStatusForBab(Number(babId));
+      setIsLockedByExam(lockRes.isLocked);
+      setLockMessage(lockRes.message || "");
+    } catch (err) {
+      console.error("Error checking exam lock:", err);
+    }
+  };
+
   const fetchSoal = () => {
     if (!babId || isNaN(Number(babId))) {
       return;
@@ -42,6 +58,7 @@ export function useSoalViewModel(babId: string) {
           babId,
           selectedBloomLevel || undefined,
           selectedType || undefined,
+          selectedTag || undefined,
         )
       ),
       fetchWithRetry(() => getKompetensiBab(Number(babId))),
@@ -50,12 +67,17 @@ export function useSoalViewModel(babId: string) {
           .getSoalGenerationStatus(Number(babId))
           .catch(() => ({ isGenerating: false }))
       ),
+      fetchWithRetry(() =>
+        guruRepository.getExamLockStatusForBab(Number(babId)).catch(() => ({ isLocked: false, message: "" }))
+      ),
     ])
-      .then(([res, kompRes, statusRes]) => {
+      .then(([res, kompRes, statusRes, lockRes]) => {
         setBab(res.bab);
         setSoalList(res.soalList);
         setKompetensiList(kompRes);
         setIsGeneratingSoal(statusRes.isGenerating);
+        setIsLockedByExam(lockRes.isLocked);
+        setLockMessage(lockRes.message || "");
         setLoading(false);
       })
       .catch((err) => {
@@ -66,13 +88,14 @@ export function useSoalViewModel(babId: string) {
 
   useEffect(() => {
     fetchSoal();
-  }, [babId, selectedBloomLevel, selectedType]);
+  }, [babId, selectedBloomLevel, selectedType, selectedTag]);
 
   const handleGenerateQuestion = async (jumlahSoal: number = 10) => {
     await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
     await checkGenerationStatus();
     fetchSoal();
   };
+
   const handleAddSoal = async (
     type: "MCQ" | "ESSAY",
     text: string,
@@ -83,6 +106,7 @@ export function useSoalViewModel(babId: string) {
     kompetensiBabId?: string | null,
     linkGambarSoal?: string,
     jawabanBenarEssay?: string,
+    tags?: string[],
   ) => {
     await guruRepository.addSoal({
       babId,
@@ -95,6 +119,7 @@ export function useSoalViewModel(babId: string) {
       bloomLevel,
       kompetensiBabId,
       linkGambarSoal,
+      tags: tags || [],
     });
     fetchSoal();
   };
@@ -104,9 +129,14 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   };
 
-  const handleDeleteSoal = async (id: string) => {
-    await guruRepository.deleteSoal(id);
-    fetchSoal();
+  const handleDeleteSoal = async (id: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      await guruRepository.deleteSoal(id);
+      fetchSoal();
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message || "Gagal menghapus soal." };
+    }
   };
 
   const handleAcceptSoal = async (id: string) => {
@@ -140,7 +170,10 @@ export function useSoalViewModel(babId: string) {
     kompetensiList,
     loading,
     isGeneratingSoal,
+    isLockedByExam,
+    lockMessage,
     checkGenerationStatus,
+    checkExamLock,
     handleAddSoal,
     handleEditSoal,
     handleDeleteSoal,
@@ -153,5 +186,7 @@ export function useSoalViewModel(babId: string) {
     setSelectedType,
     selectedBloomLevel,
     setSelectedBloomLevel,
+    selectedTag,
+    setSelectedTag,
   };
 }

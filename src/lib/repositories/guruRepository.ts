@@ -2,8 +2,8 @@ import { StatusUjian, TipeSoal } from "@prisma/client";
 import * as guruDB from "../services/db/guru/guruDB";
 import * as classDashboardDB from "../services/db/guru/classDashboardDB";
 import { initiatePdfExtraction } from "../services/process-book/initiate-extractor";
-import { Bab, Kelas, Soal, UjianTemplate } from "@/src/app/types/guru";
-import { generateQuestionsWithGroq, enqueueGenerateQuestions } from "../services/process-book/generate-questions";
+import { Bab, Kelas, Soal } from "@/src/app/types/guru";
+import { enqueueGenerateQuestions } from "../services/process-book/generate-questions";
 
 export const guruRepository = {
   uploadImage: async (file: File): Promise<string> => {
@@ -269,11 +269,13 @@ export const guruRepository = {
     babId: string,
     bloomLevel?: string,
     type?: TipeSoal,
+    tag?: string,
   ): Promise<{ bab: Bab | null; soalList: Soal[] }> => {
     const rawSoal = await guruDB.getSoalList(
       parseInt(babId),
       bloomLevel,
       type,
+      tag,
     );
 
     const rawBab = await guruDB.getBabDetail(parseInt(babId));
@@ -300,6 +302,7 @@ export const guruRepository = {
           jawabanBenarEssay: s.jawabanBenarEssay || "",
           difficulty: s.difficulty,
           bloomLevel: s.bloomLevel,
+          tags: s.tags || [],
           kompetensiBabId: s.kompetensiBabId?.toString() || null,
           linkGambarSoal: s.linkGambarSoal || "",
           isAccepted: s.isAccepted,
@@ -319,6 +322,7 @@ export const guruRepository = {
       jawabanBenarEssay: soal.jawabanBenarEssay || null,
       difficulty: soal.difficulty || null,
       bloomLevel: soal.bloomLevel || null,
+      tags: soal.tags || [],
       kompetensiBabId: soal.kompetensiBabId ? Number(soal.kompetensiBabId) : null,
       linkGambarSoal: soal.linkGambarSoal || null,
       isAccepted: soal.isAccepted !== undefined ? soal.isAccepted : true,
@@ -333,6 +337,7 @@ export const guruRepository = {
       options: newSoal.opsiJawaban,
       jawabanBenarMcq: newSoal.jawabanBenarMcq,
       jawabanBenarEssay: newSoal.jawabanBenarEssay,
+      tags: newSoal.tags || [],
     };
   },
 
@@ -348,6 +353,7 @@ export const guruRepository = {
       jawabanBenarEssay: soal.jawabanBenarEssay !== undefined ? (soal.jawabanBenarEssay || null) : undefined,
       difficulty: soal.difficulty !== undefined ? Number(soal.difficulty) : undefined,
       bloomLevel: soal.bloomLevel !== undefined ? soal.bloomLevel : undefined,
+      tags: soal.tags !== undefined ? soal.tags : undefined,
       kompetensiBab: soal.kompetensiBabId !== undefined ? (
         soal.kompetensiBabId ? { connect: { id: Number(soal.kompetensiBabId) } } : { disconnect: true }
       ) : undefined,
@@ -366,6 +372,7 @@ export const guruRepository = {
       jawabanBenarEssay: updatedSoal.jawabanBenarEssay,
       difficulty: updatedSoal.difficulty,
       bloomLevel: updatedSoal.bloomLevel,
+      tags: updatedSoal.tags || [],
     };
   },
 
@@ -491,6 +498,18 @@ export const guruRepository = {
   getSoalGenerationStatus: async (babId: number) => {
     return await guruDB.getSoalGenerationStatus(babId);
   },
+  getBookAiProcessingStatus: async (bukuId: number) => {
+    return await guruDB.getBookAiProcessingStatus(bukuId);
+  },
+  validateQuestionPoolRequirements: async (ujianId: number) => {
+    return await guruDB.validateQuestionPoolRequirements(ujianId);
+  },
+  getExamLockStatusForBab: async (babId: number) => {
+    return await guruDB.getExamLockStatusForBab(babId);
+  },
+  getExamLockStatusForUjian: async (ujianId: number) => {
+    return await guruDB.getExamLockStatusForUjian(ujianId);
+  },
 
   getKelas: async (
     sekolah_id: number,
@@ -531,8 +550,11 @@ export const guruRepository = {
   },
 
   // --- JADWAL ---
-  getJadwal: async (guruId: number = 2) => {
-    const rawJadwal = await guruDB.getJadwal(guruId);
+  getJadwal: async (
+    guruId: number = 2,
+    filters?: { startDate?: string; endDate?: string; kelasId?: string }
+  ) => {
+    const rawJadwal = await guruDB.getJadwal(guruId, filters);
     return rawJadwal.map((j: any) => ({
       id: j.id.toString(),
       templateId: j.ujianId.toString(),
@@ -598,19 +620,51 @@ export const guruRepository = {
   },
 
   // --- REPORTS ---
-  getCompletedJadwal: async (guruId: number = 2) => {
-    const rawJadwal = await guruDB.getJadwal(guruId);
+  getCompletedJadwal: async (
+    guruId: number = 2,
+    filters?: { startDate?: string; endDate?: string; kelasId?: string }
+  ) => {
+    const rawJadwal = await guruDB.getJadwal(guruId, filters);
+
     return rawJadwal
       .filter((j: any) => j.status === StatusUjian.COMPLETED)
-      .map((j: any) => ({
-        id: j.id.toString(),
-        templateId: j.ujianId.toString(),
-        title: j.judulJadwal || j.ujian?.judulUjian || "Ujian",
-        className: j.kelas.namaKelas,
-        startTime: j.waktuMulaiAktif?.toISOString() || "",
-        status: "Completed",
-        type: j.tipeUjian?.namaTipeUjian || "Ujian",
-      }));
+      .map((j: any) => {
+        const totalStudents = j.sesiSiswa.length;
+
+        const completedAiResponses = j.sesiSiswa.filter(
+          (s: any) => s.aiLogs?.status === "COMPLETED"
+        ).length;
+
+        const failedAiResponses = j.sesiSiswa.filter(
+          (s: any) => s.aiLogs?.status === "FAILED"
+        ).length;
+
+        // Report can only be accessed when all students have finished AI processing
+        const isReportReady =
+          totalStudents > 0 &&
+          completedAiResponses + failedAiResponses === totalStudents;
+
+        const isGenerating =
+          totalStudents === 0 ||
+          !isReportReady;
+
+        return {
+          id: j.id.toString(),
+          templateId: j.ujianId.toString(),
+          title: j.judulJadwal || j.ujian?.judulUjian || "Ujian",
+          className: j.kelas.namaKelas,
+          startTime: j.waktuMulaiAktif?.toISOString() || "",
+          status: "Completed",
+          type: j.tipeUjian?.namaTipeUjian || "Ujian",
+
+          // New fields
+          isGenerating,
+          isReportReady,
+          totalStudents,
+          completedAiResponses,
+          failedAiResponses,
+        };
+      });
   },
 
   getReportDetail: async (jadwalId: string) => {
@@ -653,12 +707,14 @@ export const guruRepository = {
         jawabanId: ans.id.toString(),
         text: ans.teksSoal,
         type: ans.type,
+        opsiJawaban: ans.opsiJawaban,
         studentAnswer: ans.jawabanSiswa,
         isCorrect: ans.isCorrect,
         point: ans.nilaiPoin,
         feedback: ans.catatanKoreksi || "",
         aiResponse: ans.aiResponse || "",
         jawabanBenarEssay: ans.jawabanBenarEssay || ans.soalAsli?.jawabanBenarEssay || "",
+        jawabanBenarMCQ: ans.jawabanBenarMcq || ans.jawabanBenarMCQ || ans.soalAsli?.jawabanBenarMCQ || "",
       })),
     };
   },

@@ -7,6 +7,7 @@ declare module "next-auth" {
     role?: string;
     name?: string;
     sekolah_id?: number;
+    isRetired?: boolean;
   }
 
   interface Session {
@@ -14,6 +15,7 @@ declare module "next-auth" {
       id?: string;
       role?: string;
       sekolah_id?: number;
+      isRetired?: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -24,5 +26,6 @@ declare module "next-auth/jwt" {
     id?: string;
     name?: string | null;
     sekolah_id?: number;
+    isRetired?: boolean;
   }
 }

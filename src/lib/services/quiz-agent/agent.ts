@@ -2,7 +2,7 @@
 
 import { Content, Part } from "@google/genai";
 import prisma from "../db/prisma";
-import { googleGenAI as ai, DEFAULT_GEMINI_MODEL as DEFAULT_AGENT_MODEL } from "../llm/providers";
+import { getGoogleGenAI } from "../llm/providers";
 import {
   queryQuestionsToolDeclaration,
   submitQuestionSelectionToolDeclaration,
@@ -10,6 +10,7 @@ import {
   executeQueryQuestionsFromBank,
   executeFallbackQuestionSelection,
 } from "./tools";
+import { getModelName } from "../llm/router";
 
 const CAPTAIN_CHILI_PROMPTS = {
   selectQuestions: (competencyName: string) => `
@@ -44,6 +45,7 @@ Instructions:
  * Selects 5 balanced diagnostic questions for a given competency using Google GenAI SDK tool calling.
  */
 export async function agentSelectQuestions(kompetensiBabId: number): Promise<number[]> {
+  const { ai, reportError } = await getGoogleGenAI()
   try {
     const competency = await prisma.kompetensiBab.findUnique({
       where: { id: kompetensiBabId },
@@ -73,7 +75,7 @@ export async function agentSelectQuestions(kompetensiBabId: number): Promise<num
     const MAX_TURNS = 6;
     for (let turn = 0; turn < MAX_TURNS; turn++) {
       const response = await ai.models.generateContent({
-        model: DEFAULT_AGENT_MODEL,
+        model: await getModelName("quiz_agent", "GEMINI"),
         contents,
         config: {
           tools,
@@ -168,6 +170,7 @@ export async function agentSelectQuestions(kompetensiBabId: number): Promise<num
 export async function agentEvaluateAnswers(
   questionsWithAnswers: any[]
 ): Promise<{ feedback: string; conceptUnderstood: boolean }> {
+  const { ai, reportError } = await getGoogleGenAI()
   const formattedData = questionsWithAnswers.map((item) => ({
     question: item.text,
     options: item.options,
@@ -199,7 +202,7 @@ export async function agentEvaluateAnswers(
     ];
 
     const response = await ai.models.generateContent({
-      model: DEFAULT_AGENT_MODEL,
+      model: await getModelName("quiz_agent", "GEMINI"),
       contents,
       config: {
         tools,

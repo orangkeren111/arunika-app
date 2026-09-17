@@ -280,3 +280,90 @@ export async function getCompetencyById(kompetensiBabId: number) {
   });
 }
 
+export async function updateQuizSessionMode(
+  sessionId: number,
+  sessionMode: "QUIZ_ACTIVE" | "CHAT_REMEDIATION" | "MASTERED" | "FAILED"
+) {
+  return await prisma.quizSession.update({
+    where: { id: sessionId },
+    data: {
+      sessionMode,
+      lastActiveAt: new Date(),
+    },
+  });
+}
+
+export async function queryQuestionsFromBankDirect(
+  kompetensiBabId: number,
+  bloomLevel?: string,
+  tag?: string
+) {
+  const whereClause: any = {
+    kompetensiBabId,
+    isAccepted: true,
+    isRejected: false,
+  };
+
+  if (bloomLevel) {
+    whereClause.bloomLevel = bloomLevel;
+  }
+
+  if (tag && tag.trim() !== "") {
+    whereClause.OR = [
+      { tags: { has: tag } },
+      { teksSoal: { contains: tag, mode: "insensitive" } },
+    ];
+  }
+
+  let questions = await prisma.bankSoal.findMany({
+    where: whereClause,
+    select: {
+      id: true,
+      teksSoal: true,
+      opsiJawaban: true,
+      jawabanBenarMcq: true,
+      difficulty: true,
+      bloomLevel: true,
+      tags: true,
+      linkGambarSoal: true,
+    },
+    take: 10,
+  });
+
+  // Fallback: If no match with specific filters, query any accepted questions in this competency
+  if (questions.length === 0) {
+    questions = await prisma.bankSoal.findMany({
+      where: {
+        kompetensiBabId,
+        isAccepted: true,
+        isRejected: false,
+      },
+      select: {
+        id: true,
+        teksSoal: true,
+        opsiJawaban: true,
+        jawabanBenarMcq: true,
+        difficulty: true,
+        bloomLevel: true,
+        tags: true,
+        linkGambarSoal: true,
+      },
+      take: 10,
+    });
+  }
+
+  return questions;
+}
+
+export async function getQuestionsByIds(questionIds: number[]) {
+  if (!questionIds || questionIds.length === 0) return [];
+  return await prisma.bankSoal.findMany({
+    where: {
+      id: { in: questionIds },
+      isAccepted: true,
+      isRejected: false,
+    },
+  });
+}
+
+

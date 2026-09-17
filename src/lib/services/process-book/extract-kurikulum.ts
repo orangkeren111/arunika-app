@@ -3,25 +3,7 @@
 import { GoogleGenAI, Content, File as GeminiFile } from "@google/genai";
 import prisma from "../db/prisma";
 import fs from "fs/promises";
-import { fetch as undiciFetch } from "undici";
-
-let aiInstance: GoogleGenAI | null = null;
-function getAiClient() {
-  if (!aiInstance) {
-    if (!process.env.GEMINI_API_KEY) {
-      throw new Error("GEMINI_API_KEY is not defined in environment variables");
-    }
-    // Ensure undici fetch is used in Node environments
-    if (typeof globalThis.fetch !== 'function') {
-      // @ts-ignore
-      globalThis.fetch = undiciFetch;
-    }
-    aiInstance = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY
-    });
-  }
-  return aiInstance;
-}
+import { getGoogleGenAI } from "../llm/providers";
 
 // Poll until the uploaded file is ACTIVE
 async function waitForFileActive(
@@ -29,7 +11,7 @@ async function waitForFileActive(
   { timeoutMs = 60_000, intervalMs = 1500 } = {},
 ): Promise<GeminiFile> {
   const start = Date.now();
-  const ai = getAiClient();
+  const { ai, reportError } = await getGoogleGenAI();
   let file = await ai.files.get({ name });
 
   while (file.state === "PROCESSING") {
@@ -49,7 +31,7 @@ async function waitForFileActive(
 
 export async function processKurikulumExtract(tempFilePath: string) {
   let uploadedName: string | undefined;
-  const ai = getAiClient();
+  const { ai, reportError } = await getGoogleGenAI();
 
   try {
     // 1. Upload to Gemini File API

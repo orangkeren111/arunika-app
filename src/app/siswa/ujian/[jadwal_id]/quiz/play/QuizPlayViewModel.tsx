@@ -1,20 +1,27 @@
 import { useEffect, useState, useRef } from "react";
 import { quizRepository } from "@/src/lib/repositories/quizRepository";
+import { MicroPayloadVector } from "@/src/lib/services/quiz-agent/routerAgent";
+import { ChatMessageItem } from "@/src/lib/services/quiz-agent/tutorAgent";
 
-interface Competency {
+export interface Competency {
   id: number;
   code: string;
   name: string;
   jumlahSoal: number;
 }
 
-interface Question {
+export interface Question {
   id: number;
   text: string;
   options: string[];
   correctAnswer: string;
+  difficulty?: number;
+  bloomLevel?: string;
+  tags?: string[];
   linkGambarSoal?: string | null;
 }
+
+export type SessionState = "QUIZ" | "CHAT" | "WIN" | "FAIL";
 
 export function useQuizPlayViewModel(
   sessionId: number,
@@ -23,6 +30,8 @@ export function useQuizPlayViewModel(
 ) {
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState<any>(null);
+  const [sessionState, setSessionState] = useState<SessionState>("QUIZ");
+
   const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [currentComp, setCurrentComp] = useState<Competency | null>(null);
 
@@ -31,36 +40,35 @@ export function useQuizPlayViewModel(
   const [userAnswers, setUserAnswers] = useState<Record<number, string>>({});
   const [currentQIdx, setCurrentQIdx] = useState(0);
   const [evaluating, setEvaluating] = useState(false);
+  const [evaluatedBatch, setEvaluatedBatch] = useState<any[] | null>(null);
 
-  // Agent feedback & outcomes
+  // Agent feedback & state
   const [agentFeedback, setAgentFeedback] = useState("");
+  const [failedTags, setFailedTags] = useState<string[]>([]);
+  const [chatMessages, setChatMessages] = useState<ChatMessageItem[]>([]);
+  const [chatSending, setChatSending] = useState(false);
   const [levelCompleted, setLevelCompleted] = useState(false);
-  const [isGameOver, setIsGameOver] = useState(false);
-  const [gameOutcome, setGameOutcome] = useState<"WIN" | "FAIL" | "AFK" | null>(null);
 
   // Timers
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 Minutes (900 seconds)
+  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 Minutes
   const [showIdlePrompt, setShowIdlePrompt] = useState(false);
   const lastActiveRef = useRef<number>(Date.now());
   const idleTimeoutRef = useRef<any>(null);
+  const questionStartTimesRef = useRef<Record<number, number>>({});
 
   useEffect(() => {
     const initGame = async () => {
-      // 1. Fetch Session details
       const detail = await quizRepository.getQuizSessionDetail(sessionId);
       if (!detail || detail.status !== "PLAYING") {
-        setIsGameOver(true);
-        setGameOutcome((detail?.status as any) || "FAIL");
+        setSessionState("FAIL");
         setLoading(false);
         return;
       }
       setSession(detail);
 
-      // 2. Fetch enabled competencies
       const list = await quizRepository.getCompetenciesForUjian(detail.ujianId);
       setCompetencies(list);
 
-      // Resolve targeted competency or fallback to current session level
       let activeComp: Competency | undefined;
       if (targetCompetencyId) {
         activeComp = list.find((c) => c.id === targetCompetencyId);
@@ -69,10 +77,8 @@ export function useQuizPlayViewModel(
       if (!activeComp) {
         const levelIdx = detail.currentLevel - 1;
         if (levelIdx >= list.length) {
-          // Already cleared all levels!
           await quizRepository.finishOrFailSession(sessionId, "FINISHED");
-          setGameOutcome("WIN");
-          setIsGameOver(true);
+          setSessionState("WIN");
           setLoading(false);
           return;
         }
@@ -80,15 +86,12 @@ export function useQuizPlayViewModel(
       }
 
       setCurrentComp(activeComp);
-
-      // 3. Load active batch questions
       await loadQuestionsForCompetency(activeComp.id);
       setLoading(false);
     };
 
     initGame();
 
-    // Start 15 minutes overall game timer
     const gameTimer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
@@ -100,7 +103,6 @@ export function useQuizPlayViewModel(
       });
     }, 1000);
 
-    // Track user activity for AFK checks
     const trackActivity = () => {
       lastActiveRef.current = Date.now();
       quizRepository.updateQuizActivity(sessionId);
@@ -108,14 +110,10 @@ export function useQuizPlayViewModel(
     window.addEventListener("click", trackActivity);
     window.addEventListener("keydown", trackActivity);
 
-    // AFK Polling interval
     const afkPoll = setInterval(() => {
       const inactiveMs = Date.now() - lastActiveRef.current;
       if (inactiveMs >= 4.5 * 60 * 1000 && !showIdlePrompt) {
-        // Show idle warning
         setShowIdlePrompt(true);
-
-        // Give 30 seconds to respond, otherwise kick
         idleTimeoutRef.current = setTimeout(() => {
           handleAfkKick();
         }, 30000);
@@ -131,34 +129,36 @@ export function useQuizPlayViewModel(
     };
   }, [sessionId]);
 
-  const [seenQuestionIds, setSeenQuestionIds] = useState<number[]>([]);
-  const [evaluatedBatch, setEvaluatedBatch] = useState<any[] | null>(null);
+  const loadQuestionsForCompetency = async (compBabId: number, preselected?: Question[]) => {
+    if (preselected && preselected.length === 5) {
+      setActiveQuestions(preselected);
+    } else {
+      const selectedIds = await quizRepository.runAgentSelectQuestions(compBabId);
+      const allPool = await quizRepository.getQuestionsForCompetency(compBabId);
 
-  const loadQuestionsForCompetency = async (compBabId: number, currentSeen: number[] = []) => {
-    const selectedIds = await quizRepository.runAgentSelectQuestions(compBabId);
-    const allPool = await quizRepository.getQuestionsForCompetency(compBabId);
+      if (allPool.length === 0) {
+        setActiveQuestions([]);
+        return;
+      }
 
-    if (allPool.length === 0) {
-      setActiveQuestions([]);
-      return;
+      const selectedQ = allPool.filter((q) => selectedIds.includes(q.id));
+      const finalBatch = selectedQ.length >= 3 ? selectedQ : allPool.sort(() => 0.5 - Math.random()).slice(0, 5);
+      setActiveQuestions(finalBatch);
     }
 
-    // Prefer questions that haven't been seen yet in this competency session
-    let unseenPool = allPool.filter((q) => !currentSeen.includes(q.id));
-    if (unseenPool.length < 5) {
-      unseenPool = allPool; // Fallback to entire pool if unseen is exhausted
-    }
-
-    const selectedQ = unseenPool.filter((q) => selectedIds.includes(q.id));
-    const finalBatch = selectedQ.length >= 3 ? selectedQ : unseenPool.sort(() => 0.5 - Math.random()).slice(0, 5);
-
-    setActiveQuestions(finalBatch);
-    setSeenQuestionIds((prev) => Array.from(new Set([...prev, ...finalBatch.map((q) => q.id)])));
     setCurrentQIdx(0);
     setUserAnswers({});
     setAgentFeedback("");
     setLevelCompleted(false);
     setEvaluatedBatch(null);
+
+    // Initialize answer start timestamps for micro-payload vectors
+    const now = Date.now();
+    const timestamps: Record<number, number> = {};
+    activeQuestions.forEach((q) => {
+      timestamps[q.id] = now;
+    });
+    questionStartTimesRef.current = timestamps;
   };
 
   const handleSelectAnswer = (questionId: number, answer: string) => {
@@ -184,8 +184,7 @@ export function useQuizPlayViewModel(
       timestamp: new Date().toISOString(),
     };
     await quizRepository.finishOrFailSession(sessionId, "FAILED", "TIME_EXPIRED", timeoutLog);
-    setGameOutcome("FAIL");
-    setIsGameOver(true);
+    setSessionState("FAIL");
   };
 
   const handleAfkKick = async () => {
@@ -201,8 +200,7 @@ export function useQuizPlayViewModel(
       timestamp: new Date().toISOString(),
     };
     await quizRepository.finishOrFailSession(sessionId, "AFK", "AFK_INACTIVITY", afkLog);
-    setGameOutcome("AFK");
-    setIsGameOver(true);
+    setSessionState("FAIL");
     setShowIdlePrompt(false);
   };
 
@@ -214,59 +212,75 @@ export function useQuizPlayViewModel(
   };
 
   const handleSubmitBatch = async () => {
+    if (!currentComp) return;
     setEvaluating(true);
 
-    const evaluationData = activeQuestions.map((q) => {
-      const studentAnswer = userAnswers[q.id] || "";
-      const isCorrect = studentAnswer === q.correctAnswer;
+    const now = Date.now();
+    // Build micro-payload vectors for routerAgent
+    const vectors: MicroPayloadVector[] = activeQuestions.map((q) => {
+      const studentAns = userAnswers[q.id] || "";
+      const isCorrect = studentAns === q.correctAnswer;
+      const startTime = questionStartTimesRef.current[q.id] || now;
+      const durationS = Math.max(1, Math.round((now - startTime) / 1000));
+      const firstTag = q.tags && q.tags.length > 0 ? q.tags[0] : currentComp.name;
+
       return {
-        id: q.id,
-        text: q.text,
-        options: q.options,
-        linkGambarSoal: q.linkGambarSoal || null,
-        studentAnswer,
-        correctAnswer: q.correctAnswer,
-        isCorrect,
-        difficulty: (q as any).difficulty || 5,
-        bloomLevel: (q as any).bloomLevel || "C1",
+        q_id: q.id,
+        bloom: q.bloomLevel || "C1",
+        tag: firstTag,
+        ok: isCorrect,
+        ans_time_s: durationS,
       };
     });
 
-    // 1. Evaluate answers via Agent
-    const result = await quizRepository.runAgentEvaluateAnswers(evaluationData);
-    setAgentFeedback(result.feedback);
-    setEvaluatedBatch(evaluationData);
+    const evalBatchData = activeQuestions.map((q) => ({
+      id: q.id,
+      text: q.text,
+      options: q.options,
+      linkGambarSoal: q.linkGambarSoal || null,
+      studentAnswer: userAnswers[q.id] || "",
+      correctAnswer: q.correctAnswer,
+      isCorrect: userAnswers[q.id] === q.correctAnswer,
+      difficulty: q.difficulty || 5,
+      bloomLevel: q.bloomLevel || "C1",
+    }));
 
-    // 2. Count incorrect answers
-    const wrongCount = evaluationData.filter((q) => !q.isCorrect).length;
+    setEvaluatedBatch(evalBatchData);
+
+    const wrongCount = vectors.filter((v) => !v.ok).length;
     const currentStreak = (session?.wrongStreak || 0) + wrongCount;
 
-    // Create structured competency log
+    // Call routerAgent via repository
+    const result = await quizRepository.runBatchEvaluation(
+      sessionId,
+      currentComp.id,
+      vectors,
+      currentStreak
+    );
+
+    setAgentFeedback(result.feedback);
+    setFailedTags(result.failedTags);
+
     const competencyLog = {
       siswaId: session?.siswaId,
       ujianId: session?.ujianId,
-      competencyId: currentComp?.id,
-      competencyName: currentComp?.name,
+      competencyId: currentComp.id,
+      competencyName: currentComp.name,
       status: result.conceptUnderstood ? "FINISHED" : "NOT_FINISHED",
-      reason: result.conceptUnderstood
-        ? "CONCEPT_MASTERED"
-        : currentStreak >= 5
-        ? "WRONG_STREAK_EXCEEDED"
-        : "NEEDS_MORE_PRACTICE",
+      nextAction: result.nextAction,
       agentFeedback: result.feedback,
+      failedTags: result.failedTags,
       conceptUnderstood: result.conceptUnderstood,
-      evaluationBatch: evaluationData,
+      evaluationBatch: evalBatchData,
       timestamp: new Date().toISOString(),
     };
 
-    if (result.conceptUnderstood) {
+    if (result.nextAction === "MASTERED") {
       setLevelCompleted(true);
       await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, true);
 
-      // If playing a specific targeted competency, complete game when mastered
       if (targetCompetencyId) {
-        setGameOutcome("WIN");
-        setIsGameOver(true);
+        setSessionState("WIN");
         setEvaluating(false);
         return;
       }
@@ -281,43 +295,85 @@ export function useQuizPlayViewModel(
           "ALL_COMPETENCIES_MASTERED",
           competencyLog
         );
-        setGameOutcome("WIN");
-        setIsGameOver(true);
-      }
-    } else {
-      if (currentStreak >= 5) {
-        await quizRepository.finishOrFailSession(
-          sessionId,
-          "FAILED",
-          "WRONG_STREAK_EXCEEDED",
-          competencyLog
-        );
-        setGameOutcome("FAIL");
-        setIsGameOver(true);
+        setSessionState("WIN");
       } else {
-        // Log current attempt in history without levelling up
-        await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
-        for (let i = 0; i < wrongCount; i++) {
-          await quizRepository.incrementWrongStreak(sessionId);
-        }
-        setSession((prev: any) => ({ ...prev, wrongStreak: currentStreak }));
+        // Mastered current level, prompt user or auto proceed to next level
+        setSessionState("WIN");
       }
+    } else if (result.nextAction === "REMEDIATE_CHAT") {
+      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
+      for (let i = 0; i < wrongCount; i++) {
+        await quizRepository.incrementWrongStreak(sessionId);
+      }
+
+      // Initialize chat drawer with Captain Chili's opening feedback
+      const initialMessage: ChatMessageItem = {
+        role: "tutor",
+        text: `🦫 ${result.feedback} Mari kita bahas topik "${result.failedTags.join(", ") || currentComp.name}" bersama Kapten Chili!`,
+      };
+      setChatMessages([initialMessage]);
+      setSessionState("CHAT");
+    } else if (result.nextAction === "FAIL_SESSION") {
+      await quizRepository.finishOrFailSession(
+        sessionId,
+        "FAILED",
+        "WRONG_STREAK_EXCEEDED",
+        competencyLog
+      );
+      setSessionState("FAIL");
+    } else {
+      // NEXT_BATCH
+      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
+      if (result.nextQuestions && result.nextQuestions.length === 5) {
+        await loadQuestionsForCompetency(currentComp.id, result.nextQuestions);
+      } else {
+        await loadQuestionsForCompetency(currentComp.id);
+      }
+      setSessionState("QUIZ");
     }
 
     setEvaluating(false);
   };
 
-  const handleRetryBatch = async () => {
-    if (!currentComp) return;
-    setLoading(true);
-    await loadQuestionsForCompetency(currentComp.id, seenQuestionIds);
-    setLoading(false);
+  const handleSendMessage = async (userText: string) => {
+    if (!userText.trim() || chatSending) return;
+    setChatSending(true);
+
+    const updatedHistory: ChatMessageItem[] = [
+      ...chatMessages,
+      { role: "user", text: userText },
+    ];
+    setChatMessages(updatedHistory);
+
+    const tutorResult = await quizRepository.sendTutorChatMessage(
+      sessionId,
+      updatedHistory,
+      failedTags,
+      `Competency: ${currentComp?.name || ""}`
+    );
+
+    const finalHistory: ChatMessageItem[] = [
+      ...updatedHistory,
+      { role: "tutor", text: tutorResult.text },
+    ];
+    setChatMessages(finalHistory);
+    setChatSending(false);
+
+    if (tutorResult.resumeQuiz) {
+      setSessionState("QUIZ");
+      if (currentComp) {
+        await loadQuestionsForCompetency(currentComp.id);
+      }
+    }
+  };
+
+  const handleManualResumeQuiz = () => {
+    setSessionState("QUIZ");
   };
 
   const handleProceedToNextLevel = async () => {
     if (targetCompetencyId) {
-      setGameOutcome("WIN");
-      setIsGameOver(true);
+      setSessionState("WIN");
       return;
     }
     setLoading(true);
@@ -330,16 +386,15 @@ export function useQuizPlayViewModel(
 
     const levelIdx = updatedDetail.currentLevel - 1;
     if (levelIdx >= competencies.length) {
-      setGameOutcome("WIN");
-      setIsGameOver(true);
+      setSessionState("WIN");
       setLoading(false);
       return;
     }
 
     const activeComp = competencies[levelIdx];
     setCurrentComp(activeComp);
-    setSeenQuestionIds([]);
-    await loadQuestionsForCompetency(activeComp.id, []);
+    setSessionState("QUIZ");
+    await loadQuestionsForCompetency(activeComp.id);
     setLoading(false);
   };
 
@@ -352,6 +407,7 @@ export function useQuizPlayViewModel(
   return {
     loading,
     session,
+    sessionState,
     competencies,
     currentComp,
     activeQuestions,
@@ -360,15 +416,17 @@ export function useQuizPlayViewModel(
     evaluating,
     agentFeedback,
     evaluatedBatch,
+    failedTags,
+    chatMessages,
+    chatSending,
     levelCompleted,
-    isGameOver,
-    gameOutcome,
     timeLeft: formatTimer(timeLeft),
     showIdlePrompt,
     handleSelectAnswer,
     handleNextQuestion,
     handleSubmitBatch,
-    handleRetryBatch,
+    handleSendMessage,
+    handleManualResumeQuiz,
     handleProceedToNextLevel,
     handleKeepPlaying,
   };

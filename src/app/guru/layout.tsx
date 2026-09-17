@@ -89,10 +89,9 @@ export default function GuruLayout({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium
-                  ${
-                    active
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                  ${active
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
+                    : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                   }`}
               >
                 <item.icon size={20} />
@@ -131,7 +130,7 @@ export default function GuruLayout({
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
+            <Link href="/profile" className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">
                   {currentUser?.name || ""}
@@ -140,7 +139,7 @@ export default function GuruLayout({
               <div className="w-9 h-9 md:w-10 md:h-10 bg-[var(--info)] text-white rounded-full flex items-center justify-center font-bold">
                 B
               </div>
-            </div>
+            </Link>
           </div>
         </header>
         <main className="p-4 md:p-8 flex-1 overflow-y-auto w-full">

@@ -6,6 +6,7 @@ export interface QuestionBankItem {
   text: string;
   difficulty: number;
   bloomLevel: string;
+  tags?: string[];
 }
 
 export interface QuestionQueryResult {
@@ -15,32 +16,44 @@ export interface QuestionQueryResult {
 }
 
 /**
- * Executes direct and fallback database queries for questions matching competency, Bloom level, and keyword.
+ * Executes direct and fallback database queries for questions matching competency, Bloom level, and tag/keyword.
  */
 export async function executeQueryQuestionsFromBank(
   kompetensiBabId: number,
-  bloomLevel: string,
-  keyword: string
+  bloomLevel?: string,
+  tag?: string
 ): Promise<QuestionQueryResult> {
-  // Primary Search: competency + bloomLevel + keyword
+  const whereClause: any = {
+    kompetensiBabId,
+    isAccepted: true,
+    isRejected: false,
+  };
+
+  if (bloomLevel) {
+    whereClause.bloomLevel = bloomLevel;
+  }
+
+  if (tag && tag.trim() !== "") {
+    whereClause.OR = [
+      { tags: { has: tag } },
+      { teksSoal: { contains: tag, mode: "insensitive" } },
+    ];
+  }
+
   let questions = await prisma.bankSoal.findMany({
-    where: {
-      kompetensiBabId,
-      bloomLevel,
-      teksSoal: { contains: keyword, mode: "insensitive" },
-      isAccepted: true,
-      isRejected: false,
-    },
+    where: whereClause,
     select: {
       id: true,
       teksSoal: true,
       difficulty: true,
       bloomLevel: true,
+      tags: true,
     },
+    take: 10,
   });
 
-  // Fallback 1: Search by competency + bloomLevel (without keyword)
-  if (questions.length === 0) {
+  // Fallback 1: Search by competency & bloomLevel
+  if (questions.length === 0 && bloomLevel) {
     questions = await prisma.bankSoal.findMany({
       where: {
         kompetensiBabId,
@@ -53,29 +66,13 @@ export async function executeQueryQuestionsFromBank(
         teksSoal: true,
         difficulty: true,
         bloomLevel: true,
+        tags: true,
       },
+      take: 10,
     });
   }
 
-  // Fallback 2: Search by competency + keyword (without bloomLevel)
-  if (questions.length === 0) {
-    questions = await prisma.bankSoal.findMany({
-      where: {
-        kompetensiBabId,
-        teksSoal: { contains: keyword, mode: "insensitive" },
-        isAccepted: true,
-        isRejected: false,
-      },
-      select: {
-        id: true,
-        teksSoal: true,
-        difficulty: true,
-        bloomLevel: true,
-      },
-    });
-  }
-
-  // Fallback 3: Retrieve any questions in this competency
+  // Fallback 2: Retrieve any questions in this competency
   if (questions.length === 0) {
     questions = await prisma.bankSoal.findMany({
       where: {
@@ -88,6 +85,7 @@ export async function executeQueryQuestionsFromBank(
         teksSoal: true,
         difficulty: true,
         bloomLevel: true,
+        tags: true,
       },
       take: 15,
     });
@@ -101,6 +99,7 @@ export async function executeQueryQuestionsFromBank(
       text: q.teksSoal,
       difficulty: q.difficulty,
       bloomLevel: q.bloomLevel || "C1",
+      tags: q.tags || [],
     })),
   };
 }
@@ -128,7 +127,7 @@ export async function executeFallbackQuestionSelection(kompetensiBabId: number):
 export const queryQuestionsToolDeclaration: FunctionDeclaration = {
   name: "queryQuestionsFromBank",
   description:
-    "Search and retrieve questions from the bank for this competency, filtering by Bloom's taxonomy level (C1 to C6) and search keywords.",
+    "Search and retrieve questions from the bank for this competency, filtering by Bloom's taxonomy level (C1 to C6) and tag/keyword.",
   parameters: {
     type: Type.OBJECT,
     properties: {
@@ -137,12 +136,11 @@ export const queryQuestionsToolDeclaration: FunctionDeclaration = {
         enum: ["C1", "C2", "C3", "C4", "C5", "C6"],
         description: "Bloom's taxonomy cognitive level (C1 to C6).",
       },
-      keyword: {
+      tag: {
         type: Type.STRING,
-        description: "Keyword to search within the question body.",
+        description: "Topic tag or keyword to filter questions.",
       },
     },
-    required: ["bloomLevel", "keyword"],
   },
 };
 
@@ -172,21 +170,54 @@ export const submitQuestionSelectionToolDeclaration: FunctionDeclaration = {
 export const submitAnswerEvaluationToolDeclaration: FunctionDeclaration = {
   name: "submitAnswerEvaluation",
   description:
-    "Submit pedagogical feedback and concept mastery evaluation for the student's quiz answers.",
+    "Submit pedagogical feedback, nextAction decision, and concept evaluation based on performance vectors.",
   parameters: {
     type: Type.OBJECT,
     properties: {
+      nextAction: {
+        type: Type.STRING,
+        enum: ["NEXT_BATCH", "REMEDIATE_CHAT", "MASTERED", "FAIL_SESSION"],
+        description: "The autonomous next decision for the session.",
+      },
       feedback: {
         type: Type.STRING,
         description:
-          "Friendly, constructive, and encouraging pedagogical feedback in Indonesian, written as Captain Chili the Capybara mentor.",
+          "Warm, constructive, 1-2 sentence pedagogical feedback in Indonesian as Captain Chili the Capybara mentor.",
       },
       conceptUnderstood: {
         type: Type.BOOLEAN,
         description:
-          "True ONLY if the student demonstrated genuine concept mastery by correctly answering key/higher-difficulty questions in this set.",
+          "True ONLY if the student demonstrated genuine concept mastery.",
+      },
+      failedTags: {
+        type: Type.ARRAY,
+        items: { type: Type.STRING },
+        description: "Array of tags/topics where the student showed misconceptions or errors.",
       },
     },
-    required: ["feedback", "conceptUnderstood"],
+    required: ["nextAction", "feedback", "conceptUnderstood"],
+  },
+};
+
+/**
+ * Tool Declaration: finishRemediationAndResumeQuiz
+ */
+export const finishRemediationAndResumeQuizToolDeclaration: FunctionDeclaration = {
+  name: "finishRemediationAndResumeQuiz",
+  description:
+    "Tool called by tutorAgent when the student demonstrates concept understanding or completes micro-tutoring to close chat and trigger the next quiz batch.",
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      summary: {
+        type: Type.STRING,
+        description: "Brief recap of the remediated concept and student understanding.",
+      },
+      readyToResume: {
+        type: Type.BOOLEAN,
+        description: "Set to true to return the student to the active quiz batch.",
+      },
+    },
+    required: ["readyToResume"],
   },
 };

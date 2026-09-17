@@ -117,9 +117,23 @@ export function useKelasDetailViewModel(kelasId: string) {
     fetchGrades();
   };
 
-  const handleStartExam = async (jadwalId: string) => {
+  const handleStartExam = async (jadwalId: string): Promise<{ success: boolean; error?: string }> => {
+    const examObj = exams.find((e) => e.id.toString() === jadwalId.toString() || e.jadwalId?.toString() === jadwalId.toString());
+    const ujianId = examObj?.ujianId || examObj?.ujian?.id;
+
+    if (ujianId) {
+      const valRes = await guruRepository.validateQuestionPoolRequirements(Number(ujianId));
+      if (!valRes.isValid) {
+        return {
+          success: false,
+          error: `Gagal Memulai Ujian: ${valRes.errors.join(" ")}`,
+        };
+      }
+    }
+
     await guruRepository.updateJadwalStatus(jadwalId, StatusUjian.ONGOING);
     fetchExams();
+    return { success: true };
   };
 
   const handleStopExam = async (jadwalId: string) => {

@@ -28,6 +28,12 @@ export default auth(
       return NextResponse.redirect(new URL("/login", req.nextUrl));
     }
 
+    const isRetired = req.auth?.user?.isRetired;
+
+    if (isLoggedIn && isRetired === true && !pathname.startsWith("/unauthorized")) {
+      return NextResponse.redirect(new URL("/unauthorized", req.nextUrl));
+    }
+
     // 2. Proteksi rute berdasarkan peran (Role-based Authorization)
     if (isLoggedIn) {
       if (pathname.startsWith("/superadmin") && role !== "SUPERADMIN") {

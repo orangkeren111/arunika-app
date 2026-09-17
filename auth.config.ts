@@ -17,6 +17,7 @@ export const authConfig = {
         token.role = user.role;
         token.sekolah_id = user.sekolah_id;
         token.name = user.name;
+        token.isRetired = user.isRetired;
       }
       return token;
     },
@@ -26,6 +27,7 @@ export const authConfig = {
         session.user.role = token.role as string;
         session.user.sekolah_id = token.sekolah_id as number;
         session.user.name = token.name as string;
+        session.user.isRetired = token.isRetired as boolean;
       }
       return session;
     },

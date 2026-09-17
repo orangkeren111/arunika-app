@@ -39,14 +39,7 @@ export async function initiatePdfExtraction(formData: FormData) {
       },
     });
 
-    // 4. THE TRIGGER: Fire and Forget
-    // We call the orchestrator but DO NOT put 'await' in front of it.
-    // This allows Node to execute it in the background while instantly moving to step 5.
-    fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/llm/worker`, {
-      method: "POST",
-    }).catch(() => {});
-
-    // 5. Return success instantly to the frontend UI
+    // Return success instantly to the frontend UI
     return {
       success: true,
       jobId: job.id,

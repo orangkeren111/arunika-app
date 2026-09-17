@@ -12,6 +12,7 @@ import {
   Menu,
   X,
   FileText,
+  MonitorCog,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -30,7 +31,8 @@ export default function AdminLayout({
     { href: "/admin/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { href: "/admin/users", label: "Pengguna", icon: Users },
     { href: "/admin/kelas", label: "Kelas", icon: BookOpen },
-    { href: "/admin/kurikulum", label: "Kurikulum", icon: FileText },
+    // { href: "/admin/kurikulum", label: "Kurikulum", icon: FileText },
+    { href: "/admin/control", label: "Control Center", icon: MonitorCog },
   ];
 
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
@@ -126,7 +128,7 @@ export default function AdminLayout({
 
           <div className="flex items-center gap-4">
             <ThemeToggle />
-            <div className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
+            <Link href="/profile" className="flex items-center gap-3 border-l border-[var(--border)] pl-4">
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-[var(--foreground)]">
                   Admin Utama
@@ -138,7 +140,7 @@ export default function AdminLayout({
               <div className="w-9 h-9 md:w-10 md:h-10 bg-[var(--accent)] text-[var(--accent-foreground)] rounded-full flex items-center justify-center font-bold">
                 A
               </div>
-            </div>
+            </Link>
           </div>
         </header>
 

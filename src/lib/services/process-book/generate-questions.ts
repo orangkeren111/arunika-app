@@ -2,10 +2,10 @@
 
 import { generateText } from "ai";
 import prisma from "../db/prisma";
-import { getSmartTextModel } from "../llm/providers";
 import { BOOK_PROMPTS } from "../llm/prompts";
+import { callSmartText } from "../llm/router";
 
-export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: number = 10) {
+export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: number = 10) {
   // 1. Fetch chapter (bab) details
   const bab = await prisma.bab.findUnique({
     where: { id: babId },
@@ -80,10 +80,7 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
     )}${imageCatalogPrompt}`;
 
     // 3. Ask central Smart Text Model (providers.ts) to generate questions
-    const result = await generateText({
-      model: getSmartTextModel(),
-      prompt,
-    });
+    const result = await callSmartText(prompt)
 
     let rawText = result.text.replace(/```json|```/g, "").trim();
 
@@ -121,7 +118,7 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
       }
     }
 
-    const tokens = result.usage?.totalTokens ?? 0;
+    const tokens = result.tokens ?? 0;
     totalTokens += tokens;
 
     const questions = parsedResponse.questions || [];
@@ -139,6 +136,7 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
         jawabanBenarEssay: q.explanation || q.jawabanBenarEssay || null,
         difficulty: Number(q.difficulty ?? 5),
         bloomLevel: q.bloomLevel || "C1",
+        tags: Array.isArray(q.tags) ? q.tags.map(String) : [],
         linkGambarSoal: q.linkGambarSoal || null,
         isAccepted: true,
         isRejected: false,
@@ -150,7 +148,6 @@ export async function generateQuestionsWithGroq(babId: number, totalJumlahSoal: 
 }
 
 export async function enqueueGenerateQuestions(babId: number, totalJumlahSoal: number = 10) {
-  // 1. Enqueue job into taskQueue
   await prisma.taskQueue.create({
     data: {
       type: "generate_soal",
@@ -160,11 +157,5 @@ export async function enqueueGenerateQuestions(babId: number, totalJumlahSoal: n
       },
     },
   });
-
-  // 2. Fire and forget worker trigger
-  fetch(`${process.env.NEXT_PUBLIC_BASE_URL}/api/llm/worker`, {
-    method: "POST",
-  }).catch(() => { });
-
   return { success: true, message: "Question generation queued." };
 }

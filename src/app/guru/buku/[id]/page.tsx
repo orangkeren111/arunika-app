@@ -27,6 +27,8 @@ export default function BabPage({
   const {
     buku,
     babList,
+    isProcessingAi,
+    statusStage,
     handleAddBab,
     handleEditBab,
     handleDeleteBab,
@@ -48,12 +50,14 @@ export default function BabPage({
   });
 
   const openAddModal = () => {
+    if (isProcessingAi) return;
     setModalMode("add");
     setFormData({ title: "" });
     setIsModalOpen(true);
   };
 
   const openEditModal = (bab: any) => {
+    if (isProcessingAi) return;
     setModalMode("edit");
     setSelectedBabId(bab.id);
     setFormData({
@@ -116,6 +120,24 @@ export default function BabPage({
         <ArrowLeft size={16} /> Kembali ke Koleksi Buku
       </Link>
 
+      {/* GATEKEEP BANNER WHEN AI PROCESSING */}
+      {isProcessingAi && (
+        <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-900 dark:text-amber-300 flex items-center justify-between gap-4 shadow-sm animate-pulse">
+          <div className="flex items-center gap-3">
+            <div className="w-5 h-5 border-2 border-amber-600 border-t-transparent rounded-full animate-spin shrink-0"></div>
+            <div>
+              <h4 className="font-bold text-sm">Buku Ini Sedang Diproses Oleh AI (Task Queue)</h4>
+              <p className="text-xs opacity-90">
+                Tahap: {statusStage || "Processing Task Queue..."}. Pengelolaan bab dan bank soal dikunci sementara hingga proses AI selesai.
+              </p>
+            </div>
+          </div>
+          <span className="text-xs font-mono font-bold bg-amber-600/20 px-2.5 py-1 rounded-full border border-amber-600/30 shrink-0">
+            Auto-Syncing
+          </span>
+        </div>
+      )}
+
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
         <div className="w-full lg:w-auto">
           <h1 className="text-xl md:text-2xl font-bold text-[var(--foreground)] break-words">
@@ -134,13 +156,15 @@ export default function BabPage({
           </Link>
           <button
             onClick={() => setIsUploadModalOpen(true)}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--foreground)] bg-[var(--card)] px-3 py-2 rounded-lg hover:bg-[var(--muted)] transition text-sm md:text-base whitespace-nowrap"
+            disabled={isProcessingAi}
+            className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-[var(--border)] text-[var(--foreground)] bg-[var(--card)] px-3 py-2 rounded-lg hover:bg-[var(--muted)] transition text-sm md:text-base whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Upload size={18} /> Upload PDF
           </button>
           <button
             onClick={openAddModal}
-            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition text-sm md:text-base"
+            disabled={isProcessingAi}
+            className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2 rounded-lg hover:opacity-90 transition text-sm md:text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={18} /> Tambah Bab
           </button>
