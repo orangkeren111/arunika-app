@@ -5,6 +5,7 @@ import {
 
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
+import bcrypt from "bcryptjs";
 
 const connectionString = process.env.DATABASE_URL;
 const pool = new Pool({ connectionString });
@@ -31,11 +32,13 @@ async function main() {
   console.log("Mulai proses seeding data baru...");
 
   // 2. Buat Superadmin
+  const hashedPassword = await bcrypt.hash("123", 10);
+
   await prisma.user.create({
     data: {
       name: "Arunika Superadmin",
       email: "superadmin@arunika.com",
-      password: "123",
+      password: hashedPassword,
       role: Role.SUPERADMIN,
       sekolahId: null, // Superadmin tidak terikat sekolah
     },

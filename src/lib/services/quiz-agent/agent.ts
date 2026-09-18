@@ -1,3 +1,4 @@
+/*
 "use server";
 
 import { Content, Part } from "@google/genai";
@@ -44,6 +45,7 @@ Instructions:
 /**
  * Selects 5 balanced diagnostic questions for a given competency using Google GenAI SDK tool calling.
  */
+/*
 export async function agentSelectQuestions(kompetensiBabId: number): Promise<number[]> {
   const { ai, reportError } = await getGoogleGenAI()
   try {
@@ -163,10 +165,11 @@ export async function agentSelectQuestions(kompetensiBabId: number): Promise<num
     return await executeFallbackQuestionSelection(kompetensiBabId);
   }
 }
-
+*/
 /**
  * Evaluates student quiz answers and generates pedagogical feedback from Captain Chili.
  */
+/*
 export async function agentEvaluateAnswers(
   questionsWithAnswers: any[]
 ): Promise<{ feedback: string; conceptUnderstood: boolean }> {
@@ -245,3 +248,4 @@ export async function agentEvaluateAnswers(
     };
   }
 }
+*/

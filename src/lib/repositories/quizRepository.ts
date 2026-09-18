@@ -1,5 +1,4 @@
 import * as quizDB from "../services/db/quiz/quizDB";
-import * as quizAgent from "../services/quiz-agent/agent";
 import { runRouterAgentEvaluation, MicroPayloadVector } from "../services/quiz-agent/routerAgent";
 import { runTutorAgentChat, ChatMessageItem } from "../services/quiz-agent/tutorAgent";
 
@@ -22,8 +21,8 @@ export const quizRepository = {
     };
   },
 
-  claimPlayingSlot: async (sessionId: number) => {
-    return await quizDB.claimPlayingSlot(sessionId);
+  claimPlayingSlot: async (sessionId: number, kompetensiBabId?: number) => {
+    return await quizDB.claimPlayingSlot(sessionId, kompetensiBabId);
   },
 
   updateQuizActivity: async (sessionId: number) => {
@@ -51,8 +50,8 @@ export const quizRepository = {
     }));
   },
 
-  getCompetenciesForUjian: async (ujianId: number, sessionId?: number) => {
-    const list = await quizDB.getCompetenciesForUjian(ujianId, sessionId);
+  getCompetenciesForUjian: async (ujianId: number, siswaId: number, sessionId?: number) => {
+    const list = await quizDB.getCompetenciesForUjian(ujianId, siswaId, sessionId);
     return list.map((item: any) => ({
       id: item.kompetensiBab.id,
       code: item.kompetensiBab.nomerKompetensi,
@@ -66,9 +65,10 @@ export const quizRepository = {
     const questions = await quizDB.getQuestionsForCompetency(kompetensiBabId);
     return questions.map((q) => ({
       id: q.id,
+      type: q.type as "MCQ" | "ESSAY",
       text: q.teksSoal,
-      options: q.opsiJawaban as string[],
-      correctAnswer: q.jawabanBenarMcq || "",
+      options: (q.opsiJawaban as string[]) || [],
+      correctAnswer: q.type === "ESSAY" ? (q.jawabanBenarEssay || "") : (q.jawabanBenarMcq || ""),
       difficulty: q.difficulty,
       bloomLevel: q.bloomLevel || "C1",
       tags: q.tags || [],
@@ -80,9 +80,10 @@ export const quizRepository = {
     const questions = await quizDB.getQuestionsByIds(questionIds);
     return questions.map((q) => ({
       id: q.id,
+      type: q.type as "MCQ" | "ESSAY",
       text: q.teksSoal,
-      options: q.opsiJawaban as string[],
-      correctAnswer: q.jawabanBenarMcq || "",
+      options: (q.opsiJawaban as string[]) || [],
+      correctAnswer: q.type === "ESSAY" ? (q.jawabanBenarEssay || "") : (q.jawabanBenarMcq || ""),
       difficulty: q.difficulty,
       bloomLevel: q.bloomLevel || "C1",
       tags: q.tags || [],
@@ -107,46 +108,77 @@ export const quizRepository = {
       lastActiveAt: session.lastActiveAt,
     };
   },
-
-  updateQuizSessionHistory: async (sessionId: number, history: any, levelCompleted?: boolean) => {
-    return await quizDB.updateQuizSessionHistory(sessionId, history, levelCompleted);
-  },
-
-  updateQuizSessionMode: async (
-    sessionId: number,
-    sessionMode: "QUIZ_ACTIVE" | "CHAT_REMEDIATION" | "MASTERED" | "FAILED"
-  ) => {
-    return await quizDB.updateQuizSessionMode(sessionId, sessionMode);
-  },
-
-  incrementWrongStreak: async (sessionId: number) => {
-    return await quizDB.incrementWrongStreak(sessionId);
-  },
-
-  runAgentSelectQuestions: async (kompetensiBabId: number) => {
-    return await quizAgent.agentSelectQuestions(kompetensiBabId);
-  },
-
-  runAgentEvaluateAnswers: async (questionsWithAnswers: any[]) => {
-    return await quizAgent.agentEvaluateAnswers(questionsWithAnswers);
-  },
-
   runBatchEvaluation: async (
     sessionId: number,
     kompetensiBabId: number,
+    kompetensiName: string,
     vectors: MicroPayloadVector[],
-    wrongStreak: number = 0
+    evalBatchData: any[]
   ) => {
-    const result = await runRouterAgentEvaluation(sessionId, kompetensiBabId, vectors, wrongStreak);
+    const session = await quizDB.getQuizSessionDetail(sessionId);
+    const currentStreak = session?.wrongStreak || 0;
+
+    // 1. Pass BOTH vectors and evalBatchData to the router. 
+    // The router needs evalBatchData to read the actual essay text and reference answers.
+    const result = await runRouterAgentEvaluation(
+      sessionId,
+      kompetensiBabId,
+      vectors,
+      evalBatchData, // ADDED: So the agent can grade essays
+      currentStreak
+    );
+
+    // 2. Retrieve the graded data from the agent (or fallback to original if agent fails)
+    // The agent will overwrite 'isCorrect: true' for essays that are conceptually right.
+    const gradedBatchData = (result as any).gradedBatchData || evalBatchData;
+
+    // 3. NOW calculate the wrong count accurately based on the AI's grading
+    const wrongCount = gradedBatchData.filter((item: any) => !item.isCorrect).length;
 
     let nextQuestions: any[] = [];
     if (result.nextAction === "NEXT_BATCH" && result.nextQuestionIds.length > 0) {
       nextQuestions = await quizRepository.fetchBatchQuestionDetails(result.nextQuestionIds);
     }
 
+    const competencyLog = {
+      siswaId: session?.siswaId,
+      ujianId: session?.ujianId,
+      competencyId: kompetensiBabId,
+      competencyName: kompetensiName,
+      status: result.conceptUnderstood ? "FINISHED" : "NOT_FINISHED",
+      nextAction: result.nextAction,
+      thoughtProcess: result.thoughtProcess,
+      agentFeedback: result.feedback,
+      failedTags: result.failedTags,
+      conceptUnderstood: result.conceptUnderstood,
+      evaluationBatch: gradedBatchData, // Save the graded version to history
+      timestamp: new Date().toISOString(),
+    };
+
+    // Lock Database State based entirely on the Agent's decision
+    if (result.nextAction === "MASTERED") {
+      await quizDB.updateQuizSessionHistory(sessionId, competencyLog, true);
+      await quizDB.updateQuizSessionMode(sessionId, "MASTERED");
+    } else if (result.nextAction === "FAIL_SESSION") {
+      await quizDB.finishOrFailSession(sessionId, "FAILED", "WRONG_STREAK_EXCEEDED", competencyLog);
+      await quizDB.updateQuizSessionMode(sessionId, "FAILED");
+    } else {
+      await quizDB.updateQuizSessionHistory(sessionId, competencyLog, false);
+      if (result.nextAction === "REMEDIATE_CHAT") {
+        for (let i = 0; i < wrongCount; i++) {
+          await quizDB.incrementWrongStreak(sessionId);
+        }
+        await quizDB.updateQuizSessionMode(sessionId, "CHAT_REMEDIATION");
+      } else {
+        await quizDB.updateQuizSessionMode(sessionId, "QUIZ_ACTIVE");
+      }
+    }
+
     return {
       ...result,
       nextQuestions,
+      wrongCount,
+      gradedBatchData, // Return to frontend so it can display correct/incorrect checks for essays
     };
   },
 
@@ -156,7 +188,11 @@ export const quizRepository = {
     failedTags: string[] = [],
     contextSummary: string = ""
   ) => {
-    return await runTutorAgentChat(sessionId, chatHistory, failedTags, contextSummary);
+    const result = await runTutorAgentChat(sessionId, chatHistory, failedTags, contextSummary);
+    if (result.resumeQuiz) {
+      await quizDB.updateQuizSessionMode(sessionId, "QUIZ_ACTIVE");
+    }
+    return result;
   },
 
   getUjianIdByJadwal: async (jadwalId: number) => {

@@ -2,6 +2,7 @@ import { generateText, LanguageModel } from "ai";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createMistral } from "@ai-sdk/mistral";
 import prisma from "../db/prisma";
 import { GoogleGenAI } from "@google/genai";
 import { decryptApiKey, encryptApiKey } from "@/src/lib/utils/hasher";
@@ -118,6 +119,27 @@ function createSdkModel(provider: String, apiKey: string, modelName: string): La
         apiKey
       });
       return groq(modelName);
+    }
+    case "MISTRAL": {
+      const mistral = createMistral({
+        apiKey,
+      });
+      return mistral(modelName);
+    }
+
+    case "OPENAI": {
+      const openai = createOpenAI({
+        apiKey,
+      });
+      return openai(modelName);
+    }
+
+    case "DEEPSEEK": {
+      const deepseek = createOpenAI({
+        baseURL: "https://api.deepseek.com",
+        apiKey,
+      });
+      return deepseek(modelName);
     }
     case "OPENROUTER": {
       const openrouter = createOpenAI({

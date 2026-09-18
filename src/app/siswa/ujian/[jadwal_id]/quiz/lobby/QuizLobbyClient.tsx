@@ -31,6 +31,7 @@ export default function QuizLobbyClient({
     handleResetLobbyGame,
     handleCheckRoomAvailability,
     handleCloseClaimModal,
+    handleSelectCompetency
   } = useQuizLobbyViewModel(jadwalId, ujianId, siswaId);
 
   // Local Mascot interactive state
@@ -282,8 +283,8 @@ export default function QuizLobbyClient({
                         key={opt}
                         onClick={() => handleSelectAnswer(currentQ.id, opt)}
                         className={`btn-capy p-3.5 md:p-4 text-left text-xs md:text-sm rounded-2xl border-2 transition-all flex items-center gap-3 ${selected
-                            ? "bg-[#6B8E23] text-white border-[#556B2F] font-bold shadow-md"
-                            : "bg-[#FDF5E6] border-[#D2B48C] text-[#8B5A2B] hover:bg-[#A2CDB0]/30"
+                          ? "bg-[#6B8E23] text-white border-[#556B2F] font-bold shadow-md"
+                          : "bg-[#FDF5E6] border-[#D2B48C] text-[#8B5A2B] hover:bg-[#A2CDB0]/30"
                           }`}
                       >
                         <span
@@ -401,11 +402,11 @@ export default function QuizLobbyClient({
                   <button
                     key={comp.id}
                     onClick={() => {
-                      window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${sessionId}&competencyId=${comp.id}`;
+                      handleSelectCompetency(comp.id);
                     }}
                     className={`btn-capy w-full p-3 border-2 rounded-2xl flex items-center justify-between transition cursor-pointer text-left ${comp.isCompleted
-                        ? "bg-green-50 border-green-300 hover:bg-green-100"
-                        : "bg-[#FDF5E6] border-[#D2B48C] hover:bg-[#A2CDB0]/40"
+                      ? "bg-green-50 border-green-300 hover:bg-green-100"
+                      : "bg-[#FDF5E6] border-[#D2B48C] hover:bg-[#A2CDB0]/40"
                       }`}
                   >
                     <div>

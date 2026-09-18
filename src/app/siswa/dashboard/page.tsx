@@ -45,7 +45,8 @@ export default function SiswaDashboardPage() {
   }
 
   return (
-    <div className="min-h-[calc(100vh-8rem)] lg:h-[calc(100vh-8rem)] flex flex-col gap-5">
+    /* PERUBAHAN: Menghapus lg:h-[calc(100vh-8rem)] agar halaman bisa memanjang dan di-scroll */
+    <div className="min-h-[calc(100vh-8rem)] flex flex-col gap-5 pb-6">
       {/* Greeting */}
       <section className="shrink-0 bg-[var(--primary)] text-[var(--primary-foreground)] p-5 sm:p-6 md:p-7 rounded-2xl shadow-sm relative overflow-hidden">
         <div className="relative z-10">
@@ -67,11 +68,12 @@ export default function SiswaDashboardPage() {
       </section>
 
       {/* Dashboard Content */}
-      <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left Column */}
-        <div className="lg:col-span-2 min-h-0 flex flex-col gap-5">
+        <div className="lg:col-span-2 flex flex-col gap-5">
           {/* Performance Chart */}
-          <section className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-sm min-h-[300px] lg:flex-1 lg:min-h-0">
+          {/* PERUBAHAN: Menghapus lg:flex-1 dan memberikan min-h tetap agar grafik punya ruang yang cukup */}
+          <section className="bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-sm min-h-[350px] flex flex-col">
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="min-w-0">
                 <h2 className="font-bold text-base sm:text-lg text-[var(--card-foreground)]">
@@ -95,7 +97,8 @@ export default function SiswaDashboardPage() {
             </div>
 
             {performanceHistory.length > 0 ? (
-              <div className="h-[220px] sm:h-[260px] lg:h-[calc(100%-4rem)] min-h-[200px]">
+              /* PERUBAHAN: Mengatur tinggi grafik menjadi fleksibel tapi memiliki minimal tinggi */
+              <div className="flex-1 min-h-[250px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart
                     data={performanceHistory}
@@ -158,7 +161,7 @@ export default function SiswaDashboardPage() {
                 </ResponsiveContainer>
               </div>
             ) : (
-              <div className="h-[220px] flex items-center justify-center text-center text-sm text-[var(--muted-foreground)]">
+              <div className="flex-1 flex items-center justify-center text-center text-sm text-[var(--muted-foreground)]">
                 Belum ada ujian yang selesai dinilai.
               </div>
             )}
@@ -218,7 +221,7 @@ export default function SiswaDashboardPage() {
         </div>
 
         {/* Right Column */}
-        <div className="min-h-0 flex flex-col gap-5">
+        <div className="flex flex-col gap-5">
           {/* Learning Insight */}
           <section className="shrink-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl p-4 sm:p-5 shadow-sm">
             <h2 className="font-bold text-base sm:text-lg text-[var(--card-foreground)]">
@@ -274,7 +277,8 @@ export default function SiswaDashboardPage() {
           </section>
 
           {/* Recent Exams */}
-          <section className="min-h-[360px] lg:flex-1 lg:min-h-0 bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm flex flex-col overflow-hidden">
+          {/* PERUBAHAN: Memberikan max-height spesifik (contoh max-h-[500px]) agar punya scroll sendiri bila item sangat banyak, tapi tidak merusak layout */}
+          <section className="bg-[var(--card)] border border-[var(--border)] rounded-2xl shadow-sm flex flex-col overflow-hidden max-h-[500px]">
             <div className="shrink-0 p-4 sm:p-5 pb-3">
               <h2 className="font-bold text-base sm:text-lg text-[var(--card-foreground)]">
                 Ujian Terbaru
@@ -285,7 +289,7 @@ export default function SiswaDashboardPage() {
               </p>
             </div>
 
-            <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-5 pb-5 space-y-3">
+            <div className="flex-1 overflow-y-auto px-4 sm:px-5 pb-5 space-y-3">
               {recentHistory.length > 0 ? (
                 recentHistory.map((hist) => {
                   const isGraded = hist.status === "Dinilai";
@@ -305,7 +309,7 @@ export default function SiswaDashboardPage() {
                           <p className="text-xs text-[var(--muted-foreground)] mt-1">
                             {hist.submittedAt
                               ? new Date(
-                                hist.submittedAt,
+                                hist.submittedAt
                               ).toLocaleDateString("id-ID", {
                                 day: "numeric",
                                 month: "short",
@@ -341,7 +345,7 @@ export default function SiswaDashboardPage() {
                         {isGraded ? (
                           <Link
                             href={`/siswa/ujian/${hist.attemptId}/laporan`}
-                            className="text-xs font-semibold text-[var(--primary)] hover:opacity-75 transition flex items-center gap-1"
+                            className="flex items-center gap-1 text-xs font-semibold text-[var(--primary)] hover:opacity-75 transition"
                           >
                             <FileText size={13} />
                             Buka Laporan
@@ -363,7 +367,7 @@ export default function SiswaDashboardPage() {
                   );
                 })
               ) : (
-                <div className="h-full flex flex-col items-center justify-center text-center px-5">
+                <div className="h-[200px] flex flex-col items-center justify-center text-center px-5">
                   <Trophy
                     size={32}
                     className="text-[var(--muted-foreground)] mb-3"

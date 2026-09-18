@@ -9,14 +9,16 @@ import {
   executeQueryQuestionsFromBank,
   executeFallbackQuestionSelection,
 } from "./tools";
-import { updateQuizSessionMode } from "../db/quiz/quizDB";
 import { getGoogleGenAI } from "../llm/providers";
 import { getModelName } from "../llm/router";
 
 export interface MicroPayloadVector {
   q_id: number;
+  type: string;
   bloom: string;
   tag: string;
+  student_answer?: string;
+  reference_answer?: string;
   ok: boolean;
   ans_time_s: number;
 }
@@ -24,61 +26,49 @@ export interface MicroPayloadVector {
 export interface RouterEvaluationResult {
   nextAction: "NEXT_BATCH" | "REMEDIATE_CHAT" | "MASTERED" | "FAIL_SESSION";
   feedback: string;
+  thoughtProcess: string;
   conceptUnderstood: boolean;
   failedTags: string[];
   nextQuestionIds: number[];
+  gradedBatchData?: any[]; // The array updated by the AI
 }
 
 const ROUTER_SYSTEM_PROMPT = `
 You are Captain Chili, the Autonomous Supervisor Router Agent for Arunika Quiz Engine.
-Your responsibility is to analyze student performance micro-payload vectors: [{ q_id, bloom, tag, ok, ans_time_s }].
+You receive both micro-payload vectors and the full evaluation batch data (evalBatchData) containing student answers.
 
-Pedagogical Rules for Evaluation:
-1. Accuracy >= 80% (4 or 5 out of 5 correct) with success on higher Bloom levels (C3-C6) -> set nextAction to "MASTERED".
-2. Repeated foundational failures (accuracy < 60% with mistakes on C1-C2 levels or specific concept tags) -> set nextAction to "REMEDIATE_CHAT", list the failedTags, and set conceptUnderstood to false.
-3. Moderate performance (e.g. 60-79% accuracy, or minor mistakes without fundamental gap) -> set nextAction to "NEXT_BATCH", conceptUnderstood false.
-4. Consecutive severe failure streak (wrongStreak >= 5) -> set nextAction to "FAIL_SESSION".
+Your responsibilities:
+1. ESSAY GRADING: If a question is of type "ESSAY", read the 'studentAnswer' and compare it to the 'correctAnswer' (reference rubric). If the student's answer captures the core concept (even if worded differently), consider it CORRECT.
+2. ANALYZE: Evaluate the overall performance based on the graded accuracy.
+3. ROUTE: Determine the next action.
+
+Pedagogical Rules for Routing:
+- Accuracy >= 80% (4 or 5 out of 5 correct) with success on higher Bloom levels (C3-C6) -> set nextAction to "MASTERED".
+- Repeated foundational failures (accuracy < 60% with mistakes on C1-C2 levels or specific concept tags) -> set nextAction to "REMEDIATE_CHAT", list the failedTags, and set conceptUnderstood to false.
+- Moderate performance (e.g. 60-79% accuracy) -> set nextAction to "NEXT_BATCH", conceptUnderstood false.
+- Consecutive severe failure streak (wrongStreak >= 5) -> set nextAction to "FAIL_SESSION".
 
 Execution Procedure:
-- Call tool "submitAnswerEvaluation" with your computed (nextAction, feedback, conceptUnderstood, failedTags).
-- If nextAction is "NEXT_BATCH", you MUST subsequently query the bank using "queryQuestionsFromBank" and submit 5 pre-selected question IDs for the upcoming batch using "submitQuestionSelection".
+1. ALWAYS analyze the student's errors (and evaluate essays) in your 'thoughtProcess' first.
+2. Call tool "submitAnswerEvaluation" with your computed (thoughtProcess, nextAction, feedback, conceptUnderstood, failedTags) AND the 'gradedEssays' array containing the IDs of essays you determined are CORRECT.
+3. If nextAction is "NEXT_BATCH", you MUST subsequently query the bank using "queryQuestionsFromBank" and submit 5 pre-selected question IDs for the upcoming batch using "submitQuestionSelection".
 `;
 
 export async function runRouterAgentEvaluation(
   sessionId: number,
   kompetensiBabId: number,
   vectors: MicroPayloadVector[],
+  evalBatchData: any[],
   wrongStreak: number = 0
 ): Promise<RouterEvaluationResult> {
   const { ai, reportError } = await getGoogleGenAI()
   let nextAction: "NEXT_BATCH" | "REMEDIATE_CHAT" | "MASTERED" | "FAIL_SESSION" = "NEXT_BATCH";
   let feedback = "Tetap semangat dan santai bersama Kapten Chili! 🦫🌶️";
+  let thoughtProcess = "Sedang mengevaluasi jawaban esai dan menganalisis hasil belajar secara mendalam...";
   let conceptUnderstood = false;
   let failedTags: string[] = [];
   let nextQuestionIds: number[] = [];
-
-  // Local fallback heuristic calculation
-  const totalCount = vectors.length || 1;
-  const correctCount = vectors.filter((v) => v.ok).length;
-  const accuracy = correctCount / totalCount;
-
-  // Extract failed tags
-  const failedVectors = vectors.filter((v) => !v.ok);
-  failedTags = Array.from(new Set(failedVectors.map((v) => v.tag).filter(Boolean)));
-
-  // Fallback defaults in case LLM tool call isn't triggered
-  if (accuracy >= 0.8) {
-    nextAction = "MASTERED";
-    conceptUnderstood = true;
-  } else if (accuracy < 0.6 || failedVectors.some((v) => v.bloom === "C1" || v.bloom === "C2")) {
-    if (wrongStreak >= 4) {
-      nextAction = "FAIL_SESSION";
-    } else {
-      nextAction = "REMEDIATE_CHAT";
-    }
-  } else {
-    nextAction = "NEXT_BATCH";
-  }
+  let finalGradedBatchData = [...evalBatchData];
 
   try {
     const competency = await prisma.kompetensiBab.findUnique({
@@ -86,12 +76,23 @@ export async function runRouterAgentEvaluation(
     });
     const competencyName = competency?.isiKompetensi || `Kompetensi ID ${kompetensiBabId}`;
 
+    // Pass the rich evalBatchData so the LLM can read the essay text and reference answers
     const userPrompt = `
 Session ID: ${sessionId}
 Competency: "${competencyName}"
 Wrong Streak: ${wrongStreak}
-Micro-Payload Vectors:
-${JSON.stringify(vectors, null, 2)}
+
+Micro-Payload Vectors (Quick Overview):
+${JSON.stringify(vectors.map(v => ({ id: v.q_id, type: v.type, tag: v.tag, ok: v.ok })), null, 2)}
+
+Full Batch Data for Grading (Pay attention to ESSAY types, compare studentAnswer to correctAnswer):
+${JSON.stringify(evalBatchData.map(q => ({
+      id: q.id,
+      type: q.type,
+      text: q.text,
+      studentAnswer: q.studentAnswer,
+      correctAnswer: q.correctAnswer
+    })), null, 2)}
 `;
 
     const contents: Content[] = [
@@ -136,10 +137,21 @@ ${JSON.stringify(vectors, null, 2)}
       for (const call of functionCalls) {
         if (call.name === "submitAnswerEvaluation") {
           const args = (call.args || {}) as any;
+          if (args.thoughtProcess) thoughtProcess = args.thoughtProcess;
           if (args.nextAction) nextAction = args.nextAction;
           if (args.feedback) feedback = args.feedback;
           if (typeof args.conceptUnderstood === "boolean") conceptUnderstood = args.conceptUnderstood;
           if (Array.isArray(args.failedTags)) failedTags = args.failedTags;
+
+          // CRITICAL: Apply the AI's essay grades back to the data array
+          if (Array.isArray(args.gradedCorrectEssayIds)) {
+            finalGradedBatchData = finalGradedBatchData.map(item => {
+              if (item.type === "ESSAY" && args.gradedCorrectEssayIds.includes(item.id)) {
+                return { ...item, isCorrect: true };
+              }
+              return item;
+            });
+          }
 
           responseParts.push({
             functionResponse: {
@@ -183,37 +195,26 @@ ${JSON.stringify(vectors, null, 2)}
         });
       }
 
-      // If nextAction is NEXT_BATCH and we already have 5 nextQuestionIds, break early
-      if (nextAction === "NEXT_BATCH" && nextQuestionIds.length === 5) {
-        break;
-      }
-      // If nextAction is not NEXT_BATCH and evaluation has been submitted, break early
-      if (nextAction !== "NEXT_BATCH" && feedback) {
-        break;
-      }
+      if (nextAction === "NEXT_BATCH" && nextQuestionIds.length === 5) break;
+      if (nextAction !== "NEXT_BATCH" && feedback) break;
     }
   } catch (error) {
     console.error("Error in runRouterAgentEvaluation:", error);
   }
 
-  // If nextAction === "NEXT_BATCH" but LLM didn't select 5 question IDs, fallback query
   if (nextAction === "NEXT_BATCH" && nextQuestionIds.length < 5) {
     nextQuestionIds = await executeFallbackQuestionSelection(kompetensiBabId);
   }
 
-  // Update sessionMode in database based on nextAction decision
-  let dbSessionMode: "QUIZ_ACTIVE" | "CHAT_REMEDIATION" | "MASTERED" | "FAILED" = "QUIZ_ACTIVE";
-  if (nextAction === "REMEDIATE_CHAT") dbSessionMode = "CHAT_REMEDIATION";
-  else if (nextAction === "MASTERED") dbSessionMode = "MASTERED";
-  else if (nextAction === "FAIL_SESSION") dbSessionMode = "FAILED";
-
-  await updateQuizSessionMode(sessionId, dbSessionMode);
+  // NOTE: Database Mode updating is now handled safely by the backend quizRepository!
 
   return {
     nextAction,
     feedback,
+    thoughtProcess,
     conceptUnderstood,
     failedTags,
     nextQuestionIds,
+    gradedBatchData: finalGradedBatchData // Return the newly graded array
   };
 }

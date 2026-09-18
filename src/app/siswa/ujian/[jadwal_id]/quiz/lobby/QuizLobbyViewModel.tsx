@@ -1,5 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { quizRepository } from "@/src/lib/repositories/quizRepository";
+import { useSession } from "next-auth/react";
 
 interface LobbyQuestion {
   id: number;
@@ -26,6 +27,7 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
   const [checkingAvailability, setCheckingAvailability] = useState(false);
 
   const [competencies, setCompetencies] = useState<any[]>([]);
+  const { data: userSession } = useSession()
 
   useEffect(() => {
     let isMounted = true;
@@ -38,7 +40,7 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
           quizRepository.getLobbyQuizQuestions(ujianId),
         ]);
 
-        const compList = await quizRepository.getCompetenciesForUjian(ujianId, session.id);
+        const compList = await quizRepository.getCompetenciesForUjian(ujianId, Number(userSession?.user?.id), session.id);
 
         if (isMounted) {
           setActiveSessions(count);
@@ -102,6 +104,21 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
 
   const handleSelectAnswer = (questionId: number, option: string) => {
     setUserAnswers((prev) => ({ ...prev, [questionId]: option }));
+  };
+
+  const handleSelectCompetency = async (competencyId: number) => {
+    const session = await quizRepository.joinOrRegisterQueue(siswaId, ujianId);
+
+    // Check if slot can be claimed immediately on init
+    if (session.status === "WAITING") {
+      const claimed = await quizRepository.claimPlayingSlot(session.id, competencyId);
+      if (claimed) {
+        window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${session.id}&competencyId=${competencyId}`;
+      }
+    } else if (session.status === "PLAYING") {
+      await quizRepository.claimPlayingSlot(session.id, competencyId);
+      window.location.href = `/siswa/ujian/${jadwalId}/quiz/play?sessionId=${session.id}&competencyId=${competencyId}`;
+    }
   };
 
   const handleNextQuestion = () => {
@@ -169,5 +186,6 @@ export function useQuizLobbyViewModel(jadwalId: string, ujianId: number, siswaId
     handleResetLobbyGame,
     handleCheckRoomAvailability,
     handleCloseClaimModal,
+    handleSelectCompetency
   };
 }

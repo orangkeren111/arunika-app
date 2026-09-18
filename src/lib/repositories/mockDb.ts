@@ -107,6 +107,7 @@ export let mockJadwal: JadwalUjian[] = [
   {
     id: "j1",
     templateId: "u1",
+    title: "UH 1 Biologi Kls X",
     className: "10 MIPA 1",
     startTime: "2026-06-25 08:00",
     type: "Ulangan Harian",
@@ -115,6 +116,7 @@ export let mockJadwal: JadwalUjian[] = [
   {
     id: "j2",
     templateId: "u1",
+    title: "UH 1 Biologi Kls X",
     className: "10 MIPA 1",
     startTime: "2026-06-20 08:00",
     type: "Ulangan Harian",

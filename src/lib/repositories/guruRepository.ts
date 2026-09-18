@@ -632,17 +632,17 @@ export const guruRepository = {
         const totalStudents = j.sesiSiswa.length;
 
         const completedAiResponses = j.sesiSiswa.filter(
-          (s: any) => s.aiLogs?.status === "COMPLETED"
+          (s: any) => s.aiLogs[0]?.status?.trim().toUpperCase() === "DONE"
         ).length;
 
         const failedAiResponses = j.sesiSiswa.filter(
-          (s: any) => s.aiLogs?.status === "FAILED"
+          (s: any) => ["FAILED", "ERROR"].includes(s.aiLogs[0]?.status?.trim().toUpperCase())
         ).length;
 
         // Report can only be accessed when all students have finished AI processing
         const isReportReady =
           totalStudents > 0 &&
-          completedAiResponses + failedAiResponses === totalStudents;
+          (completedAiResponses + failedAiResponses) === totalStudents;
 
         const isGenerating =
           totalStudents === 0 ||

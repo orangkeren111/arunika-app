@@ -1,4 +1,6 @@
-import { useEffect, useState, useRef } from "react";
+"use client";
+
+import { useState, useEffect, useRef } from "react";
 import { quizRepository } from "@/src/lib/repositories/quizRepository";
 import { MicroPayloadVector } from "@/src/lib/services/quiz-agent/routerAgent";
 import { ChatMessageItem } from "@/src/lib/services/quiz-agent/tutorAgent";
@@ -12,6 +14,7 @@ export interface Competency {
 
 export interface Question {
   id: number;
+  type?: "MCQ" | "ESSAY";
   text: string;
   options: string[];
   correctAnswer: string;
@@ -22,6 +25,7 @@ export interface Question {
 }
 
 export type SessionState = "QUIZ" | "CHAT" | "WIN" | "FAIL";
+export type ReviewStep = "THOUGHTS" | "RESULTS";
 
 export function useQuizPlayViewModel(
   sessionId: number,
@@ -32,7 +36,6 @@ export function useQuizPlayViewModel(
   const [session, setSession] = useState<any>(null);
   const [sessionState, setSessionState] = useState<SessionState>("QUIZ");
 
-  const [competencies, setCompetencies] = useState<Competency[]>([]);
   const [currentComp, setCurrentComp] = useState<Competency | null>(null);
 
   // Active batch questions
@@ -41,6 +44,15 @@ export function useQuizPlayViewModel(
   const [currentQIdx, setCurrentQIdx] = useState(0);
   const [evaluating, setEvaluating] = useState(false);
   const [evaluatedBatch, setEvaluatedBatch] = useState<any[] | null>(null);
+
+  // Agent review workflow
+  const [reviewStep, setReviewStep] = useState<ReviewStep>("THOUGHTS");
+  const [pendingPostReviewAction, setPendingPostReviewAction] = useState<{
+    nextAction: "NEXT_BATCH" | "REMEDIATE_CHAT" | "MASTERED" | "FAIL_SESSION";
+    thoughtProcess: string;
+    nextQuestions?: any[];
+    wrongCount: number;
+  } | null>(null);
 
   // Agent feedback & state
   const [agentFeedback, setAgentFeedback] = useState("");
@@ -66,27 +78,42 @@ export function useQuizPlayViewModel(
       }
       setSession(detail);
 
-      const list = await quizRepository.getCompetenciesForUjian(detail.ujianId);
-      setCompetencies(list);
+      let activeComp: Competency | null = null;
 
-      let activeComp: Competency | undefined;
       if (targetCompetencyId) {
-        activeComp = list.find((c) => c.id === targetCompetencyId);
+        // Fetch specific competency if target is provided
+        const compInfo = await quizRepository.getCompetencyById(targetCompetencyId);
+        if (compInfo) {
+          activeComp = { ...compInfo, jumlahSoal: 5 }; // Fallback jumlahSoal if needed
+        }
+      } else {
+        // Fetch the competency based on the user's current level in the session
+        const compInfo = await quizRepository.getCompetencyById(detail.currentLevel);
+        if (compInfo) {
+          activeComp = { ...compInfo, jumlahSoal: 5 };
+        }
       }
 
       if (!activeComp) {
-        const levelIdx = detail.currentLevel - 1;
-        if (levelIdx >= list.length) {
-          await quizRepository.finishOrFailSession(sessionId, "FINISHED");
-          setSessionState("WIN");
-          setLoading(false);
-          return;
-        }
-        activeComp = list[levelIdx] || list[0];
+        // If no active comp could be resolved, the student might have finished all levels
+        await quizRepository.finishOrFailSession(sessionId, "FINISHED");
+        setSessionState("WIN");
+        setLoading(false);
+        return;
       }
 
       setCurrentComp(activeComp);
       await loadQuestionsForCompetency(activeComp.id);
+
+      // Sync UI if the user reloads the page during a specific phase
+      if (detail.sessionMode === "CHAT_REMEDIATION") {
+        setSessionState("CHAT");
+      } else if (detail.sessionMode === "MASTERED") {
+        setSessionState("WIN");
+      } else if (detail.sessionMode === "FAILED") {
+        setSessionState("FAIL");
+      }
+
       setLoading(false);
     };
 
@@ -133,16 +160,12 @@ export function useQuizPlayViewModel(
     if (preselected && preselected.length === 5) {
       setActiveQuestions(preselected);
     } else {
-      const selectedIds = await quizRepository.runAgentSelectQuestions(compBabId);
       const allPool = await quizRepository.getQuestionsForCompetency(compBabId);
-
       if (allPool.length === 0) {
         setActiveQuestions([]);
         return;
       }
-
-      const selectedQ = allPool.filter((q) => selectedIds.includes(q.id));
-      const finalBatch = selectedQ.length >= 3 ? selectedQ : allPool.sort(() => 0.5 - Math.random()).slice(0, 5);
+      const finalBatch = allPool.sort(() => 0.5 - Math.random()).slice(0, 5);
       setActiveQuestions(finalBatch);
     }
 
@@ -151,6 +174,8 @@ export function useQuizPlayViewModel(
     setAgentFeedback("");
     setLevelCompleted(false);
     setEvaluatedBatch(null);
+    setPendingPostReviewAction(null);
+    setReviewStep("THOUGHTS");
 
     // Initialize answer start timestamps for micro-payload vectors
     const now = Date.now();
@@ -172,34 +197,12 @@ export function useQuizPlayViewModel(
   };
 
   const handleTimeout = async () => {
-    const timeoutLog = {
-      siswaId: session?.siswaId,
-      ujianId: session?.ujianId,
-      competencyId: currentComp?.id,
-      competencyName: currentComp?.name,
-      status: "NOT_FINISHED",
-      reason: "TIME_EXPIRED",
-      agentFeedback: agentFeedback || "Waktu sesi kuis telah habis.",
-      conceptUnderstood: false,
-      timestamp: new Date().toISOString(),
-    };
-    await quizRepository.finishOrFailSession(sessionId, "FAILED", "TIME_EXPIRED", timeoutLog);
+    await quizRepository.finishOrFailSession(sessionId, "FAILED", "TIME_EXPIRED");
     setSessionState("FAIL");
   };
 
   const handleAfkKick = async () => {
-    const afkLog = {
-      siswaId: session?.siswaId,
-      ujianId: session?.ujianId,
-      competencyId: currentComp?.id,
-      competencyName: currentComp?.name,
-      status: "NOT_FINISHED",
-      reason: "AFK_INACTIVITY",
-      agentFeedback: "Pemain tidak aktif (AFK). Sesi dihentikan.",
-      conceptUnderstood: false,
-      timestamp: new Date().toISOString(),
-    };
-    await quizRepository.finishOrFailSession(sessionId, "AFK", "AFK_INACTIVITY", afkLog);
+    await quizRepository.finishOrFailSession(sessionId, "AFK", "AFK_INACTIVITY");
     setSessionState("FAIL");
     setShowIdlePrompt(false);
   };
@@ -216,123 +219,109 @@ export function useQuizPlayViewModel(
     setEvaluating(true);
 
     const now = Date.now();
-    // Build micro-payload vectors for routerAgent
+
+    // Pass ALL data to the Router Agent, including raw text for Essay evaluation
     const vectors: MicroPayloadVector[] = activeQuestions.map((q) => {
-      const studentAns = userAnswers[q.id] || "";
-      const isCorrect = studentAns === q.correctAnswer;
+      const studentAns = (userAnswers[q.id] || "").trim();
+
+      // MCQ is still auto-graded by frontend to save LLM tokens. 
+      // ESSAY is marked as 'false' initially; the Agent will evaluate and override this.
+      const isCorrect = q.type === "ESSAY" ? false : studentAns === q.correctAnswer;
+
       const startTime = questionStartTimesRef.current[q.id] || now;
       const durationS = Math.max(1, Math.round((now - startTime) / 1000));
       const firstTag = q.tags && q.tags.length > 0 ? q.tags[0] : currentComp.name;
 
       return {
         q_id: q.id,
+        type: q.type || "MCQ",
         bloom: q.bloomLevel || "C1",
         tag: firstTag,
-        ok: isCorrect,
+        student_answer: studentAns,
+        reference_answer: q.correctAnswer,
+        ok: isCorrect, // Agent will recalculate this if type === 'ESSAY'
         ans_time_s: durationS,
+      } as any; // Type asserted as 'any' here temporarily. Update your MicroPayloadVector interface on the backend!
+    });
+
+    const evalBatchData = activeQuestions.map((q) => {
+      const studentAns = (userAnswers[q.id] || "").trim();
+      return {
+        ...q,
+        studentAnswer: studentAns,
+        isCorrect: false, // Will be updated by Agent's response
+        correctAnswer: q.correctAnswer,
+        difficulty: q.difficulty || 5,
+        bloomLevel: q.bloomLevel || "C1",
       };
     });
 
-    const evalBatchData = activeQuestions.map((q) => ({
-      id: q.id,
-      text: q.text,
-      options: q.options,
-      linkGambarSoal: q.linkGambarSoal || null,
-      studentAnswer: userAnswers[q.id] || "",
-      correctAnswer: q.correctAnswer,
-      isCorrect: userAnswers[q.id] === q.correctAnswer,
-      difficulty: q.difficulty || 5,
-      bloomLevel: q.bloomLevel || "C1",
-    }));
 
-    setEvaluatedBatch(evalBatchData);
-
-    const wrongCount = vectors.filter((v) => !v.ok).length;
-    const currentStreak = (session?.wrongStreak || 0) + wrongCount;
-
-    // Call routerAgent via repository
+    // Backend takes full control of state mutation AND Essay Grading
     const result = await quizRepository.runBatchEvaluation(
       sessionId,
       currentComp.id,
+      currentComp.name,
       vectors,
-      currentStreak
+      evalBatchData
     );
+
+    // Merge the Agent's final graded array (which includes essay grades) back into the UI
+    if (result.gradedBatchData) {
+      setEvaluatedBatch(result.gradedBatchData);
+    } else {
+      // Fallback if backend doesn't return the graded array
+      setEvaluatedBatch(evalBatchData);
+    }
 
     setAgentFeedback(result.feedback);
     setFailedTags(result.failedTags);
+    setReviewStep("THOUGHTS");
 
-    const competencyLog = {
-      siswaId: session?.siswaId,
-      ujianId: session?.ujianId,
-      competencyId: currentComp.id,
-      competencyName: currentComp.name,
-      status: result.conceptUnderstood ? "FINISHED" : "NOT_FINISHED",
+    setPendingPostReviewAction({
       nextAction: result.nextAction,
-      agentFeedback: result.feedback,
-      failedTags: result.failedTags,
-      conceptUnderstood: result.conceptUnderstood,
-      evaluationBatch: evalBatchData,
-      timestamp: new Date().toISOString(),
-    };
+      thoughtProcess: result.thoughtProcess,
+      nextQuestions: result.nextQuestions,
+      wrongCount: result.wrongCount,
+    });
 
-    if (result.nextAction === "MASTERED") {
+    setEvaluating(false);
+  };
+
+  const handleContinueAfterReview = async () => {
+    if (!pendingPostReviewAction || !currentComp) return;
+    const { nextQuestions } = pendingPostReviewAction;
+
+    // FETCH ABSOLUTE TRUTH FROM BACKEND
+    const updatedSession = await quizRepository.getQuizSessionDetail(sessionId);
+    if (!updatedSession) return;
+
+    setSession(updatedSession);
+    setPendingPostReviewAction(null);
+    setReviewStep("THOUGHTS");
+
+    // Route UI purely based on DB sessionMode updated by the Router Agent
+    if (updatedSession.sessionMode === "MASTERED") {
       setLevelCompleted(true);
-      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, true);
-
-      if (targetCompetencyId) {
-        setSessionState("WIN");
-        setEvaluating(false);
-        return;
-      }
-
-      const nextLevel = session.currentLevel + 1;
-      const finishedAll = nextLevel > competencies.length;
-
-      if (finishedAll) {
-        await quizRepository.finishOrFailSession(
-          sessionId,
-          "FINISHED",
-          "ALL_COMPETENCIES_MASTERED",
-          competencyLog
-        );
-        setSessionState("WIN");
-      } else {
-        // Mastered current level, prompt user or auto proceed to next level
-        setSessionState("WIN");
-      }
-    } else if (result.nextAction === "REMEDIATE_CHAT") {
-      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
-      for (let i = 0; i < wrongCount; i++) {
-        await quizRepository.incrementWrongStreak(sessionId);
-      }
-
-      // Initialize chat drawer with Captain Chili's opening feedback
+      setSessionState("WIN");
+    } else if (updatedSession.sessionMode === "CHAT_REMEDIATION") {
       const initialMessage: ChatMessageItem = {
         role: "tutor",
-        text: `🦫 ${result.feedback} Mari kita bahas topik "${result.failedTags.join(", ") || currentComp.name}" bersama Kapten Chili!`,
+        text: `🦫 ${agentFeedback} Mari kita bahas topik "${failedTags.join(", ") || currentComp.name}" bersama Kapten Chili!`,
       };
       setChatMessages([initialMessage]);
       setSessionState("CHAT");
-    } else if (result.nextAction === "FAIL_SESSION") {
-      await quizRepository.finishOrFailSession(
-        sessionId,
-        "FAILED",
-        "WRONG_STREAK_EXCEEDED",
-        competencyLog
-      );
+    } else if (updatedSession.sessionMode === "FAILED") {
       setSessionState("FAIL");
     } else {
-      // NEXT_BATCH
-      await quizRepository.updateQuizSessionHistory(sessionId, competencyLog, false);
-      if (result.nextQuestions && result.nextQuestions.length === 5) {
-        await loadQuestionsForCompetency(currentComp.id, result.nextQuestions);
+      // QUIZ_ACTIVE / NEXT_BATCH
+      if (nextQuestions && nextQuestions.length === 5) {
+        await loadQuestionsForCompetency(currentComp.id, nextQuestions);
       } else {
         await loadQuestionsForCompetency(currentComp.id);
       }
       setSessionState("QUIZ");
     }
-
-    setEvaluating(false);
   };
 
   const handleSendMessage = async (userText: string) => {
@@ -359,6 +348,7 @@ export function useQuizPlayViewModel(
     setChatMessages(finalHistory);
     setChatSending(false);
 
+    // Tutor Agent has absolute authority to release the student
     if (tutorResult.resumeQuiz) {
       setSessionState("QUIZ");
       if (currentComp) {
@@ -367,35 +357,12 @@ export function useQuizPlayViewModel(
     }
   };
 
-  const handleManualResumeQuiz = () => {
-    setSessionState("QUIZ");
-  };
-
   const handleProceedToNextLevel = async () => {
-    if (targetCompetencyId) {
-      setSessionState("WIN");
-      return;
-    }
-    setLoading(true);
-    const updatedDetail = await quizRepository.getQuizSessionDetail(sessionId);
-    if (!updatedDetail) {
-      setLoading(false);
-      return;
-    }
-    setSession(updatedDetail);
-
-    const levelIdx = updatedDetail.currentLevel - 1;
-    if (levelIdx >= competencies.length) {
-      setSessionState("WIN");
-      setLoading(false);
-      return;
-    }
-
-    const activeComp = competencies[levelIdx];
-    setCurrentComp(activeComp);
-    setSessionState("QUIZ");
-    await loadQuestionsForCompetency(activeComp.id);
-    setLoading(false);
+    // Note: Because the frontend no longer calculates 'next level', 
+    // this logic should ideally be handled by returning to a lobby 
+    // or relying on a backend route to advance the session.
+    // For now, if they click proceed, we'll route them to WIN or back to lobby.
+    setSessionState("WIN");
   };
 
   const formatTimer = (seconds: number) => {
@@ -408,7 +375,6 @@ export function useQuizPlayViewModel(
     loading,
     session,
     sessionState,
-    competencies,
     currentComp,
     activeQuestions,
     userAnswers,
@@ -420,14 +386,17 @@ export function useQuizPlayViewModel(
     chatMessages,
     chatSending,
     levelCompleted,
+    reviewStep,
+    setReviewStep,
     timeLeft: formatTimer(timeLeft),
     showIdlePrompt,
     handleSelectAnswer,
     handleNextQuestion,
     handleSubmitBatch,
     handleSendMessage,
-    handleManualResumeQuiz,
     handleProceedToNextLevel,
     handleKeepPlaying,
+    handleContinueAfterReview,
+    pendingPostReviewAction,
   };
 }

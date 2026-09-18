@@ -170,10 +170,15 @@ export const submitQuestionSelectionToolDeclaration: FunctionDeclaration = {
 export const submitAnswerEvaluationToolDeclaration: FunctionDeclaration = {
   name: "submitAnswerEvaluation",
   description:
-    "Submit pedagogical feedback, nextAction decision, and concept evaluation based on performance vectors.",
+    "Submit pedagogical feedback, nextAction decision, concept evaluation, and your detailed internal thought process. Also submit IDs of any essay answers you determined are conceptually correct.",
   parameters: {
     type: Type.OBJECT,
     properties: {
+      thoughtProcess: {
+        type: Type.STRING,
+        description:
+          "Your internal pedagogical reasoning. Analyze the student's errors, grade their essays by comparing studentAnswer to correctAnswer, identify knowledge gaps, and explain WHY you are choosing the nextAction. This will be shown to the student.",
+      },
       nextAction: {
         type: Type.STRING,
         enum: ["NEXT_BATCH", "REMEDIATE_CHAT", "MASTERED", "FAIL_SESSION"],
@@ -186,16 +191,20 @@ export const submitAnswerEvaluationToolDeclaration: FunctionDeclaration = {
       },
       conceptUnderstood: {
         type: Type.BOOLEAN,
-        description:
-          "True ONLY if the student demonstrated genuine concept mastery.",
+        description: "True ONLY if the student demonstrated genuine concept mastery.",
       },
       failedTags: {
         type: Type.ARRAY,
         items: { type: Type.STRING },
         description: "Array of tags/topics where the student showed misconceptions or errors.",
       },
+      gradedCorrectEssayIds: {
+        type: Type.ARRAY,
+        items: { type: Type.NUMBER },
+        description: "Array of Question IDs for ESSAY questions where you determined the student's answer was conceptually correct based on the reference answer.",
+      }
     },
-    required: ["nextAction", "feedback", "conceptUnderstood"],
+    required: ["thoughtProcess", "nextAction", "feedback", "conceptUnderstood"],
   },
 };
 
@@ -205,7 +214,7 @@ export const submitAnswerEvaluationToolDeclaration: FunctionDeclaration = {
 export const finishRemediationAndResumeQuizToolDeclaration: FunctionDeclaration = {
   name: "finishRemediationAndResumeQuiz",
   description:
-    "Tool called by tutorAgent when the student demonstrates concept understanding or completes micro-tutoring to close chat and trigger the next quiz batch.",
+    "Tool called by tutorAgent ONLY when the student demonstrates clear concept understanding to close chat and trigger the next quiz batch.",
   parameters: {
     type: Type.OBJECT,
     properties: {

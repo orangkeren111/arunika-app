@@ -49,14 +49,14 @@ export async function joinOrRegisterQueue(siswaId: number, ujianId: number) {
       siswaId,
       ujianId,
       status: "WAITING",
-      currentLevel: 1,
+      currentLevel: -99,
       wrongStreak: 0,
       lastActiveAt: new Date(),
     },
   });
 }
 
-export async function claimPlayingSlot(sessionId: number): Promise<boolean> {
+export async function claimPlayingSlot(sessionId: number, kompetensiBabId?: number): Promise<boolean> {
   return await prisma.$transaction(async (tx) => {
     const session = await tx.quizSession.findUnique({
       where: { id: sessionId },
@@ -74,17 +74,20 @@ export async function claimPlayingSlot(sessionId: number): Promise<boolean> {
     });
 
     if (activeCount < 20) {
-      await tx.quizSession.update({
-        where: { id: sessionId },
-        data: {
-          status: "PLAYING",
-          startedAt: new Date(),
-          lastActiveAt: new Date(),
-        },
-      });
+      if (kompetensiBabId) {
+        await tx.quizSession.update({
+          where: { id: sessionId },
+          data: {
+            status: "PLAYING",
+            currentLevel: kompetensiBabId,
+            startedAt: new Date(),
+            lastActiveAt: new Date(),
+          },
+        });
+        return true;
+      }
       return true;
     }
-
     return false;
   });
 }
@@ -159,7 +162,7 @@ export async function getLobbyQuizQuestions(ujianId: number) {
   return questions.sort(() => 0.5 - Math.random()).slice(0, 10);
 }
 
-export async function getCompetenciesForUjian(ujianId: number, sessionId?: number) {
+export async function getCompetenciesForUjian(ujianId: number, siswaId: number, sessionId?: number) {
   const competencies = await prisma.ujianTemplateKompetensi.findMany({
     where: { ujianId, isEnabled: true },
     include: {
@@ -172,22 +175,22 @@ export async function getCompetenciesForUjian(ujianId: number, sessionId?: numbe
 
   let historyLogs: any[] = [];
   if (sessionId) {
-    const session = await prisma.quizSession.findUnique({
-      where: { id: sessionId },
-      select: { history: true },
+    const session = await prisma.quizSession.findMany({
+      where: { siswaId: siswaId, ujianId: ujianId, startedAt: { not: null } },
+      orderBy: { createdAt: "desc" },
     });
-    if (session?.history && typeof session.history === "object" && Array.isArray((session.history as any).logs)) {
-      historyLogs = (session.history as any).logs;
-    } else if (Array.isArray(session?.history)) {
-      historyLogs = session.history;
+    if (session && typeof session === "object" && Array.isArray((session as any).logs)) {
+      historyLogs = (session as any).logs;
+    } else if (Array.isArray(session)) {
+      historyLogs = session;
     }
   }
 
   return competencies.map((item) => {
     const finishedLog = historyLogs.find(
       (l: any) =>
-        l.competencyId === item.kompetensiBab.id &&
-        (l.status === "FINISHED" || l.conceptUnderstood === true)
+        l.currentLevel === item.kompetensiBabId &&
+        l.sessionMode === "MASTERED"
     );
     return {
       ...item,
@@ -200,7 +203,6 @@ export async function getQuestionsForCompetency(kompetensiBabId: number) {
   return await prisma.bankSoal.findMany({
     where: {
       kompetensiBabId,
-      type: TipeSoal.MCQ,
       isAccepted: true,
       isRejected: false,
     },
@@ -247,7 +249,6 @@ export async function updateQuizSessionHistory(
   };
 
   if (levelCompleted) {
-    data.currentLevel = { increment: 1 };
     data.wrongStreak = 0;
   }
 
