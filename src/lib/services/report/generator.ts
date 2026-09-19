@@ -2,12 +2,210 @@
 // lib/generator.ts
 import prisma from "../db/prisma";
 import { REPORT_PROMPTS } from "../llm/prompts";
+import { callPromptGuard, callSmartText } from "../llm/router";
+
+export async function generateReport(task: any, payload: any) {
+  let tokensSpent = 0;
+
+  // Step 1: Prompt Guard Verification
+  const textToGuard = String(
+    payload.studentInputOnly || payload.prompt || ""
+  ).slice(0, 1500);
+
+  const guardCheck = await callPromptGuard(textToGuard);
+  tokensSpent += guardCheck.tokens;
+
+  if (!guardCheck.safe) {
+    console.warn(
+      `Task ${task.id} failed prompt guard check:`,
+      guardCheck.text
+    );
+
+    await prisma.savedResponses.update({
+      where: { attemptId: payload.attemptId },
+      data: {
+        overview:
+          "Peringatan Keamanan: Terdeteksi indikasi manipulasi prompt pada jawaban/pertanyaan.",
+        weakness:
+          "Tidak dapat menganalisis karena masalah keamanan.",
+        recommendation:
+          "Silakan periksa jawaban siswa secara manual.",
+        status: "FAILED",
+      },
+    });
+
+    throw new Error("Prompt guard rejected payload");
+  }
+
+  // Step 2: Smart Text Execution
+  const result = await callSmartText(payload.prompt);
+  tokensSpent += result.tokens;
+
+  let rawText = result.text
+    .replace(/```json|```/g, "")
+    .trim();
+
+  const sanitizeJsonLatex = (str: string) => {
+    let cleaned = str.replace(
+      /\f([a-zA-Z]+)/g,
+      "\\\\f$1"
+    );
+
+    cleaned = cleaned.replace(
+      /\\(?![\\"\/bfnrtu])/g,
+      "\\\\"
+    );
+
+    // Escape literal control characters inside JSON strings
+    let result = "";
+    let insideString = false;
+    let escaped = false;
+
+    for (const char of cleaned) {
+      if (char === '"' && !escaped) {
+        insideString = !insideString;
+        result += char;
+        continue;
+      }
+
+      if (insideString) {
+        if (char === "\n") {
+          result += "\\n";
+          continue;
+        }
+
+        if (char === "\r") {
+          result += "\\r";
+          continue;
+        }
+
+        if (char === "\t") {
+          result += "\\t";
+          continue;
+        }
+      }
+
+      result += char;
+      escaped = char === "\\" && !escaped;
+
+      if (char !== "\\") {
+        escaped = false;
+      }
+    }
+
+    return result;
+  };
+
+  let parsedResult: any = {};
+
+  try {
+    // First attempt: direct JSON parse
+    parsedResult = JSON.parse(rawText);
+  } catch {
+    try {
+      // Second attempt: parse sanitized JSON
+      parsedResult = JSON.parse(
+        sanitizeJsonLatex(rawText)
+      );
+    } catch {
+      try {
+        // Third attempt: extract JSON object from model output
+        const startIdx = rawText.indexOf("{");
+        const endIdx = rawText.lastIndexOf("}");
+
+        if (startIdx !== -1 && endIdx > startIdx) {
+          const jsonSub = rawText.slice(
+            startIdx,
+            endIdx + 1
+          );
+
+          parsedResult = JSON.parse(
+            sanitizeJsonLatex(jsonSub)
+          );
+        } else {
+          throw new Error(
+            "No valid JSON object bounds found in model output."
+          );
+        }
+      } catch (parseErr: any) {
+        console.error(
+          `[Report Generator Error] Failed parsing JSON for Task ${task.id}`
+        );
+
+        console.error(
+          `[Report Generator Error] Raw LLM Output:\n${result.text}`
+        );
+
+        throw new Error(
+          `LLM output invalid JSON: ${parseErr.message}`
+        );
+      }
+    }
+  }
+
+  // Step 3: Update SavedResponse
+  await prisma.savedResponses.update({
+    where: { attemptId: payload.attemptId },
+    data: {
+      overview: parsedResult.overview,
+      weakness: parsedResult.weakness,
+      recommendation: parsedResult.recommendation,
+      status: "DONE",
+    },
+  });
+
+  // Step 4: Update essay answers
+  if (Array.isArray(parsedResult.essayChecks)) {
+    for (const check of parsedResult.essayChecks) {
+      if (check.jawabanId) {
+        await prisma.jawabanSiswa
+          .update({
+            where: {
+              id: Number(check.jawabanId),
+            },
+            data: {
+              aiResponse: check.aiResponse || null,
+              isCorrect:
+                typeof check.isCorrect === "boolean"
+                  ? check.isCorrect
+                  : undefined,
+              nilaiPoin:
+                typeof check.points === "number"
+                  ? check.points
+                  : undefined,
+            },
+          })
+          .catch((e) => {
+            console.error(
+              `Failed to update JawabanSiswa ${check.jawabanId}:`,
+              e
+            );
+          });
+      }
+    }
+  }
+
+  return {
+    result: parsedResult,
+    tokens: tokensSpent,
+  };
+}
 
 /**
  * Calculates metrics and enqueues the LLM generation task.
  * Called immediately when the user finishes the exam.
  */
 export async function enqueueStudentReport(attemptId: number) {
+  // 0. Validate report isn't queued
+  const existingReport = await prisma.taskQueue.findFirst({
+    where: {
+      type: "generate_report",
+      payload: { path: ["attemptId"], equals: attemptId }
+    },
+  });
+  if (existingReport) {
+    return { success: true, message: "Report already queued." };
+  }
   // 1. Fetch data with question details
   const history = await prisma.jawabanSiswa.findMany({
     where: { attemptId },

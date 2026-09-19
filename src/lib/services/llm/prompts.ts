@@ -41,10 +41,18 @@ ${summary}
     kompetensiCode: string,
     kompetensiText: string,
     goodQuestions: string[],
-    badQuestions: string[]
+    badQuestions: string[],
+    tingkatan?: string,
   ) => `
-Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various type, mostly MCQ but a sprinkle of ESSAY (optimal is 5:1).
+Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various type, mostly MCQ but a sprinkle of ESSAY if necessary (optimal is 5:1). The target is for ${tingkatan} students, so adjust accordingly.
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex) and each question having their own Bloom's Taxonomy levels (C1 to C6).
+FORMATTING RULES:
+- All overview, weakness, recommendation, and aiResponse fields must use plain text.
+- Do NOT use Markdown formatting.
+- Do NOT use **bold**, *italic*, headings, bullet Markdown, backticks, or other Markdown syntax.
+- Use normal numbered lists or simple hyphen lists when needed.
+- Do not include formatting characters such as **, *, ##, # or >.
+
 
 IMPORTANT FOR MATHEMATICAL & CHEMICAL FORMULAS (LaTeX & JSON ESCAPING):
 - Whenever generating questions, options, or explanations containing mathematical equations, formulas, fractions, powers, roots, variables, or chemical equations/compounds (e.g. H2O, CO2, chemical reactions):
@@ -79,7 +87,8 @@ else if tipeSoal is ESSAY then
   "explanation": "Photosynthesis is...",
   "tags": ["topic_keyword_1", "topic_keyword_2"]
 }]
-Do not include any markdown formatting like \`\`\`json.
+DO NOT include any markdown formatting like \`\`\`json.
+Jika soal merupakan pelajaran bahasa asing (non Indonesia), maka gunakan bahasa English atau bahasa asing tersebut. Selain itu, gunakan bahasa Indonesia
 `,
 };
 /*
@@ -93,6 +102,16 @@ ${badQuestions.length > 0 ? `DO NOT generate questions similar to these BAD/REJE
 export const REPORT_PROMPTS = {
   analysis: (historicalData: string) => `
 You are an expert educational evaluator. Review the following student quiz attempt history, which includes question competency, taxonomy level, question type (MCQ or ESSAY), reference answer / correct key, student's answer, and whether it was marked correct.
+IMPORTANT OUTPUT RULES:
+- All text values must be plain text only.
+- Do NOT use Markdown formatting.
+- Do NOT use **bold** or *italic*.
+- Do NOT use backticks.
+- Do NOT use Markdown headings.
+- Do NOT use Markdown bullet points.
+- For lists, use numbered lines such as "1. ..." or plain hyphens.
+- Do not put literal line breaks inside JSON string values. Encode line breaks as \\n.
+- Return ONLY valid JSON.
 
 For any ESSAY questions included in the student data, evaluate the student's essay answer against the question context and reference answer. Determine:
 - "isCorrect": boolean (true if the answer demonstrates understanding, false otherwise)

@@ -4,6 +4,8 @@ import React, { use, useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { quizRepository } from "@/src/lib/repositories/quizRepository";
 import QuizLobbyClient from "./QuizLobbyClient";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
+import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 
 export default function QuizLobbyPage({
   params,
@@ -14,6 +16,18 @@ export default function QuizLobbyPage({
   const { data: session, status } = useSession();
   const [ujianId, setUjianId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useOwnerGuard({
+    isAuthorized: () =>
+      siswaRepository.checkStudentAuthorizedForJadwal(
+        resolvedParams.jadwal_id,
+        session?.user?.id ? Number(session.user.id) : undefined,
+      ),
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/dashboard",
+    errorMessage: "Akses Ditolak: Anda tidak terdaftar untuk mengikuti quiz ini.",
+    isLoadingResource: status === "loading" || !session?.user?.id,
+  });
 
   useEffect(() => {
     if (status === "authenticated" && session?.user?.id) {

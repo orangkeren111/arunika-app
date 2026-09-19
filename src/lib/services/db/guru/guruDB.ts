@@ -252,11 +252,28 @@ export async function getSoalList(
 }
 
 export async function createSoal(data: any) {
+  if (data.babId) {
+    const lockStatus = await getExamLockStatusForBab(Number(data.babId));
+    if (lockStatus.isLocked) {
+      throw new Error(`Soal tidak dapat dibuat: ${lockStatus.message}`);
+    }
+  }
   return await prisma.bankSoal.create({
     data,
   });
 }
+
 export async function updateSoal(id: number, data: Prisma.BankSoalUpdateInput) {
+  const soal = await prisma.bankSoal.findUnique({
+    where: { id },
+    select: { babId: true },
+  });
+  if (soal) {
+    const lockStatus = await getExamLockStatusForBab(soal.babId);
+    if (lockStatus.isLocked) {
+      throw new Error(`Soal tidak dapat diubah: ${lockStatus.message}`);
+    }
+  }
   return prisma.bankSoal.update({
     where: { id },
     data,
@@ -558,7 +575,7 @@ export async function getReportDetail(jadwalId: number) {
       kelas: true,
       tipeUjian: true,
       sesiSiswa: {
-        include: { siswa: true },
+        include: { siswa: true, aiLogs: true },
         orderBy: { nilaiAkhir: "desc" },
       },
     },

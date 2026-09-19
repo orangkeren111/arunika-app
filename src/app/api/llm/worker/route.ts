@@ -10,6 +10,7 @@ import { processKurikulumExtract } from "@/src/lib/services/process-book/extract
 import { processPendingBookImages } from "@/src/lib/services/process-book/process-images";
 import { NextResponse } from "next/server";
 import fs from "fs/promises";
+import { generateReport } from "@/src/lib/services/report/generator";
 
 
 const globalForWorker = globalThis as unknown as {
@@ -334,58 +335,9 @@ async function processTaskQueueBatch() {
 
         let tokensSpent = 0;
         if (task.type === "generate_report") {
-          // Step 1: Prompt Guard Verification (Run on untrusted student input text, truncated to safe 1500 chars limit)
-          const textToGuard = payload.studentInputOnly || (typeof payload.prompt === "string" ? payload.prompt.slice(0, 1500) : "");
-          const guardCheck = await callPromptGuard(textToGuard);
-          tokensSpent += guardCheck.tokens;
+          const reportResult = await generateReport(task, payload);
+          tokensSpent += reportResult.tokens;
 
-          if (!guardCheck.safe) {
-            console.warn(`Task ${task.id} failed prompt guard check:`, guardCheck.text);
-            await prisma.savedResponses.update({
-              where: { attemptId: payload.attemptId },
-              data: {
-                overview: "Peringatan Keamanan: Terdeteksi indikasi manipulasi prompt pada jawaban/pertanyaan.",
-                weakness: "Tidak dapat menganalisis karena masalah keamanan.",
-                recommendation: "Silakan periksa jawaban siswa secara manual.",
-                status: "FAILED",
-              },
-            });
-            throw new Error("Prompt guard rejected payload");
-          }
-
-          // Step 2: Smart Text Execution
-          const result = await callSmartText(payload.prompt);
-          tokensSpent += result.tokens;
-          const parsedResult = JSON.parse(result.text);
-
-          // Update the SavedResponse table based on the payload's attemptId
-          await prisma.savedResponses.update({
-            where: { attemptId: payload.attemptId },
-            data: {
-              overview: parsedResult.overview,
-              weakness: parsedResult.weakness,
-              recommendation: parsedResult.recommendation,
-              status: "DONE",
-            },
-          });
-
-          // Update essay question answers with AI response and score if present
-          if (Array.isArray(parsedResult.essayChecks)) {
-            for (const check of parsedResult.essayChecks) {
-              if (check.jawabanId) {
-                await prisma.jawabanSiswa.update({
-                  where: { id: Number(check.jawabanId) },
-                  data: {
-                    aiResponse: check.aiResponse || null,
-                    isCorrect: typeof check.isCorrect === "boolean" ? check.isCorrect : undefined,
-                    nilaiPoin: typeof check.points === "number" ? check.points : undefined,
-                  },
-                }).catch((e) => {
-                  console.error(`Failed to update JawabanSiswa ${check.jawabanId}:`, e);
-                });
-              }
-            }
-          }
         } else if (task.type === "extract_kurikulum") {
           const result = await processKurikulumExtract(payload.tempFilePath);
           tokensSpent = result.tokens;

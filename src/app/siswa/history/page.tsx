@@ -148,21 +148,26 @@ export default function HistoryPage() {
                   </td>
 
                   <td className="p-4 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <Link
-                        href={`/siswa/history/${item.attemptId}`}
-                        className="text-xs md:text-sm bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[var(--accent)] transition font-bold"
-                      >
-                        <FileText size={14} /> Lihat Hasil
-                      </Link>
+                    {item.status === "Dinilai" ||
+                      item.status === "Checked" ||
+                      item.status === "Graded"
+                      ? (
+                        <div className="flex items-center justify-end gap-2">
+                          <Link
+                            href={`/siswa/history/${item.attemptId}`}
+                            className="text-xs md:text-sm bg-[var(--muted)] text-[var(--foreground)] border border-[var(--border)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:bg-[var(--accent)] transition font-bold"
+                          >
+                            <FileText size={14} /> Lihat Hasil
+                          </Link>
 
-                      <Link
-                        href={`/siswa/ujian/${item.jadwalId}/quiz/lobby`}
-                        className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:opacity-90 transition font-bold shadow-sm"
-                      >
-                        <Play size={14} /> Lobby Quiz
-                      </Link>
-                    </div>
+                          <Link
+                            href={`/siswa/ujian/${item.jadwalId}/quiz/lobby`}
+                            className="text-xs md:text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-3 py-1.5 rounded-lg flex items-center gap-1 hover:opacity-90 transition font-bold shadow-sm"
+                          >
+                            <Play size={14} /> Lobby Quiz
+                          </Link>
+                        </div>) : (<></>)
+                    }
                   </td>
                 </tr>
               ))

@@ -90,10 +90,26 @@ export function useSoalViewModel(babId: string) {
     fetchSoal();
   }, [babId, selectedBloomLevel, selectedType, selectedTag]);
 
+  const [crudError, setCrudError] = useState<string | null>(null);
+  const [isErrorModalOpen, setIsErrorModalOpen] = useState(false);
+
+  const showError = (message: string) => {
+    setCrudError(message);
+    setIsErrorModalOpen(true);
+  };
+
   const handleGenerateQuestion = async (jumlahSoal: number = 10) => {
-    await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
-    await checkGenerationStatus();
-    fetchSoal();
+    try {
+      if (isLockedByExam) {
+        showError(lockMessage || "Soal tidak dapat digenerate karena Ujian sedang aktif/terjadwal.");
+        return;
+      }
+      await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
+      await checkGenerationStatus();
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal membuat soal dengan AI.");
+    }
   };
 
   const handleAddSoal = async (
@@ -108,25 +124,33 @@ export function useSoalViewModel(babId: string) {
     jawabanBenarEssay?: string,
     tags?: string[],
   ) => {
-    await guruRepository.addSoal({
-      babId,
-      type,
-      text,
-      options,
-      correctAnswer,
-      jawabanBenarEssay,
-      difficulty,
-      bloomLevel,
-      kompetensiBabId,
-      linkGambarSoal,
-      tags: tags || [],
-    });
-    fetchSoal();
+    try {
+      await guruRepository.addSoal({
+        babId,
+        type,
+        text,
+        options,
+        correctAnswer,
+        jawabanBenarEssay,
+        difficulty,
+        bloomLevel,
+        kompetensiBabId,
+        linkGambarSoal,
+        tags: tags || [],
+      });
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal menambah soal.");
+    }
   };
 
   const handleEditSoal = async (id: string, payload: Soal) => {
-    await guruRepository.editSoal(id, payload);
-    fetchSoal();
+    try {
+      await guruRepository.editSoal(id, payload);
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal memperbarui soal.");
+    }
   };
 
   const handleDeleteSoal = async (id: string): Promise<{ success: boolean; error?: string }> => {
@@ -135,18 +159,28 @@ export function useSoalViewModel(babId: string) {
       fetchSoal();
       return { success: true };
     } catch (err: any) {
-      return { success: false, error: err.message || "Gagal menghapus soal." };
+      const errMsg = err.message || "Gagal menghapus soal.";
+      showError(errMsg);
+      return { success: false, error: errMsg };
     }
   };
 
   const handleAcceptSoal = async (id: string) => {
-    await guruRepository.editSoal(id, { babId, isAccepted: true, isRejected: false } as any);
-    fetchSoal();
+    try {
+      await guruRepository.editSoal(id, { babId, isAccepted: true, isRejected: false } as any);
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal menyetujui soal.");
+    }
   };
 
   const handleRejectSoal = async (id: string) => {
-    await guruRepository.editSoal(id, { babId, isAccepted: false, isRejected: true } as any);
-    fetchSoal();
+    try {
+      await guruRepository.editSoal(id, { babId, isAccepted: false, isRejected: true } as any);
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal menolak soal.");
+    }
   };
 
   const handleUploadImage = async (file: File): Promise<string> => {
@@ -155,13 +189,21 @@ export function useSoalViewModel(babId: string) {
 
   const handleUploadBabPdf = async (file: File, jumlahSoal: number = 10) => {
     if (!bab) return;
-    const formData = new FormData();
-    formData.append("bookId", bab.bookId);
-    formData.append("babId", babId);
-    formData.append("pdfFile", file);
-    formData.append("jumlahSoal", jumlahSoal.toString());
-    await guruRepository.uploadAndGenerateBookPdf(formData);
-    await checkGenerationStatus();
+    try {
+      if (isLockedByExam) {
+        showError(lockMessage || "Soal tidak dapat dibuat karena Ujian sedang aktif.");
+        return;
+      }
+      const formData = new FormData();
+      formData.append("bookId", bab.bookId);
+      formData.append("babId", babId);
+      formData.append("pdfFile", file);
+      formData.append("jumlahSoal", jumlahSoal.toString());
+      await guruRepository.uploadAndGenerateBookPdf(formData);
+      await checkGenerationStatus();
+    } catch (err: any) {
+      showError(err.message || "Gagal memproses file PDF.");
+    }
   };
 
   return {
@@ -172,6 +214,10 @@ export function useSoalViewModel(babId: string) {
     isGeneratingSoal,
     isLockedByExam,
     lockMessage,
+    crudError,
+    isErrorModalOpen,
+    setIsErrorModalOpen,
+    closeErrorModal: () => setIsErrorModalOpen(false),
     checkGenerationStatus,
     checkExamLock,
     handleAddSoal,

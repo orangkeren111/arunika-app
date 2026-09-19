@@ -16,6 +16,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { useBabViewModel } from "./GuruBukuBabViewModel";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
 
 export default function BabPage({
   params,
@@ -27,6 +28,7 @@ export default function BabPage({
   const {
     buku,
     babList,
+    loading,
     isProcessingAi,
     statusStage,
     handleAddBab,
@@ -34,6 +36,13 @@ export default function BabPage({
     handleDeleteBab,
     handleUploadBook,
   } = useBabViewModel(resolvedParams.id);
+
+  useOwnerGuard({
+    ownerId: buku?.guruId,
+    allowedRole: "GURU",
+    fallbackUrl: "/guru/buku",
+    isLoadingResource: loading || !buku,
+  });
 
   // State untuk modal Bab
   const [isModalOpen, setIsModalOpen] = useState(false);

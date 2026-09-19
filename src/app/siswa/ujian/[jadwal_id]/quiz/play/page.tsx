@@ -2,7 +2,10 @@
 
 import React, { use } from "react";
 import { useSearchParams } from "next/navigation";
+import { useSession } from "next-auth/react";
 import QuizPlayClient from "./QuizPlayClient";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
+import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 
 export default function QuizPlayPage({
   params,
@@ -11,8 +14,21 @@ export default function QuizPlayPage({
 }) {
   const resolvedParams = use(params);
   const searchParams = useSearchParams();
+  const { data: session, status } = useSession();
   const sessionId = searchParams.get("sessionId");
   const competencyId = searchParams.get("competencyId") || searchParams.get("competency_id");
+
+  useOwnerGuard({
+    isAuthorized: () =>
+      siswaRepository.checkStudentAuthorizedForJadwal(
+        resolvedParams.jadwal_id,
+        session?.user?.id ? Number(session.user.id) : undefined,
+      ),
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/dashboard",
+    errorMessage: "Akses Ditolak: Anda tidak terdaftar untuk mengikuti quiz ini.",
+    isLoadingResource: status === "loading" || !session?.user?.id,
+  });
 
   if (!sessionId) {
     return (

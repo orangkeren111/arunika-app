@@ -48,15 +48,22 @@ export default function ReportDetailPage({ params }: { params: Promise<{ jadwal_
                 <td className="p-4 font-medium">{attempt.studentName}</td>
                 <td className="p-4 text-center font-bold text-[var(--primary)]">{attempt.score !== null ? attempt.score : '-'}</td>
                 <td className="p-4 flex justify-center">
-                   {attempt.status === 'Graded' || attempt.status === 'Checked' ? 
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-[var(--foreground)]"><CheckCircle size={14} className="text-emerald-500"/> Dinilai</span> :
-                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-[var(--foreground)]"><Clock size={14} className="text-amber-500"/> Menunggu Koreksi</span>
-                   }
+                  {attempt.status === 'Graded' || attempt.status === 'Checked' ?
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 border border-emerald-500/30 text-[var(--foreground)]"><CheckCircle size={14} className="text-emerald-500" /> Dinilai</span> : (
+                      attempt.status === 'Generating' ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-[var(--foreground)]"><Clock size={14} className="text-amber-500" /> Diproses AI</span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-500/15 border border-amber-500/30 text-[var(--foreground)]"><Clock size={14} className="text-amber-500" /> Menunggu Koreksi</span>
+                      ))
+                  }
                 </td>
                 <td className="p-4 text-right">
-                   <Link href={`/guru/reports/attempt/${attempt.id}`} className="text-sm text-[var(--secondary)] font-medium hover:underline">
+                  {attempt.status !== 'Generating' ? (
+                    <Link href={`/guru/reports/attempt/${attempt.id}`} className="text-sm text-[var(--secondary)] font-medium hover:underline">
                       Periksa Jawaban
-                   </Link>
+                    </Link>
+                  ) : (<></>)
+                  }
                 </td>
               </tr>
             ))}

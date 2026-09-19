@@ -4,6 +4,7 @@ export interface Buku {
   description: string;
   chapterCount: number;
   jobStatus?: string | null;
+  guruId?: number;
 }
 
 export interface Bab {

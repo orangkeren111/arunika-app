@@ -4,10 +4,26 @@ import React, { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, ShieldAlert, Timer, FileText } from 'lucide-react';
 import { useExamLobby } from './SiswaUjianLobbyViewModel';
+import { useOwnerGuard } from '@/src/lib/hooks/useOwnerGuard';
+import { siswaRepository } from '@/src/lib/repositories/siswaRepository';
+import { useSession } from 'next-auth/react';
 
 export default function ExamLobbyPage({ params }: { params: Promise<{ jadwal_id: string }> }) {
   const resolvedParams = use(params);
+  const { data: session } = useSession();
   const { exam } = useExamLobby(resolvedParams.jadwal_id);
+
+  useOwnerGuard({
+    isAuthorized: () =>
+      siswaRepository.checkStudentAuthorizedForJadwal(
+        resolvedParams.jadwal_id,
+        session?.user?.id ? Number(session.user.id) : undefined,
+      ),
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/dashboard",
+    errorMessage: "Akses Ditolak: Anda tidak terdaftar untuk mengikuti ujian ini.",
+    isLoadingResource: !session?.user?.id,
+  });
 
   if (!exam) return <p className="p-8 text-center text-[var(--muted-foreground)]">Memuat jadwal...</p>;
 
@@ -25,18 +41,18 @@ export default function ExamLobbyPage({ params }: { params: Promise<{ jadwal_id:
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
           <div className="bg-[var(--muted)] p-4 rounded-xl flex items-center gap-4">
-             <div className="p-3 bg-white rounded-lg text-[var(--primary)]"><Timer size={24}/></div>
-             <div>
-               <p className="text-xs text-[var(--muted-foreground)]">Durasi Waktu</p>
-               <p className="font-bold text-[var(--foreground)]">{exam.durationMinutes} Menit</p>
-             </div>
+            <div className="p-3 bg-white rounded-lg text-[var(--primary)]"><Timer size={24} /></div>
+            <div>
+              <p className="text-xs text-[var(--muted-foreground)]">Durasi Waktu</p>
+              <p className="font-bold text-[var(--foreground)]">{exam.durationMinutes} Menit</p>
+            </div>
           </div>
           <div className="bg-[var(--muted)] p-4 rounded-xl flex items-center gap-4">
-             <div className="p-3 bg-white rounded-lg text-[var(--secondary)]"><FileText size={24}/></div>
-             <div>
-               <p className="text-xs text-[var(--muted-foreground)]">Format Ujian</p>
-               <p className="font-bold text-[var(--foreground)]">Pilihan Ganda & Essay</p>
-             </div>
+            <div className="p-3 bg-white rounded-lg text-[var(--secondary)]"><FileText size={24} /></div>
+            <div>
+              <p className="text-xs text-[var(--muted-foreground)]">Format Ujian</p>
+              <p className="font-bold text-[var(--foreground)]">Pilihan Ganda & Essay</p>
+            </div>
           </div>
         </div>
 
@@ -63,15 +79,12 @@ export default function ExamLobbyPage({ params }: { params: Promise<{ jadwal_id:
 
         {exam.isFinishedByUser ? (
           <div className="space-y-3">
-            <Link 
-              href={`/siswa/ujian/${exam.jadwalId}/quiz/lobby`}
-              className="w-full block text-center bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition shadow-md"
+            <button
+              disabled
+              className="w-full block text-center bg-gray-300 text-gray-500 py-4 rounded-xl font-bold text-lg cursor-not-allowed shadow-inner"
             >
-              Main Kuis Eagle's Open Room 🦅
-            </Link>
-            <p className="text-xs text-center text-gray-400">
-              Ujian ini sudah Anda selesaikan. Ayo asah kompetensimu lewat petualangan kuis bersama Elang!
-            </p>
+              Ujian Telah Selesai
+            </button>
           </div>
         ) : exam.isEnded || !exam.isOngoing ? (
           <button
@@ -81,7 +94,7 @@ export default function ExamLobbyPage({ params }: { params: Promise<{ jadwal_id:
             Ujian Tidak Dapat Dimulai
           </button>
         ) : (
-          <Link 
+          <Link
             href={`/siswa/ujian/${exam.jadwalId}/attempt`}
             className="w-full block text-center bg-[var(--primary)] text-[var(--primary-foreground)] py-4 rounded-xl font-bold text-lg hover:opacity-90 transition shadow-md"
           >

@@ -5,12 +5,22 @@ import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { ArrowLeft, CalendarClock, Play, FileText } from 'lucide-react';
 import { useKelasDetail } from './SiswaKelasDetailViewModel';
+import { useOwnerGuard } from '@/src/lib/hooks/useOwnerGuard';
+import { siswaRepository } from '@/src/lib/repositories/siswaRepository';
 
 export default function KelasDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const resolvedParams = use(params);
   const { data: session } = useSession();
   const studentId = session?.user?.id ? Number(session.user.id) : undefined;
-  const { kelas, exams } = useKelasDetail(resolvedParams.id, studentId);
+  const { kelas, exams, loading } = useKelasDetail(resolvedParams.id, studentId);
+
+  useOwnerGuard({
+    isAuthorized: () => siswaRepository.checkStudentInKelas(resolvedParams.id, studentId),
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/dashboard",
+    errorMessage: "Akses Ditolak: Anda tidak terdaftar sebagai anggota kelas ini.",
+    isLoadingResource: loading || !studentId,
+  });
 
   if (!kelas) return <p className="text-[var(--muted-foreground)]">Memuat data kelas...</p>;
 

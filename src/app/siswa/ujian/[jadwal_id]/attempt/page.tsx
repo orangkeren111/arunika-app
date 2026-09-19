@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 import { MathRenderer } from "@/src/components/MathRenderer";
 import { useExamAttempt } from "./SiswaUjianAttemptViewModel";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
+import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
+import { useSession } from "next-auth/react";
 
 export default function ExamAttemptPage({
   params,
@@ -21,6 +24,7 @@ export default function ExamAttemptPage({
 }) {
   const router = useRouter();
   const resolvedParams = use(params);
+  const { data: session } = useSession();
 
   const {
     currentQ,
@@ -39,6 +43,18 @@ export default function ExamAttemptPage({
     warningMessage,
     dismissWarningModal,
   } = useExamAttempt(resolvedParams.jadwal_id);
+
+  useOwnerGuard({
+    isAuthorized: () =>
+      siswaRepository.checkStudentAuthorizedForJadwal(
+        resolvedParams.jadwal_id,
+        session?.user?.id ? Number(session.user.id) : undefined,
+      ),
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/dashboard",
+    errorMessage: "Akses Ditolak: Anda tidak terdaftar untuk mengikuti ujian ini.",
+    isLoadingResource: !session?.user?.id,
+  });
 
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [isFinishing, setIsFinishing] = useState(false);

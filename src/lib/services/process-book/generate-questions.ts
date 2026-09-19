@@ -11,6 +11,10 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
     where: { id: babId },
     include: { kompetensi: true },
   });
+  const buku = await prisma.buku.findUnique({
+    where: { id: bab?.bukuId },
+    select: { guru: { select: { sekolah: { select: { tingkat: true } } } } },
+  })
 
   if (!bab) throw new Error("Bab not found");
 
@@ -76,7 +80,8 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
       comp.nomerKompetensi,
       comp.isiKompetensi,
       goodList,
-      badList
+      badList,
+      buku?.guru?.sekolah?.tingkat ?? "SMA",
     )}${imageCatalogPrompt}`;
 
     // 3. Ask central Smart Text Model (providers.ts) to generate questions

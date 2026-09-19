@@ -7,6 +7,8 @@ import { useSoalViewModel } from "./GuruSoalViewModel";
 import { MathRenderer } from "@/src/components/MathRenderer";
 import { MathEquationAssistant } from "@/src/components/MathEquationAssistant";
 import { useCustomModal } from "@/src/components/CustomModal";
+import { ErrorModal } from "@/src/components/ErrorModal";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
 
 type TipeSoal = "MCQ" | "ESSAY";
 
@@ -34,6 +36,9 @@ export default function BankSoalClientPage({
     isGeneratingSoal,
     isLockedByExam,
     lockMessage,
+    crudError,
+    isErrorModalOpen,
+    closeErrorModal,
     checkGenerationStatus,
     handleAddSoal,
     handleEditSoal,
@@ -50,6 +55,13 @@ export default function BankSoalClientPage({
     selectedTag,
     setSelectedTag,
   } = useSoalViewModel(babId);
+
+  useOwnerGuard({
+    ownerId: (bab as any)?.buku?.guruId,
+    allowedRole: "GURU",
+    fallbackUrl: "/guru/buku",
+    isLoadingResource: loading || !bab,
+  });
 
   // --- MODAL STATE ---
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -906,6 +918,13 @@ export default function BankSoalClientPage({
           </div>
         </div>
       )}
+
+      {/* ERROR MODAL FOR SOAL CRUD */}
+      <ErrorModal
+        isOpen={isErrorModalOpen}
+        onClose={closeErrorModal}
+        message={crudError || "Terjadi kesalahan pada soal."}
+      />
     </div>
   );
 }

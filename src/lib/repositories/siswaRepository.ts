@@ -1,7 +1,6 @@
 import { TipeSoal } from "@prisma/client";
 import * as siswaDB from "../services/db/siswa/siswaDB";
 import * as examService from "../services/exam-dda/examService";
-import { enqueueStudentReport } from "../services/report/generator";
 
 export const siswaRepository = {
   // --- DASHBOARD ---
@@ -143,6 +142,15 @@ export const siswaRepository = {
       studentCount: k._count?.members || 0,
     }));
   },
+  checkStudentInKelas: async (kelasId: string | number, siswaId?: number) => {
+    if (!siswaId) return false;
+    return await siswaDB.isStudentInKelas(Number(kelasId), siswaId);
+  },
+
+  checkStudentAuthorizedForJadwal: async (jadwalId: string | number, siswaId?: number) => {
+    if (!siswaId) return false;
+    return await siswaDB.isStudentAuthorizedForJadwal(Number(jadwalId), siswaId);
+  },
 
   getKelasDetail: async (kelasId: string, siswaId?: number) => {
     const rawKelas = await siswaDB.getKelasDetail(parseInt(kelasId));
@@ -279,7 +287,6 @@ export const siswaRepository = {
       const sessionState = await examService.startExamSession(jadwalId, siswaId);
       if (!sessionState.nextQuestion || isFinish) {
         await examService.finishExamSession(currentSesiId);
-        await enqueueStudentReport(currentSesiId);
         return { finished: true };
       }
       return {

@@ -3,6 +3,7 @@
 import { use } from "react";
 import { ArrowLeft, CheckSquare, Square } from "lucide-react";
 import { useFormUjianViewModel } from "./GuruFormUjianViewModel";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
 import Link from "next/link";
 
 export default function ExamBuilderPage({
@@ -14,6 +15,7 @@ export default function ExamBuilderPage({
 
   const {
     isOwner,
+    loading,
     template,
     setTemplate,
     babList,
@@ -28,6 +30,13 @@ export default function ExamBuilderPage({
     setTemplateKompetensi,
     availableSoalCounts,
   } = useFormUjianViewModel(resolvedParams.id);
+
+  useOwnerGuard({
+    isAuthorized: resolvedParams.id === "new" || isOwner,
+    allowedRole: "GURU",
+    fallbackUrl: "/guru/ujian",
+    isLoadingResource: loading,
+  });
 
   const derivedTotalQuestions = templateKompetensi.reduce(
     (sum, tk) => sum + (tk.isEnabled ? tk.jumlahSoal : 0),

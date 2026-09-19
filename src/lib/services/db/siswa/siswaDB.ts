@@ -139,6 +139,29 @@ export async function getKelasList(siswaId: number) {
   });
 }
 
+export async function isStudentInKelas(kelasId: number, siswaId: number) {
+  if (!siswaId || !kelasId) return false;
+  const member = await prisma.kelasMember.findUnique({
+    where: {
+      kelasId_userId: {
+        kelasId,
+        userId: siswaId,
+      },
+    },
+  });
+  return !!member;
+}
+
+export async function isStudentAuthorizedForJadwal(jadwalId: number, siswaId: number) {
+  if (!siswaId || !jadwalId) return false;
+  const jadwal = await prisma.jadwalUjian.findUnique({
+    where: { id: jadwalId },
+    select: { kelasId: true },
+  });
+  if (!jadwal) return false;
+  return await isStudentInKelas(jadwal.kelasId, siswaId);
+}
+
 export async function getKelasDetail(kelasId: number) {
   return await prisma.kelas.findUnique({
     where: { id: kelasId },

@@ -1,6 +1,7 @@
 import { ExamQuestion } from "@/src/app/types/siswa";
 import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 export function useExamAttempt(jadwalId: string) {
@@ -21,6 +22,7 @@ export function useExamAttempt(jadwalId: string) {
   const [warningMessage, setWarningMessage] = useState("");
 
   const { data: session, status } = useSession();
+  const router = useRouter()
 
   // Handle tab-out (blur) warning and auto-submission
   useEffect(() => {
@@ -156,12 +158,15 @@ export function useExamAttempt(jadwalId: string) {
       );
       setIsFinished(true);
       setCurrentQ(null);
+      router.push(`/siswa/history`);
     } catch (error) {
       console.error("Failed to finish exam:", error);
     } finally {
       setIsSubmitting(false);
     }
-  };  const formatTime = (seconds: number) => {
+  };
+
+  const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
       .toString()
       .padStart(2, "0");

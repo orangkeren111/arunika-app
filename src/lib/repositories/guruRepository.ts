@@ -192,6 +192,7 @@ export const guruRepository = {
         title: rawBab.judul,
         description: "",
         chapterCount: rawBab.bab.length,
+        guruId: rawBab.guruId,
       },
       babList: rawBab.bab.map((bab: any) => ({
         id: bab.id.toString(),
@@ -686,7 +687,9 @@ export const guruRepository = {
         jadwalId: sesi.jadwalUjianId.toString(),
         studentName: sesi.siswa.name,
         score: sesi.nilaiAkhir,
-        status: sesi.nilaiAkhir !== null ? "Graded" : "Pending Essay",
+        status: !sesi.aiLogs || sesi.aiLogs.length === 0 || sesi.aiLogs[0].overview === "" ? "Generating" : (
+          sesi.nilaiAkhir !== null && sesi.isChecked ?
+            "Graded" : "Pending")
       })),
     };
   },
@@ -817,6 +820,7 @@ export const guruRepository = {
       classCode: data.classCode,
       studentCount: data._count.members,
       teacherName: data.teacher.name,
+      teacherId: data.teacherId,
       students: data.members
         .map((m) => m.user)
         .filter((u) => u.role === "SISWA")

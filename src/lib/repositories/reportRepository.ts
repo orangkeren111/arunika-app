@@ -65,6 +65,7 @@ export const reportRepository = {
       className,
       teacherName,
       jadwalId: attempt.jadwalUjianId?.toString(),
+      siswaId: student.id,
       overallScore: {
         correct: correctCount,
         total: totalExamQuestions,

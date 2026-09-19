@@ -159,7 +159,6 @@ export async function submitSingleAnswer(
   const newAnsweredCount = attemptNumber;
   if (totalQuestionsLimit > 0 && newAnsweredCount >= totalQuestionsLimit) {
     await finishExamSession(sesiId);
-    await enqueueStudentReport(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
 
@@ -202,7 +201,6 @@ export async function submitSingleAnswer(
   if (!nextQuestion) {
     // If no more valid questions exist to serve, finish session gracefully
     await finishExamSession(sesiId);
-    await enqueueStudentReport(sesiId);
     return { isFinished: true, finalElo: eloAfter };
   }
 
@@ -250,6 +248,7 @@ export async function finishExamSession(sesiId: number) {
     maxTotalPoin > 0
       ? Math.round((totalPoin / maxTotalPoin) * 100 * 100) / 100
       : 0;
+  await enqueueStudentReport(sesiId);
 
   await siswaDB.finishSession(sesiId, finalScore);
 }

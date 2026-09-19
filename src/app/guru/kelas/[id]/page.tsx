@@ -15,6 +15,7 @@ import {
   History,
 } from "lucide-react";
 import { useKelasDetailViewModel } from "./GuruKelasDetailViewModel";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
 
 export default function GuruKelasDetailPage({
   params,
@@ -53,6 +54,13 @@ export default function GuruKelasDetailPage({
     loadingHistory,
     viewStudentHistory,
   } = useKelasDetailViewModel(resolvedParams.id);
+
+  useOwnerGuard({
+    ownerId: classDetail?.teacherId,
+    allowedRole: "GURU",
+    fallbackUrl: "/guru/kelas",
+    isLoadingResource: loadingClass || !classDetail,
+  });
 
   const [activeTab, setActiveTab] = useState<"dashboard" | "exams" | "students" | "report">("dashboard");
   const [showScheduleModal, setShowScheduleModal] = useState(false);

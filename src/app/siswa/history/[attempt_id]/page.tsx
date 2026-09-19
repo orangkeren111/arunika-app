@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { ReportTemplate } from "@/src/components/ReportTemplate";
 import { useStudentReportViewModel } from "./SiswaHistoryDetailViewModel";
 import { PrintReportTemplate } from "@/src/components/PrintableTemplate";
+import { useOwnerGuard } from "@/src/lib/hooks/useOwnerGuard";
 
 export default function StudentReportPage({
   params,
@@ -18,6 +19,14 @@ export default function StudentReportPage({
   const router = useRouter();
   const resolvedParams = use(params);
   const { reportData } = useStudentReportViewModel(resolvedParams.attempt_id);
+
+  useOwnerGuard({
+    ownerId: reportData?.siswaId,
+    allowedRole: "SISWA",
+    fallbackUrl: "/siswa/history",
+    errorMessage: "Akses Ditolak: Anda tidak memiliki wewenang untuk melihat laporan ini.",
+    isLoadingResource: !reportData,
+  });
 
   const printRef = useRef<HTMLDivElement>(null);
 
