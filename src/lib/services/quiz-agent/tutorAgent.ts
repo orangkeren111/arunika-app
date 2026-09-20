@@ -2,7 +2,7 @@
 
 import { Content, Part } from "@google/genai";
 import { finishRemediationAndResumeQuizToolDeclaration } from "./tools";
-import { getGoogleGenAI } from "../llm/providers";
+import { generateWithGeminiFailover, getGoogleGenAI } from "../llm/providers";
 import { getModelName } from "../llm/router";
 
 export interface ChatMessageItem {
@@ -72,15 +72,16 @@ If and ONLY if the student clearly grasps the concept, call tool "finishRemediat
       },
     ];
 
-    const response = await ai.models.generateContent({
-      model: await getModelName("quiz_agent", "GEMINI"),
-      contents,
-      config: {
-        tools,
-        systemInstruction: TUTOR_SYSTEM_PROMPT,
-      },
-    });
-
+    const response = await generateWithGeminiFailover(async (ai) => {
+      return ai.models.generateContent({
+        model: await getModelName("quiz_agent", "GEMINI"),
+        contents,
+        config: {
+          tools,
+          systemInstruction: TUTOR_SYSTEM_PROMPT,
+        },
+      });
+    })
     const candidate = response.candidates?.[0];
     const textPart = candidate?.content?.parts?.find((p) => p.text);
     if (textPart && textPart.text) {

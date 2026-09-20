@@ -206,22 +206,20 @@ export default function AiModelsPage() {
         <div className="flex items-center p-1 bg-[var(--muted)] rounded-xl border border-[var(--border)] self-start md:self-auto">
           <button
             onClick={() => setActiveTab("keys")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === "keys"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "keys"
                 ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-            }`}
+              }`}
           >
             <KeyRound className="w-4 h-4" />
             API Keys Provider ({apiKeys.length})
           </button>
           <button
             onClick={() => setActiveTab("routing")}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${
-              activeTab === "routing"
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "routing"
                 ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
                 : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
-            }`}
+              }`}
           >
             <Route className="w-4 h-4" />
             Task Routing Models ({taskRoutings.length})
@@ -324,11 +322,10 @@ export default function AiModelsPage() {
                       <td className="p-4">
                         <button
                           onClick={() => handleToggleApiKeyStatus(item.id)}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
-                            item.isActive
+                          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${item.isActive
                               ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
                               : "bg-red-500/10 text-red-600 border border-red-500/30"
-                          }`}
+                            }`}
                         >
                           <Power className="w-3 h-3" />
                           {item.isActive ? "Aktif" : "Non-Aktif"}
@@ -403,11 +400,10 @@ export default function AiModelsPage() {
                       </td>
                       <td className="p-4 font-bold">
                         <span
-                          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${
-                            item.priority === 1
+                          className={`px-2.5 py-1 rounded-lg text-xs font-bold ${item.priority === 1
                               ? "bg-amber-500/10 text-amber-600 border border-amber-500/30"
                               : "bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]"
-                          }`}
+                            }`}
                         >
                           P{item.priority} {item.priority === 1 ? "(Primary)" : "(Fallback)"}
                         </span>
@@ -423,11 +419,10 @@ export default function AiModelsPage() {
                       <td className="p-4">
                         <button
                           onClick={() => handleToggleRoutingStatus(item.id)}
-                          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${
-                            item.isActive
+                          className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${item.isActive
                               ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
                               : "bg-red-500/10 text-red-600 border border-red-500/30"
-                          }`}
+                            }`}
                         >
                           <Power className="w-3 h-3" />
                           {item.isActive ? "Aktif" : "Non-Aktif"}
@@ -590,11 +585,11 @@ export default function AiModelsPage() {
                   onChange={(e) => setRoutingForm({ ...routingForm, taskType: e.target.value })}
                   className="w-full px-4 py-2.5 rounded-xl border border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm font-mono"
                 />
-                <datalist id="task-type-options">
+                <select className="w-full px-4 py-2.5 rounded-xl border border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm font-mono" value={routingForm.taskType} onChange={(e) => setRoutingForm({ ...routingForm, taskType: e.target.value })}>
                   {KNOWN_TASK_TYPES.map((t) => (
                     <option key={t} value={t} />
                   ))}
-                </datalist>
+                </select>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

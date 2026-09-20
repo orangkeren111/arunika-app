@@ -120,7 +120,7 @@ export async function callPromptGuard(prompt: string): Promise<{ safe: boolean; 
  * 
  * @param taskType The task identifier (e.g. "extract_pdf", "fast_text", "vision")
  * @param provider The provider to look up (defaults to "GEMINI")
- * @returns The string model name configured in LlmTaskRouting (fallback to "gemini-2.5-flash")
+ * @returns The string model name configured in LlmTaskRouting (fallback to "gemini-3.6-flash")
  */
 export async function getModelName(
   taskType: string,
@@ -142,7 +142,7 @@ export async function getModelName(
   }
 
   // Safe fallback if task routing isn't seeded in DB yet
-  return "gemini-2.5-flash";
+  return "gemini-3.6-flash";
 }
 
 /*

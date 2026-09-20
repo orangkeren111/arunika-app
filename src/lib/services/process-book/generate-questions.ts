@@ -71,7 +71,7 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
         })),
         null,
         2
-      )}\n\Note: If the soal fits an image, you can put "linkGambarSoal" with the imagePath in the soal object. If the soal does not need an image, leave "linkGambarSoal" as null. Please remember that not every question has to have an image`;
+      )}\n\Note: If the soal fits an image, you can put "linkGambarSoal" with the imagePath in the soal object. If the soal does not need an image, leave "linkGambarSoal" as null. If there are no image that fits, leave it at null. Please remember that not every question has to have an image, and don't make your own imagePath`;
     }
 
     const prompt = `${BOOK_PROMPTS.generateQuestionsByKompetensi(
@@ -95,6 +95,12 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
       // Escape any backslash that is not a valid JSON escape sequence
       return cleaned.replace(/\\(?![\\"\/bfnrtu])/g, "\\\\");
     };
+    function isValidImagePath(path: string) {
+      return (
+        path.startsWith("/uploads/book_images/") &&
+        /\.(png|jpg|jpeg|webp)$/i.test(path)
+      );
+    }
 
     let parsedResponse: any = {};
     try {
@@ -142,7 +148,7 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
         difficulty: Number(q.difficulty ?? 5),
         bloomLevel: q.bloomLevel || "C1",
         tags: Array.isArray(q.tags) ? q.tags.map(String) : [],
-        linkGambarSoal: q.linkGambarSoal || null,
+        linkGambarSoal: isValidImagePath(q.linkGambarSoal) ? q.linkGambarSoal : null,
         isAccepted: true,
         isRejected: false,
       })),

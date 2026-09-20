@@ -29,6 +29,7 @@ export interface TaskRoutingItem {
 export const KNOWN_TASK_TYPES = [
   "fast_text",
   "smart_text",
+  "process-book",
   "vision",
   "prompt_guard",
   "generate_report",
@@ -66,7 +67,7 @@ export function useAiModelsViewModel() {
   const [routingForm, setRoutingForm] = useState({
     taskType: "fast_text",
     provider: "GEMINI",
-    modelName: "gemini-2.5-flash",
+    modelName: "gemini-3.6-flash",
     priority: 1,
     isActive: true,
   });
@@ -174,7 +175,7 @@ export function useAiModelsViewModel() {
     setRoutingForm({
       taskType: "fast_text",
       provider: "GEMINI",
-      modelName: "gemini-2.5-flash",
+      modelName: "gemini-3.6-flash",
       priority: 1,
       isActive: true,
     });

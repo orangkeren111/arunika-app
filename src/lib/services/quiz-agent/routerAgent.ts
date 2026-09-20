@@ -9,7 +9,7 @@ import {
   executeQueryQuestionsFromBank,
   executeFallbackQuestionSelection,
 } from "./tools";
-import { getGoogleGenAI } from "../llm/providers";
+import { generateWithGeminiFailover, getGoogleGenAI } from "../llm/providers";
 import { getModelName } from "../llm/router";
 
 export interface MicroPayloadVector {
@@ -114,13 +114,15 @@ ${JSON.stringify(evalBatchData.map(q => ({
 
     const MAX_TURNS = 5;
     for (let turn = 0; turn < MAX_TURNS; turn++) {
-      const response = await ai.models.generateContent({
-        model: await getModelName("quiz_agent", "GEMINI"),
-        contents,
-        config: {
-          tools,
-          systemInstruction: ROUTER_SYSTEM_PROMPT,
-        },
+      const response = await generateWithGeminiFailover(async (ai) => {
+        return ai.models.generateContent({
+          model: await getModelName("quiz_agent", "GEMINI"),
+          contents,
+          config: {
+            tools,
+            systemInstruction: ROUTER_SYSTEM_PROMPT,
+          },
+        });
       });
 
       const candidate = response.candidates?.[0];

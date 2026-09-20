@@ -4,7 +4,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createMistral } from "@ai-sdk/mistral";
 import prisma from "../db/prisma";
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, File as GeminiFile } from "@google/genai";
 import { decryptApiKey, encryptApiKey } from "@/src/lib/utils/hasher";
 
 
@@ -58,6 +58,57 @@ async function getValidApiKeys(provider: String): Promise<Array<{ id: string; ke
 
   keyCache.set(provider, { keys: readyKeys, fetchedAt: now });
   return readyKeys;
+}
+
+
+/*
+
+Failover executor for Google GenAI
+*/
+export async function generateWithGeminiFailover<T>(
+  operation: (ai: GoogleGenAI) => Promise<T>
+): Promise<T> {
+  const keys = await getValidApiKeys("GEMINI");
+
+  if (keys.length === 0) {
+    throw new Error("No active GEMINI API keys available in database.");
+  }
+
+  let lastError: any;
+
+  for (const { id: keyId, key } of keys) {
+    const ai = new GoogleGenAI({ apiKey: key });
+
+    try {
+      return await operation(ai);
+    } catch (err: any) {
+      lastError = err;
+
+      const errorMessage = String(err?.message || err);
+      const statusCode = err?.status || err?.statusCode;
+
+      const isRateLimit =
+        statusCode === 429 ||
+        errorMessage.includes("429") ||
+        errorMessage.toLowerCase().includes("quota");
+
+      const isServerError =
+        statusCode >= 500 && statusCode < 600;
+
+      if (isRateLimit || isServerError) {
+        await markKeyCooldown(
+          keyId,
+          isRateLimit ? 10 : 2
+        );
+
+        continue;
+      }
+
+      throw err;
+    }
+  }
+
+  throw lastError;
 }
 
 /*
@@ -310,4 +361,167 @@ export async function getGeminiModel(modelName: string = "gemini-3.5-flash-lite"
     model: google(modelName),
     keyId
   };
+}
+
+function getRetryInfo(error: any) {
+  const message = String(error?.message || error);
+  const status = error?.status || error?.statusCode;
+
+  const isRateLimit =
+    status === 429 ||
+    message.includes("429") ||
+    message.toLowerCase().includes("quota");
+
+  const isServerError =
+    typeof status === "number" &&
+    status >= 500 &&
+    status < 600;
+
+  return {
+    retryable: isRateLimit || isServerError,
+    cooldownMinutes: isRateLimit ? 10 : 2,
+  };
+}
+
+async function waitForFileActive(
+  ai: GoogleGenAI,
+  name: string,
+  {
+    timeoutMs = 60_000,
+    intervalMs = 1500,
+  } = {},
+): Promise<GeminiFile> {
+  const start = Date.now();
+
+  let file = await ai.files.get({ name });
+
+  while (file.state === "PROCESSING") {
+    if (Date.now() - start > timeoutMs) {
+      throw new Error(
+        `Timed out waiting for file ${name} to become ACTIVE`,
+      );
+    }
+
+    await new Promise((resolve) =>
+      setTimeout(resolve, intervalMs),
+    );
+
+    file = await ai.files.get({ name });
+  }
+
+  if (file.state !== "ACTIVE") {
+    throw new Error(
+      `File ${name} ended in unexpected state: ${file.state}`,
+    );
+  }
+
+  return file;
+}
+
+export async function processPdfWithGeminiFailover<T>(
+  tempFilePath: string,
+  operation: (
+    ai: GoogleGenAI,
+    file: GeminiFile,
+  ) => Promise<T>,
+): Promise<T> {
+  const keys = await getValidApiKeys("GEMINI");
+
+  if (keys.length === 0) {
+    throw new Error(
+      "No active GEMINI API keys available in database.",
+    );
+  }
+
+  let lastError: any;
+
+  for (const { id: keyId, key } of keys) {
+    const ai = new GoogleGenAI({
+      apiKey: key,
+    });
+
+    let uploadedName: string | undefined;
+
+    try {
+      console.log(
+        `[Gemini PDF] Key ${keyId}: uploading PDF`,
+      );
+
+      // 1. Upload using this key/project
+      const uploadedFile = await ai.files.upload({
+        file: tempFilePath,
+        config: {
+          mimeType: "application/pdf",
+        },
+      });
+
+      uploadedName = uploadedFile.name ?? undefined;
+
+      if (!uploadedName) {
+        throw new Error(
+          "Upload succeeded but returned no file name",
+        );
+      }
+
+      console.log(
+        `[Gemini PDF] Key ${keyId}: file uploaded`,
+        uploadedName,
+      );
+
+      // 2. Poll using THE SAME key/project
+      const activeFile = await waitForFileActive(
+        ai,
+        uploadedName,
+      );
+
+      console.log(
+        `[Gemini PDF] Key ${keyId}: file is ACTIVE`,
+      );
+
+      // 3. Generate using THE SAME key/project
+      return await operation(ai, activeFile);
+    } catch (error: any) {
+      lastError = error;
+
+      const {
+        retryable,
+        cooldownMinutes,
+      } = getRetryInfo(error);
+
+      console.error(
+        `[Gemini PDF] Key ${keyId} failed:`,
+        error?.message || error,
+      );
+
+      // Non-retryable errors should immediately propagate.
+      if (!retryable) {
+        throw error;
+      }
+
+      await markKeyCooldown(
+        keyId,
+        cooldownMinutes,
+      );
+
+      console.log(
+        `[Gemini PDF] Key ${keyId} entered cooldown. Trying next key...`,
+      );
+    } finally {
+      // Cleanup the file from the project that uploaded it.
+      if (uploadedName) {
+        await ai.files
+          .delete({
+            name: uploadedName,
+          })
+          .catch(() => {
+            // Cleanup failure must not mask the original error.
+          });
+      }
+    }
+  }
+
+  throw (
+    lastError ??
+    new Error("All GEMINI API keys failed.")
+  );
 }
