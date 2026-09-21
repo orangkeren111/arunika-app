@@ -207,8 +207,8 @@ export default function AiModelsPage() {
           <button
             onClick={() => setActiveTab("keys")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "keys"
-                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               }`}
           >
             <KeyRound className="w-4 h-4" />
@@ -217,8 +217,8 @@ export default function AiModelsPage() {
           <button
             onClick={() => setActiveTab("routing")}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all ${activeTab === "routing"
-                ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+              ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
+              : "text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
               }`}
           >
             <Route className="w-4 h-4" />
@@ -323,8 +323,8 @@ export default function AiModelsPage() {
                         <button
                           onClick={() => handleToggleApiKeyStatus(item.id)}
                           className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${item.isActive
-                              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
-                              : "bg-red-500/10 text-red-600 border border-red-500/30"
+                            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border border-red-500/30"
                             }`}
                         >
                           <Power className="w-3 h-3" />
@@ -401,8 +401,8 @@ export default function AiModelsPage() {
                       <td className="p-4 font-bold">
                         <span
                           className={`px-2.5 py-1 rounded-lg text-xs font-bold ${item.priority === 1
-                              ? "bg-amber-500/10 text-amber-600 border border-amber-500/30"
-                              : "bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]"
+                            ? "bg-amber-500/10 text-amber-600 border border-amber-500/30"
+                            : "bg-[var(--muted)] text-[var(--muted-foreground)] border border-[var(--border)]"
                             }`}
                         >
                           P{item.priority} {item.priority === 1 ? "(Primary)" : "(Fallback)"}
@@ -420,8 +420,8 @@ export default function AiModelsPage() {
                         <button
                           onClick={() => handleToggleRoutingStatus(item.id)}
                           className={`px-3 py-1 rounded-full text-xs font-semibold flex items-center gap-1.5 transition ${item.isActive
-                              ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
-                              : "bg-red-500/10 text-red-600 border border-red-500/30"
+                            ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/30"
+                            : "bg-red-500/10 text-red-600 border border-red-500/30"
                             }`}
                         >
                           <Power className="w-3 h-3" />
@@ -577,17 +577,15 @@ export default function AiModelsPage() {
                 <label className="block text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-1.5">
                   Jenis Task (Task Type)
                 </label>
-                <input
-                  type="text"
-                  list="task-type-options"
-                  placeholder="Misal: fast_text, smart_text, vision"
+                <select
                   value={routingForm.taskType}
                   onChange={(e) => setRoutingForm({ ...routingForm, taskType: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm font-mono"
-                />
-                <select className="w-full px-4 py-2.5 rounded-xl border border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm font-mono" value={routingForm.taskType} onChange={(e) => setRoutingForm({ ...routingForm, taskType: e.target.value })}>
+                  className="w-full px-4 py-2.5 rounded-xl border border-[var(--input)] text-[var(--muted-background)] bg-[var(--background)] focus:ring-2 focus:ring-[var(--ring)] outline-none text-sm font-mono"
+                >
                   {KNOWN_TASK_TYPES.map((t) => (
-                    <option key={t} value={t} />
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
                   ))}
                 </select>
               </div>
