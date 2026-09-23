@@ -3,7 +3,7 @@ import { Prisma, StatusUjian, TipeSoal } from "@prisma/client";
 import prisma from "../prisma";
 import fs from "fs/promises";
 import path from "path";
-
+import os from "os";
 // --- DASHBOARD ---
 export async function getActiveExamsCount(guruId: number) {
   return await prisma.jadwalUjian.count({
@@ -1293,7 +1293,7 @@ export async function confirmCaptionValidation(
         ? img.imagePath.slice(1)
         : img.imagePath;
 
-      return path.join(process.cwd(), 'public', cleanPath);
+      return path.join(os.tmpdir(), 'public', cleanPath);
     });
 
     // 6. Delete all unkept images from database
