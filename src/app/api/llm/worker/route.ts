@@ -114,7 +114,7 @@ async function processGenerationStateMachine() {
 
       // Check if bab_id is present in the result to determine the next state
       const nextStatus = job.babId === null ? "EXTRACTING_IMAGES" : "GENERATING_QUESTIONS";
-      if (result.error) {
+      if ("error" in result) {
         if (job.attempts >= 2) {
           await prisma.generationJob.update({
             where: { id: job.id },
@@ -340,7 +340,9 @@ async function processTaskQueueBatch() {
 
         } else if (task.type === "extract_kurikulum") {
           const result = await processKurikulumExtract(payload.tempFilePath);
-          tokensSpent = result.tokens;
+          if ("tokens" in result) {
+            tokensSpent = result.tokens;
+          }
         } else if (task.type === "generate_soal") {
           const result = await generateQuestionsWithLLM(
             payload.babId,
