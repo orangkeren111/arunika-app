@@ -173,47 +173,6 @@ function LoginForm() {
           )}
         </button>
       </form>
-
-      {/* Asisten Mode Pengujian (Quick Fill) */}
-      <div className="pt-6 border-t border-[var(--border)]">
-        <p className="text-xs font-semibold text-[var(--muted-foreground)] uppercase tracking-wider mb-4 text-center">
-          Mode Uji Coba Cepat (Quick Fill)
-        </p>
-        <div className="grid grid-cols-4 gap-2">
-          <button
-            type="button"
-            onClick={() => handleQuickFill("superadmin@arunika.com")}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-all text-xs"
-          >
-            <ShieldAlert className="w-4 h-4 text-red-500" />
-            <span className="font-medium text-[10px]">Superadmin</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill("admin1@sekolah.com")}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-all text-xs"
-          >
-            <ShieldAlert className="w-4 h-4 text-[var(--accent)]" />
-            <span className="font-medium text-[10px]">Admin</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill("guru1@sekolah.com")}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-all text-xs"
-          >
-            <UserCog className="w-4 h-4 text-[var(--primary)]" />
-            <span className="font-medium text-[10px]">Guru</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => handleQuickFill("siswa1@sekolah.com")}
-            className="flex flex-col items-center gap-1.5 p-2 rounded-xl bg-[var(--muted)] hover:bg-[var(--border)] text-[var(--foreground)] transition-all text-xs"
-          >
-            <GraduationCap className="w-4 h-4 text-[var(--secondary)]" />
-            <span className="font-medium text-[10px]">Siswa</span>
-          </button>
-        </div>
-      </div>
     </div>
   );
 }

@@ -16,13 +16,6 @@ export default auth(
     const isLoggedIn = !!req.auth;
     const role = req.auth?.user?.role;
     const { pathname } = req.nextUrl;
-    console.log({
-      url: req.url,
-      host: req.headers.get("host"),
-      forwardedHost: req.headers.get("x-forwarded-host"),
-      forwardedProto: req.headers.get("x-forwarded-proto"),
-      auth: req.auth,
-    });
 
     // 1. Proteksi rute jika belum login
     if (

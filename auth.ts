@@ -9,7 +9,6 @@ import { authRepository } from "./src/lib/repositories/authRepository";
  * Di sini kita aman menggunakan CredentialsProvider karena tidak diimpor oleh Edge/Klien.
  */
 export const { handlers, auth, signIn, signOut } = NextAuth({
-  trustHost: true,
   ...authConfig,
   providers: [
     CredentialsProvider({

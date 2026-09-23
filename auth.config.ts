@@ -6,6 +6,7 @@ import type { NextAuthConfig } from "next-auth";
  * bcrypt, atau library server-side Node.js lainnya.
  */
 export const authConfig = {
+  trustHost: true,
   pages: {
     signIn: "/login",
     error: "/unauthorized",
