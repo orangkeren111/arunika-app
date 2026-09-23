@@ -34,7 +34,8 @@ export default function SuperadminLayout({
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ redirect: false });
+    window.location.href = "/login";
   };
 
   return (
@@ -82,10 +83,9 @@ export default function SuperadminLayout({
                 href={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200 text-sm font-medium
-                  ${
-                    active
-                      ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
-                      : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
+                  ${active
+                    ? "bg-[var(--primary)] text-[var(--primary-foreground)] shadow-md"
+                    : "text-[var(--muted-foreground)] hover:bg-[var(--muted)] hover:text-[var(--foreground)]"
                   }`}
               >
                 <item.icon size={20} />

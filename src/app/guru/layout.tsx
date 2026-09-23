@@ -41,7 +41,8 @@ export default function GuruLayout({
   const currentUser = session?.user;
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ redirect: false });
+    window.location.href = "/login";
   };
 
   return (

@@ -38,7 +38,8 @@ export default function AdminLayout({
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ redirect: false });
+    window.location.href = "/login";
   };
 
   return (

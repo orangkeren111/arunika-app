@@ -62,7 +62,8 @@ export default function SiswaLayout({
   ];
 
   const handleLogout = async () => {
-    await signOut({ callbackUrl: "/login" });
+    await signOut({ redirect: false });
+    window.location.href = "/login";
   };
 
   const isMenuSelected = (href: string) => pathname?.startsWith(href);
