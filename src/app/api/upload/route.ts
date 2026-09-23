@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeFile, mkdir } from "fs/promises";
 import path from "path";
+import os from "os";
 
 export async function POST(req: NextRequest) {
   try {
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest) {
     const ext = path.extname(file.name) || ".jpg";
     const filename = `soal_${Date.now()}_${Math.random().toString(36).substring(2, 8)}${ext}`;
 
-    const uploadDir = path.join(process.cwd(), "public", "uploads");
+    const uploadDir = path.join(os.tmpdir(), "tmp", "uploads");
     await mkdir(uploadDir, { recursive: true });
 
     const filePath = path.join(uploadDir, filename);

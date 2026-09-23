@@ -3,6 +3,8 @@
 import prisma from "../db/prisma";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
+
 
 export async function initiatePdfExtraction(formData: FormData) {
   try {
@@ -18,7 +20,7 @@ export async function initiatePdfExtraction(formData: FormData) {
 
     // Make sure you have a 'tmp' folder in your project root, or use the OS temp dir
     const tempFileName = `${Date.now()}-${file.name}`;
-    const tempFilePath = path.join(process.cwd(), "tmp", tempFileName);
+    const tempFilePath = path.join(os.tmpdir(), "tmp", tempFileName);
 
     // Ensure directory exists before writing
     await fs.mkdir(path.dirname(tempFilePath), { recursive: true });

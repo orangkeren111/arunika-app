@@ -2,7 +2,7 @@ import prisma from "../db/prisma";
 import fs from "fs/promises";
 import path from "path";
 import { callSmartText, callVision } from "../llm/router";
-
+import os from "os";
 /**
  * Image Processing Worker / Agentic Quality Filter:
  * Processes pending BukuImages using Vision AI (configured in providers.ts).
@@ -74,7 +74,7 @@ export async function processPendingBookImages(bukuId?: number) {
         const relativePath = img.imagePath.startsWith("/") ? img.imagePath.slice(1) : img.imagePath;
         const fullImagePath = path.isAbsolute(relativePath)
           ? relativePath
-          : path.join(process.cwd(), "public", relativePath);
+          : path.join(os.tmpdir(), "public", relativePath);
 
         let imageBuffer: Buffer | null = null;
         try {

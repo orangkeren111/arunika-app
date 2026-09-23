@@ -3,6 +3,7 @@ import fs from "fs/promises";
 import path from "path";
 import crypto from "crypto";
 import { PNG } from "pngjs";
+import os from "os";
 
 /**
  * Smart Image Filter
@@ -72,7 +73,7 @@ export async function extractAndStorePdfPageImages(
   babId?: number | null,
 ) {
   try {
-    const uploadDir = path.join(process.cwd(), "public", "uploads", "book_images");
+    const uploadDir = path.join(os.tmpdir(), "public", "uploads", "book_images");
     await fs.mkdir(uploadDir, { recursive: true });
 
     const pdfBuffer = await fs.readFile(pdfFilePath);
@@ -138,8 +139,8 @@ export async function extractAndStorePdfPageImages(
             const imgObj = page.objs.has(imgName)
               ? page.objs.get(imgName)
               : page.commonObjs?.has(imgName)
-              ? page.commonObjs.get(imgName)
-              : null;
+                ? page.commonObjs.get(imgName)
+                : null;
 
             if (!imgObj || !imgObj.width || !imgObj.height || !imgObj.data) continue;
 

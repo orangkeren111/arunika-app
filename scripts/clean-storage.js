@@ -1,7 +1,7 @@
 require("dotenv").config();
 const fs = require("fs/promises");
 const path = require("path");
-
+const os = require("os");
 const { Pool } = require("pg");
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { PrismaClient } = require("@prisma/client");
@@ -11,7 +11,7 @@ const pool = new Pool({ connectionString });
 const adapter = new PrismaPg(pool);
 const prisma = new PrismaClient({ adapter });
 
-const uploadsDir = path.join(process.cwd(), "public", "uploads", "book_images");
+const uploadsDir = path.join(os.tmpdir(), "public", "uploads", "book_images");
 
 async function main() {
     console.log("Starting upload cleanup...\n");

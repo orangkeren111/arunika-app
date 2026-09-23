@@ -4,6 +4,7 @@ import prisma from "../prisma";
 import { Prisma, Role } from "@prisma/client";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 
 export async function getStats(sekolah_id: number) {
   const [totalUsers, totalKelas, totalSiswa, totalGuru] = await Promise.all([
@@ -448,7 +449,7 @@ export async function initiateKurikulumExtraction(formData: FormData) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const tempFileName = `${Date.now()}-${file.name}`;
-    const tempFilePath = path.join(process.cwd(), "tmp", tempFileName);
+    const tempFilePath = path.join(os.tmpdir(), "tmp", tempFileName);
 
     await fs.mkdir(path.dirname(tempFilePath), { recursive: true });
     await fs.writeFile(tempFilePath, buffer);
