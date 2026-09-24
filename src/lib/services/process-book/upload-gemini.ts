@@ -71,7 +71,7 @@ export async function processPdfWithGemini(
                     text: `Read this single chapter (bab) document. Return a JSON object with:
 - 'chapterTitle': string, title or main topic of this chapter/bab
 - 'learningGoals': an array of strings summarizing the key learning objectives/goals
-- 'kompetensi': an array of objects representing the competencies of this chapter. Each competency object must have:
+- 'kompetensi': an array of objects representing the competencies of this chapter. If competencies doesn't exist, please make the competency first based on the learning goals. Each competency object must have:
   - 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
   - 'isiKompetensi': description of the competency`,
                   },
@@ -166,7 +166,7 @@ export async function processPdfWithGemini(
 - 'startPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
 - 'endPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
 - 'learningGoals': an array of strings summarizing the key learning objectives/goals
-- 'kompetensi': an array of objects representing the competencies of this chapter. Each competency object must have:
+- 'kompetensi': an array of objects representing the competencies of this chapter. If competencies doesn't exist, please make the competency first based on the learning goals. Each competency object must have:
   - 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
   - 'isiKompetensi': description of the competency`,
                 },
