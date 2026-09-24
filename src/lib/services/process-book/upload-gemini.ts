@@ -71,9 +71,23 @@ export async function processPdfWithGemini(
                     text: `Read this single chapter (bab) document. Return a JSON object with:
 - 'chapterTitle': string, title or main topic of this chapter/bab
 - 'learningGoals': an array of strings summarizing the key learning objectives/goals
-- 'kompetensi': an array of objects representing the competencies of this chapter. If competencies doesn't exist, please make the competency first based on the learning goals. Each competency object must have:
+- 'kompetensi': an array of objects representing the competencies of this chapter. Each competency object must have:
   - 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
-  - 'isiKompetensi': description of the competency`,
+  - 'isiKompetensi': description of the competency
+
+IMPORTANT RULES FOR KOMPETENSI:
+- 'kompetensi' MUST always contain at least one competency object.
+- NEVER return 'kompetensi': null.
+- NEVER return an empty 'kompetensi' array.
+- If explicit competencies are present in the chapter, extract them.
+- If explicit competencies are NOT present, you MUST generate one or more appropriate competencies based on the 'learningGoals'.
+- The absence of an explicit competency section is NOT a reason to leave 'kompetensi' empty.
+- Generated competencies should describe what students should be able to understand or do after learning this chapter.
+- For generated competencies, create a reasonable 'nomerKompetensi' such as '3.1', '3.2', etc.
+
+Before returning the JSON, verify that 'kompetensi' contains at least one competency object. If it is empty, generate the competency from the learningGoals before returning the result.
+
+Return ONLY valid JSON. Do not use markdown fences, explanations, comments, or additional text.`,
                   },
                 ],
               },
@@ -161,14 +175,50 @@ export async function processPdfWithGemini(
                   },
                 },
                 {
-                  text: `Read this document. Return a JSON array of objects. Each object represents a chapter (bab) and must have:
+                  text: `Read this document. Return a JSON array of objects. Each object represents exactly one chapter (bab).
+
+Each chapter object MUST contain:
+
 - 'chapterTitle': the title of the chapter/bab
-- 'startPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
-- 'endPage': physical 1-indexed PDF page number of this chapter (count starting from physical page 1 of the PDF file, integer)
+- 'startPage': physical 1-indexed PDF page number of this chapter
+- 'endPage': physical 1-indexed PDF page number of this chapter
 - 'learningGoals': an array of strings summarizing the key learning objectives/goals
-- 'kompetensi': an array of objects representing the competencies of this chapter. If competencies doesn't exist, please make the competency first based on the learning goals. Each competency object must have:
-  - 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
-  - 'isiKompetensi': description of the competency`,
+- 'kompetensi': an array of competency objects for this chapter
+
+Each competency object MUST contain:
+- 'nomerKompetensi': code or number of competency (e.g. '3.1', '4.1')
+- 'isiKompetensi': description of the competency
+
+IMPORTANT RULES FOR KOMPETENSI:
+
+1. 'kompetensi' MUST always be an array containing at least one competency.
+2. NEVER return an empty 'kompetensi' array.
+3. NEVER return 'kompetensi': null.
+4. If explicit competencies are present in the chapter, extract them.
+5. If explicit competencies are NOT present, you MUST CREATE appropriate competencies based on the chapter's learningGoals.
+6. The absence of an explicit competency section in the document is NOT a reason to leave 'kompetensi' empty.
+7. Generated competencies must represent what students should be able to understand or do after learning the chapter.
+8. If multiple learning goals exist, combine or map them into one or more appropriate competencies.
+9. For generated competencies, create a reasonable 'nomerKompetensi' such as '3.1', '3.2', etc., based on the chapter's context. Do not leave it empty.
+
+The relationship should always be:
+
+chapter → learningGoals → competencies
+
+If competencies cannot be directly extracted:
+chapter → learningGoals → GENERATE competencies
+
+FINAL VALIDATION BEFORE RETURNING:
+For EVERY chapter object, verify that:
+- 'chapterTitle' is not empty
+- 'startPage' is an integer
+- 'endPage' is an integer
+- 'learningGoals' contains at least one item
+- 'kompetensi' contains at least one competency object
+
+If 'kompetensi' is empty, generate the competency from the learningGoals before returning the JSON.
+
+Return ONLY valid JSON. Do not use markdown fences, explanations, comments, or additional text.`,
                 },
               ],
             },
