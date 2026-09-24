@@ -148,7 +148,7 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
         difficulty: Number(q.difficulty ?? 5),
         bloomLevel: q.bloomLevel || "C1",
         tags: Array.isArray(q.tags) ? q.tags.map(String) : [],
-        linkGambarSoal: isValidImagePath(q.linkGambarSoal) ? q.linkGambarSoal : null,
+        linkGambarSoal: q.linkGambarSoal && isValidImagePath(q.linkGambarSoal) ? q.linkGambarSoal : null,
         isAccepted: true,
         isRejected: false,
       })),
