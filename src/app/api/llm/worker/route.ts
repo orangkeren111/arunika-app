@@ -113,7 +113,8 @@ async function processGenerationStateMachine() {
       const result = await processPdfWithGemini(job.id, job.fileUrl ?? "");
 
       // Check if bab_id is present in the result to determine the next state
-      const nextStatus = job.babId === null ? "EXTRACTING_IMAGES" : "GENERATING_QUESTIONS";
+      // const nextStatus = job.babId === null ? "EXTRACTING_IMAGES" : "GENERATING_QUESTIONS";
+      const nextStatus = "GENERATING_QUESTIONS";
       if ("error" in result) {
         if (job.attempts >= 2) {
           await prisma.generationJob.update({
