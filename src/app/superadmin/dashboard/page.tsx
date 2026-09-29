@@ -18,9 +18,17 @@ import {
 import { useSuperadminDashboardViewModel } from "./SuperadminDashboardViewModel";
 
 export default function SuperadminDashboardPage() {
+  enum SubscriptionTier {
+    FREE = "FREE",
+    BOOK_ONLY = "BOOK_ONLY",
+    PREMIUM = "PREMIUM",
+  }
   const {
     schools,
+    rawSchools,
     loading,
+    paymentFilter,
+    setPaymentFilter,
     selectedSchool,
     setSelectedSchool,
     members,
@@ -38,10 +46,14 @@ export default function SuperadminDashboardPage() {
   const [formData, setFormData] = useState({
     name: "",
     address: "",
-    tingkat: "",
+    tingkat: "SD",
     adminName: "",
     adminEmail: "",
     adminPassword: "",
+    jumlahBulan: 12,
+    nominal: 1000000,
+    addMonths: 0,
+    tier: SubscriptionTier.FREE,
   });
 
   const openAddModal = () => {
@@ -49,10 +61,14 @@ export default function SuperadminDashboardPage() {
     setFormData({
       name: "",
       address: "",
-      tingkat: "",
+      tingkat: "SD",
       adminName: "",
       adminEmail: "",
       adminPassword: "",
+      jumlahBulan: 12,
+      nominal: 1000000,
+      addMonths: 0,
+      tier: SubscriptionTier.FREE,
     });
     setIsModalOpen(true);
   };
@@ -63,10 +79,14 @@ export default function SuperadminDashboardPage() {
     setFormData({
       name: school.name,
       address: school.address,
-      tingkat: school.tingkat,
-      adminName: "",
-      adminEmail: "",
+      tingkat: school.tingkat || "SD",
+      adminName: school.adminUser?.name || "",
+      adminEmail: school.adminUser?.email || "",
       adminPassword: "",
+      jumlahBulan: 0,
+      nominal: 0,
+      addMonths: 0,
+      tier: school.tier ? school.tier : SubscriptionTier.FREE,
     });
     setIsModalOpen(true);
   };
@@ -74,26 +94,44 @@ export default function SuperadminDashboardPage() {
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
-    setFormData({
-      name: "",
-      address: "",
-      tingkat: "",
-      adminName: "",
-      adminEmail: "",
-      adminPassword: "",
-    });
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (modalMode === "add") {
-      handleCreateSchool(formData.name, formData.address, formData.tingkat, {
-        name: formData.adminName,
-        email: formData.adminEmail,
-        password: formData.adminPassword,
-      });
+      handleCreateSchool(
+        formData.name,
+        formData.address,
+        formData.tingkat,
+        formData.tier,
+        {
+          name: formData.adminName,
+          email: formData.adminEmail,
+          password: formData.adminPassword,
+        },
+        {
+          jumlahBulan: Number(formData.jumlahBulan),
+          nominal: Number(formData.nominal),
+        }
+      );
     } else if (modalMode === "edit" && editingId) {
-      handleUpdateSchool(editingId, formData.name, formData.address);
+      handleUpdateSchool(
+        editingId,
+        formData.name,
+        formData.address,
+        formData.tier,
+        {
+          name: formData.adminName,
+          email: formData.adminEmail,
+          password: formData.adminPassword,
+        },
+        formData.addMonths > 0
+          ? {
+            addMonths: Number(formData.addMonths),
+            nominal: Number(formData.nominal),
+          }
+          : undefined
+      );
     }
     closeModal();
   };
@@ -106,6 +144,9 @@ export default function SuperadminDashboardPage() {
     );
   }
 
+  const activeCount = rawSchools.filter((s) => s.paymentStatus === "ACTIVE").length;
+  const pastDueCount = rawSchools.filter((s) => s.paymentStatus === "PAST_DUE").length;
+
   return (
     <div className="space-y-6 relative px-4 md:px-0 font-sans">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -114,15 +155,58 @@ export default function SuperadminDashboardPage() {
             Pengelolaan Sekolah & Penyewa
           </h1>
           <p className="text-[var(--muted-foreground)] mt-1 text-sm md:text-base">
-            Pantau status sekolah, penggunaan AI token, dan kelola akun administrator.
+            Pantau status sekolah, status pembayaran, penggunaan AI token, dan kelola akun administrator.
           </p>
         </div>
 
+        <div className="flex items-center gap-2">
+          <Link
+            href="/superadmin/payments/add"
+            className="flex items-center gap-2 bg-[var(--card)] text-[var(--foreground)] border border-[var(--border)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--muted)] transition-all shadow-sm"
+          >
+            <Plus size={18} /> Catat Pembayaran
+          </Link>
+
+          <button
+            onClick={openAddModal}
+            className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition-all"
+          >
+            <Plus size={18} /> Tambah Sekolah Baru
+          </button>
+        </div>
+      </div>
+
+      {/* Filter Status Pembayaran */}
+      <div className="flex items-center gap-2 border-b border-[var(--border)] pb-3">
+        <span className="text-xs font-bold text-[var(--muted-foreground)] uppercase mr-2 tracking-wider">
+          Filter Status Pembayaran:
+        </span>
         <button
-          onClick={openAddModal}
-          className="flex items-center gap-2 bg-[var(--primary)] text-[var(--primary-foreground)] px-4 py-2.5 rounded-lg text-sm font-semibold hover:opacity-95 shadow transition-all"
+          onClick={() => setPaymentFilter("ALL")}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${paymentFilter === "ALL"
+            ? "bg-[var(--primary)] text-white shadow-sm"
+            : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
         >
-          <Plus size={18} /> Tambah Sekolah Baru
+          Semua ({rawSchools.length})
+        </button>
+        <button
+          onClick={() => setPaymentFilter("ACTIVE")}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${paymentFilter === "ACTIVE"
+            ? "bg-emerald-600 text-white shadow-sm"
+            : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+        >
+          Aktif ({activeCount})
+        </button>
+        <button
+          onClick={() => setPaymentFilter("PAST_DUE")}
+          className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${paymentFilter === "PAST_DUE"
+            ? "bg-amber-600 text-white shadow-sm"
+            : "bg-[var(--muted)]/50 text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            }`}
+        >
+          Jatuh Tempo / Past Due ({pastDueCount})
         </button>
       </div>
 
@@ -160,7 +244,7 @@ export default function SuperadminDashboardPage() {
                 {/* Status Toggle Badge */}
                 <button
                   onClick={() => handleToggleSchoolStatus(school.id.toString(), school.isRetired)}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${school.isRetired
+                  className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold border transition ${school.isRetired
                     ? "bg-red-100 text-red-700 border-red-300 hover:bg-red-200 dark:bg-red-950/80 dark:text-red-300 dark:border-red-800"
                     : "bg-emerald-100 text-emerald-700 border-emerald-300 hover:bg-emerald-200 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-800"
                     }`}
@@ -176,6 +260,29 @@ export default function SuperadminDashboardPage() {
                     </>
                   )}
                 </button>
+              </div>
+
+              {/* Payment Expiration & Plan Badge */}
+              <div className="flex items-center justify-between text-xs px-3 py-2 rounded-lg bg-[var(--muted)]/40 border border-[var(--border)]">
+                <span className="text-[var(--muted-foreground)] font-medium">Paket Pembayaran:</span>
+                <div className="flex items-center gap-2">
+                  <p className="text-[var(--foreground)] font-bold">{school.tier}</p>
+                </div>
+                <span
+                  className={`font-bold px-2 py-0.5 rounded text-[11px] ${school.paymentStatus === "ACTIVE"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
+                    : "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20"
+                    }`}
+                >
+                  {school.paymentStatus === "ACTIVE" ? "Aktif s/d " : "Past Due! Exp: "}
+                  {school.aktifSampai
+                    ? new Date(school.aktifSampai).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "short",
+                      year: "numeric",
+                    })
+                    : "Belum Diatur"}
+                </span>
               </div>
 
               {/* Token Spent Highlight */}
@@ -217,7 +324,7 @@ export default function SuperadminDashboardPage() {
                 <button
                   onClick={() => openEditModal(school)}
                   className="p-1.5 text-[var(--muted-foreground)] hover:text-[var(--primary)] hover:bg-[var(--muted)] rounded transition"
-                  title="Edit Informasi Sekolah"
+                  title="Edit Informasi Sekolah & Admin"
                 >
                   <Edit2 size={16} />
                 </button>
@@ -249,7 +356,7 @@ export default function SuperadminDashboardPage() {
             </button>
 
             <h3 className="text-xl font-bold mb-6 text-[var(--foreground)] pr-6">
-              {modalMode === "add" ? "Tambah Sekolah Baru" : "Edit Informasi Sekolah"}
+              {modalMode === "add" ? "Tambah Sekolah Baru" : "Edit Informasi Sekolah & Admin"}
             </h3>
 
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -265,6 +372,12 @@ export default function SuperadminDashboardPage() {
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
+                  Tingkat Pendidikan <span className="text-red-500">*</span>
+                </label>
                 <select
                   value={formData.tingkat}
                   onChange={(e) => setFormData({ ...formData, tingkat: e.target.value })}
@@ -291,58 +404,152 @@ export default function SuperadminDashboardPage() {
                 />
               </div>
 
-              {/* Admin User Section for New School */}
-              {modalMode === "add" && (
-                <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-bold text-[var(--primary)]">
-                    <UserPlus size={16} /> Akun Admin Sekolah Utama
-                  </div>
-                  <p className="text-xs text-[var(--muted-foreground)]">
-                    Tentukan administrator awal untuk mengelola sekolah ini.
-                  </p>
-
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
-                      Nama Admin <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.adminName}
-                      onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
-                      placeholder="Nama lengkap admin"
-                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
-                      Email Admin <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="email"
-                      value={formData.adminEmail}
-                      onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
-                      placeholder="admin@sekolah.sch.id"
-                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
-                      required
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
-                      Password Admin
-                    </label>
-                    <input
-                      type="password"
-                      value={formData.adminPassword}
-                      onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
-                      placeholder="Default: admin123"
-                      className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
-                    />
-                  </div>
+              {/* Payment Plan Section */}
+              <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-[var(--primary)]">
+                  Paket Langganan Pembayaran
                 </div>
-              )}
+
+                {modalMode === "add" ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Tier <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.tier}
+                        onChange={(e) => setFormData({ ...formData, tier: e.target.value as SubscriptionTier })}
+                        className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
+                        required
+                      >
+                        <option value={SubscriptionTier.FREE}>Free</option>
+                        <option value={SubscriptionTier.BOOK_ONLY}>Book Only</option>
+                        <option value={SubscriptionTier.PREMIUM}>Premium</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Durasi (Bulan)
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={formData.jumlahBulan}
+                        onChange={(e) => setFormData({ ...formData, jumlahBulan: Number(e.target.value) })}
+                        className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Nominal (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.nominal}
+                        onChange={(e) => setFormData({ ...formData, nominal: Number(e.target.value) })}
+                        className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Tier <span className="text-red-500">*</span>
+                      </label>
+                      <select
+                        value={formData.tier}
+                        onChange={(e) => setFormData({ ...formData, tier: e.target.value as SubscriptionTier })}
+                        className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
+                        required
+                      >
+                        <option value={SubscriptionTier.FREE}>Free</option>
+                        <option value={SubscriptionTier.BOOK_ONLY}>Book Only</option>
+                        <option value={SubscriptionTier.PREMIUM}>Premium</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Perpanjang (Bulan)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.addMonths}
+                        onChange={(e) => setFormData({ ...formData, addMonths: Number(e.target.value) })}
+                        placeholder="0 = Tidak perpanjang"
+                        className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                        Nominal Pembayaran (Rp)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={formData.nominal}
+                        onChange={(e) => setFormData({ ...formData, nominal: Number(e.target.value) })}
+                        className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Admin User Section (Upsert) */}
+              <div className="border-t border-[var(--border)] pt-4 mt-4 space-y-3">
+                <div className="flex items-center gap-2 text-sm font-bold text-[var(--primary)]">
+                  <UserPlus size={16} /> Akun Admin Sekolah
+                </div>
+                <p className="text-xs text-[var(--muted-foreground)]">
+                  {modalMode === "add"
+                    ? "Tentukan administrator awal untuk mengelola sekolah ini."
+                    : "Kelola/Perbarui akun administrator utama sekolah ini (Upsert)."}
+                </p>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                    Nama Admin <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.adminName}
+                    onChange={(e) => setFormData({ ...formData, adminName: e.target.value })}
+                    placeholder="Nama lengkap admin"
+                    className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                    required={modalMode === "add"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                    Email Admin <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="email"
+                    value={formData.adminEmail}
+                    onChange={(e) => setFormData({ ...formData, adminEmail: e.target.value })}
+                    placeholder="admin@sekolah.sch.id"
+                    className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                    required={modalMode === "add"}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                    Password Admin {modalMode === "edit" && "(Kosongkan jika tidak diubah)"}
+                  </label>
+                  <input
+                    type="password"
+                    value={formData.adminPassword}
+                    onChange={(e) => setFormData({ ...formData, adminPassword: e.target.value })}
+                    placeholder={modalMode === "add" ? "Default: admin123" : "Password baru (opsional)"}
+                    className="w-full p-2 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm"
+                  />
+                </div>
+              </div>
 
               <div className="flex justify-end gap-3 pt-4 border-t border-[var(--border)]">
                 <button
@@ -356,7 +563,7 @@ export default function SuperadminDashboardPage() {
                   type="submit"
                   className="px-4 py-2 text-sm font-bold text-white bg-[var(--primary)] rounded-lg hover:opacity-90 transition"
                 >
-                  {modalMode === "add" ? "Buat Sekolah & Admin" : "Simpan Perubahan"}
+                  {modalMode === "add" ? "Buat Sekolah & Admin" : "Simpan Perubahan (Upsert)"}
                 </button>
               </div>
             </form>
@@ -366,3 +573,4 @@ export default function SuperadminDashboardPage() {
     </div>
   );
 }
+

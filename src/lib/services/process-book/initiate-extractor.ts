@@ -26,7 +26,10 @@ export async function initiatePdfExtraction(formData: FormData) {
     await fs.mkdir(path.dirname(tempFilePath), { recursive: true });
     await fs.writeFile(tempFilePath, buffer);
 
-    const jumlahSoal = formData.get("jumlahSoal") as string;
+    const jumlahSoalMcq = formData.get("jumlahMcq") as string;
+    const jumlahSoalEssay = formData.get("jumlahEssay") as string;
+    const totalJumlahSoal = Number(jumlahSoalMcq) + Number(jumlahSoalEssay);
+    const pilihanPerMcq = formData.get("pilihanPerMcq") as string;
     const babId = formData.get("babId") as string | null;
 
     // 3. Create the Job Queue record in Prisma
@@ -37,7 +40,10 @@ export async function initiatePdfExtraction(formData: FormData) {
         status: "PENDING",
         bukuId: Number(bukuId),
         babId: babId ? Number(babId) : null,
-        jumlahSoal: jumlahSoal ? Number(jumlahSoal) : 10,
+        jumlahSoal: totalJumlahSoal,
+        jumlahMcq: jumlahSoalMcq ? Number(jumlahSoalMcq) : 10,
+        jumlahEssay: jumlahSoalEssay ? Number(jumlahSoalEssay) : 10,
+        pilihanPerMcq: pilihanPerMcq ? Number(pilihanPerMcq) : 4,
       },
     });
 

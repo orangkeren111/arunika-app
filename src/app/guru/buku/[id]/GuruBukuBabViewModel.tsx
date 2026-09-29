@@ -66,11 +66,14 @@ export function useBabViewModel(bookId: string) {
     fetchBab();
   };
 
-  const handleUploadBook = async (file: File, jumlahSoal: number = 10) => {
+  const handleUploadBook = async (file: File, jumlahSoal: number = 10, jumlahSoalMcq: number = 7, jumlahSoalEssay: number = 3, pilihanPerMcq: number = 4) => {
     const formData = new FormData();
     formData.append("bookId", bookId.toString());
     formData.append("pdfFile", file);
     formData.append("jumlahSoal", jumlahSoal.toString());
+    formData.append("jumlahMcq", jumlahSoalMcq.toString());
+    formData.append("jumlahEssay", jumlahSoalEssay.toString());
+    formData.append("pilihanPerMcq", pilihanPerMcq.toString());
     await guruRepository.uploadAndGenerateBookPdf(formData);
     await checkAiStatus();
   };

@@ -5,6 +5,18 @@ import { getKompetensiBab } from "../../../../../../lib/services/db/guru/kompete
 import { fetchWithRetry } from "@/src/lib/utils/retryFunction";
 import { TipeSoal } from "@prisma/client";
 
+export interface SoalImportRow {
+  type: "MCQ" | "ESSAY";
+  teksSoal: string;
+  difficulty: number;
+  bloomLevel: string;
+  opsiJawaban: string[] | null;
+  jawabanBenarMcq: string | null;
+  jawabanBenarEssay: string | null;
+  tags: string[];
+  kompetensiBabId: number | null;
+}
+
 interface Kompetensi {
   id: number;
   nomerKompetensi: string;
@@ -186,10 +198,19 @@ export function useSoalViewModel(babId: string) {
   const handleUploadImage = async (file: File): Promise<string> => {
     return await guruRepository.uploadImage(file);
   };
+  const handleUploadExcelSoal = async (rows: SoalImportRow[]) => {
+    try {
+      await guruRepository.batchImportSoal(babId, rows);
+      fetchSoal();
+    } catch (err: any) {
+      showError(err.message || "Gagal mengimpor soal dari Excel.");
+    }
+  };
 
-  const handleUploadBabPdf = async (file: File, jumlahSoal: number = 10) => {
+  const handleUploadBabPdf = async (file: File, jumlahSoalMcq: number = 7, jumlahSoalEssay: number = 3, pilihanPerMcq: number = 4) => {
     if (!bab) return;
     try {
+      const jumlahSoal = jumlahSoalMcq + jumlahSoalEssay;
       if (isLockedByExam) {
         showError(lockMessage || "Soal tidak dapat dibuat karena Ujian sedang aktif.");
         return;
@@ -199,6 +220,9 @@ export function useSoalViewModel(babId: string) {
       formData.append("babId", babId);
       formData.append("pdfFile", file);
       formData.append("jumlahSoal", jumlahSoal.toString());
+      formData.append("jumlahMcq", jumlahSoalMcq.toString());
+      formData.append("jumlahEssay", jumlahSoalEssay.toString());
+      formData.append("pilihanPerMcq", pilihanPerMcq.toString());
       await guruRepository.uploadAndGenerateBookPdf(formData);
       await checkGenerationStatus();
     } catch (err: any) {
@@ -228,6 +252,7 @@ export function useSoalViewModel(babId: string) {
     handleRejectSoal,
     handleUploadImage,
     handleUploadBabPdf,
+    handleUploadExcelSoal,
     selectedType,
     setSelectedType,
     selectedBloomLevel,

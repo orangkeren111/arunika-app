@@ -4,6 +4,15 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
+type ViolationType =
+  | "WINDOW_BLUR"
+  | "TAB_HIDDEN"
+  | "RIGHT_CLICK_ATTEMPT"
+  | "COPY_ATTEMPT"
+  | "PASTE_ATTEMPT"
+  | "INSPECT_ELEMENT_F12"
+  | "INSPECT_ELEMENT_SHORTCUT";
+
 export function useExamAttempt(jadwalId: string) {
   // State for the single active question
   const [currentQ, setCurrentQ] = useState<ExamQuestion | null>(null);
@@ -26,34 +35,93 @@ export function useExamAttempt(jadwalId: string) {
 
   // Handle tab-out (blur) warning and auto-submission
   useEffect(() => {
-    if (isFinished || loading) return;
+    if (isFinished || loading || !session) return;
 
-    const handleBlur = () => {
+    // Helper to handle both UI warnings and Backend Logging
+    const recordViolation = async (violationType: ViolationType) => {
+      // 1. Fire and forget to your backend (so it's saved even if they refresh)
+      await siswaRepository.handleCheatViolation(
+        jadwalId,
+        Number(session?.user?.id) || 0,
+        violationType,
+        Number(currentQ?.id) || 0
+      );
+
+      // 2. Update local UI state
       setWarnings((prev) => {
         if (prev >= 3) return prev;
         const nextWarnings = prev + 1;
+
         if (nextWarnings >= 3) {
-          setWarningMessage(
-            "Anda telah keluar dari halaman ujian sebanyak 3 kali. Ujian Anda otomatis selesai dan dikumpulkan."
-          );
+          setWarningMessage("Anda telah melakukan pelanggaran 3 kali. Ujian Anda otomatis selesai dan dikumpulkan.");
           setShowWarningModal(true);
           handleSubmitExam();
           return 3;
         } else {
-          setWarningMessage(
-            `Peringatan! Dilarang membuka tab lain atau keluar dari halaman ujian. Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`
-          );
+          setWarningMessage(`Peringatan! Terdeteksi aktivitas mencurigakan (${violationType}). Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`);
           setShowWarningModal(true);
           return nextWarnings;
         }
       });
     };
 
-    window.addEventListener("blur", handleBlur);
-    return () => {
-      window.removeEventListener("blur", handleBlur);
+    // --- EVENT HANDLERS ---
+
+    const handleBlur = () => recordViolation("WINDOW_BLUR");
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) recordViolation("TAB_HIDDEN");
     };
-  }, [isFinished, loading, session]);
+
+    const handleContextMenu = (e: any) => {
+      e.preventDefault(); // Blocks right-click menu
+      recordViolation("RIGHT_CLICK_ATTEMPT");
+    };
+
+    const handleCopy = (e: any) => {
+      e.preventDefault(); // Blocks copying question text
+      recordViolation("COPY_ATTEMPT");
+    };
+
+    const handlePaste = (e: any) => {
+      e.preventDefault(); // Blocks pasting answers (e.g., from ChatGPT)
+      recordViolation("PASTE_ATTEMPT");
+    };
+
+    const handleKeyDown = (e: any) => {
+      // Block F12 (Inspect Element)
+      if (e.key === "F12") {
+        e.preventDefault();
+        recordViolation("INSPECT_ELEMENT_F12");
+      }
+      // Block Ctrl+Shift+I (Inspect) or Ctrl+Shift+J (Console) or Ctrl+U (View Source)
+      if (e.ctrlKey && (
+        (e.shiftKey && (e.key === "I" || e.key === "i" || e.key === "J" || e.key === "j")) ||
+        (e.key === "U" || e.key === "u")
+      )) {
+        e.preventDefault();
+        recordViolation("INSPECT_ELEMENT_SHORTCUT");
+      }
+    };
+
+    // --- ATTACH LISTENERS ---
+    window.addEventListener("blur", handleBlur);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    window.addEventListener("contextmenu", handleContextMenu);
+    window.addEventListener("copy", handleCopy);
+    window.addEventListener("paste", handlePaste);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      // --- CLEANUP ---
+      window.removeEventListener("blur", handleBlur);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      window.removeEventListener("contextmenu", handleContextMenu);
+      window.removeEventListener("copy", handleCopy);
+      window.removeEventListener("paste", handlePaste);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isFinished, loading, session]); // Make sure session is in deps
 
   // 1. Initialize Exam / Resume Exam
   useEffect(() => {
@@ -71,10 +139,14 @@ export function useExamAttempt(jadwalId: string) {
             if (res.totalQuestions) {
               setTotalQuestions(res.totalQuestions);
             }
-            if (res.durationMinutes) {
-              setTimeLeft(res.durationMinutes * 60);
+            if (res.remainingSeconds) {
+              setTimeLeft(res.remainingSeconds);
             }
-          } else {
+            if (res.cheatCount) {
+              setWarnings(res.cheatCount);
+            }
+          }
+          else {
             setIsFinished(true);
           }
         } catch (error) {

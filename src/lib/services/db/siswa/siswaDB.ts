@@ -202,51 +202,8 @@ export async function getJadwalDetail(jadwalId: number) {
   });
 }
 
-// --- ATTEMPT (SUBMISSION) ---
-export async function submitAnswers(
-  attemptId: number,
-  answersData: {
-    soalId: number;
-    soalAsliId: number;
-    nomor: number;
-    teksSoal: string;
-    opsiJawaban: string[];
-    jawabanBenarMcq: string;
-    difficulty: number;
-    bloomLevel?: string;
-    jawabanSiswa: string;
-    isCorrect?: boolean;
-    nilaiPoin?: number;
-    type: TipeSoal;
-  }[],
-) {
-  // Gunakan transaksi untuk menyimpan semua jawaban dan mengakhiri ujian sekaligus
-  return await prisma.$transaction([
-    prisma.jawabanSiswa.createMany({
-      data: answersData.map((a) => ({
-        nomor: a.nomor,
-        attemptId: attemptId,
 
-        soalAsliId: a.soalAsliId,
-
-        teksSoal: a.teksSoal,
-        opsiJawaban: a.opsiJawaban,
-        jawabanBenarMcq: a.jawabanBenarMcq,
-        type: a.type,
-
-        difficulty: a.difficulty,
-        bloomLevel: a.bloomLevel,
-
-        jawabanSiswa: a.jawabanSiswa,
-      })),
-    }),
-    prisma.sesiUjianSiswa.update({
-      where: { id: attemptId },
-      data: { waktuSelesai: new Date() },
-    }),
-  ]);
-}
-
+// UJIAN ATTEMPT
 export async function getAttemptDetail(attemptId: number) {
   return await prisma.sesiUjianSiswa.findUnique({
     where: { id: attemptId },
@@ -330,6 +287,44 @@ export async function saveSingleAnswer(data: any) {
   return prisma.jawabanSiswa.create({
     data: data,
   });
+}
+
+export async function logCheatingAttempt(
+  sesiId: number,
+  siswaId: number,
+  violationType: string, // e.g., "TAB_SWITCH", "LOST_FOCUS", "COPY_ATTEMPT"
+  nomorSoal: number
+) {
+  // 1. Fetch current logs to safely append
+  const session = await prisma.sesiUjianSiswa.findUnique({
+    where: { id: sesiId, siswaId: siswaId },
+    select: { cheatLogs: true, cheatCount: true }
+  });
+
+  if (!session) throw new Error("Session not found");
+
+  // 2. Safely parse existing logs (defaults to empty array if null)
+  const currentLogs = Array.isArray(session.cheatLogs) ? session.cheatLogs : [];
+
+  const newEvent = {
+    timestamp: new Date().toISOString(),
+    type: violationType,
+    nomorSoal: nomorSoal
+  };
+
+  // 3. Update database: atomic increment and overwrite JSON with the appended array
+  const updatedSession = await prisma.sesiUjianSiswa.update({
+    where: { id: sesiId, siswaId: siswaId },
+    data: {
+      cheatCount: { increment: 1 },
+      cheatLogs: [...currentLogs, newEvent]
+    }
+  });
+
+  return {
+    success: true,
+    totalCheats: updatedSession.cheatCount
+  };
 }
 export async function getListJawaban(attemptId: number) {
   const answers = await prisma.jawabanSiswa.findMany({

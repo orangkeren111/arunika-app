@@ -375,6 +375,76 @@ export default function SchoolDetailPage({
         </div>
       </div>
 
+      {/* Payment History Card */}
+      <div className="bg-[var(--card)] p-6 rounded-2xl border border-[var(--border)] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-extrabold text-[var(--foreground)] tracking-tight flex items-center gap-2">
+              <Zap size={20} className="text-emerald-500" /> Riwayat Pembayaran Langganan
+            </h2>
+            <p className="text-xs text-[var(--muted-foreground)] mt-0.5">
+              Status Aktif Sampai:{" "}
+              <span className="font-bold text-[var(--foreground)]">
+                {school.aktifSampai
+                  ? new Date(school.aktifSampai).toLocaleDateString("id-ID", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })
+                  : "Belum Diatur"}
+              </span>
+            </p>
+          </div>
+          <Link
+            href="/superadmin/payments/add"
+            className="text-xs font-bold bg-[var(--primary)] text-white px-3 py-1.5 rounded-lg hover:opacity-90 transition shadow-sm"
+          >
+            + Tambah Pembayaran
+          </Link>
+        </div>
+
+        {!data.pembayaranHistory || data.pembayaranHistory.length === 0 ? (
+          <p className="text-center text-sm text-[var(--muted-foreground)] py-6">
+            Belum ada transaksi pembayaran tercatat untuk sekolah ini.
+          </p>
+        ) : (
+          <div className="border border-[var(--border)] rounded-xl overflow-hidden bg-[var(--background)]">
+            <table className="w-full text-left text-sm border-collapse">
+              <thead className="bg-[var(--muted)] text-[var(--foreground)] border-b border-[var(--border)]">
+                <tr>
+                  <th className="p-3.5 font-bold">ID Transaksi</th>
+                  <th className="p-3.5 font-bold">Tanggal Pembayaran</th>
+                  <th className="p-3.5 font-bold">Durasi Langganan</th>
+                  <th className="p-3.5 font-bold">Nominal Pembayaran</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border)]">
+                {data.pembayaranHistory.map((p: any) => (
+                  <tr key={p.id} className="hover:bg-[var(--muted)]/20 transition-colors">
+                    <td className="p-3.5 text-xs text-[var(--muted-foreground)] font-mono">#{p.id}</td>
+                    <td className="p-3.5 font-medium text-[var(--foreground)]">
+                      {new Date(p.tanggalBayar).toLocaleDateString("id-ID", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </td>
+                    <td className="p-3.5 font-bold text-emerald-600 dark:text-emerald-400">
+                      +{p.jumlahBulan} Bulan
+                    </td>
+                    <td className="p-3.5 font-bold text-[var(--foreground)]">
+                      {p.nominal ? `Rp ${Number(p.nominal).toLocaleString("id-ID")}` : "-"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Section: School Members Table */}
       <div className="bg-[var(--card)] p-6 rounded-xl border border-[var(--border)] shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">

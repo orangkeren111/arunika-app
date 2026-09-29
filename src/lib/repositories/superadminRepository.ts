@@ -1,6 +1,6 @@
 import { Tingkat } from "@/src/app/types/admin";
 import * as superadminDB from "../services/db/superadmin/superadminDB";
-
+type SubscriptionTier = "FREE" | "BOOK_ONLY" | "PREMIUM";
 export const superadminRepository = {
   getSchoolsWithStats: async () => {
     return await superadminDB.getSchoolsWithStats();
@@ -10,13 +10,26 @@ export const superadminRepository = {
     name: string,
     address?: string,
     tingkat?: Tingkat,
-    adminData?: { name: string; email: string; password?: string }
+    tier?: SubscriptionTier,
+    adminData?: { name: string; email: string; password?: string },
+    paymentPlan?: { jumlahBulan: number; nominal?: number }
   ) => {
-    return await superadminDB.createSchool(name, address, tingkat, adminData);
+    return await superadminDB.createSchool(name, address, tingkat, tier, adminData, paymentPlan);
   },
 
-  updateSchool: async (id: string, name: string, address?: string) => {
-    return await superadminDB.updateSchool(parseInt(id), name, address);
+  updateSchool: async (
+    id: string,
+    name: string,
+    address?: string,
+    tier?: SubscriptionTier,
+    adminData?: { name?: string; email?: string; password?: string },
+    paymentPlan?: { addMonths?: number; nominal?: number; aktifSampai?: string }
+  ) => {
+    return await superadminDB.updateSchool(parseInt(id), name, address, tier, adminData, paymentPlan);
+  },
+
+  addSchoolPayment: async (sekolahId: string, jumlahBulan: number, nominal?: number) => {
+    return await superadminDB.addSchoolPayment(parseInt(sekolahId), jumlahBulan, nominal);
   },
 
   deleteSchool: async (id: string) => {

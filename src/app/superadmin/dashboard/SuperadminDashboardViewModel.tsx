@@ -2,12 +2,14 @@ import { superadminRepository } from "@/src/lib/repositories/superadminRepositor
 import { useEffect, useState } from "react";
 import { useSession } from "next-auth/react";
 import { Tingkat } from "../../types/admin";
+type SubscriptionTier = "FREE" | "BOOK_ONLY" | "PREMIUM";
 
 export function useSuperadminDashboardViewModel() {
   const { data: session, status } = useSession();
 
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [paymentFilter, setPaymentFilter] = useState<"ALL" | "ACTIVE" | "PAST_DUE">("ALL");
 
   // School detail roster modal
   const [selectedSchool, setSelectedSchool] = useState<any>(null);
@@ -26,19 +28,35 @@ export function useSuperadminDashboardViewModel() {
     fetchSchools();
   }, [session, status]);
 
+  const filteredSchools = schools.filter((school) => {
+    if (paymentFilter === "ALL") return true;
+    return school.paymentStatus === paymentFilter;
+  });
+
   const handleCreateSchool = async (
     name: string,
     address: string,
     tingkat: string,
-    adminData?: { name: string; email: string; password?: string }
+    tier: string,
+    adminData?: { name: string; email: string; password?: string },
+    paymentPlan?: { jumlahBulan: number; nominal?: number }
   ) => {
     const tingkatEnum = tingkat as Tingkat;
-    await superadminRepository.createSchool(name, address, tingkatEnum, adminData);
+    const tierEnum = tier as SubscriptionTier;
+    await superadminRepository.createSchool(name, address, tingkatEnum, tierEnum, adminData, paymentPlan);
     fetchSchools();
   };
 
-  const handleUpdateSchool = async (id: string, name: string, address: string) => {
-    await superadminRepository.updateSchool(id, name, address);
+  const handleUpdateSchool = async (
+    id: string,
+    name: string,
+    address: string,
+    tier: string,
+    adminData?: { name?: string; email?: string; password?: string },
+    paymentPlan?: { addMonths?: number; nominal?: number; aktifSampai?: string }
+  ) => {
+    const tierEnum = tier as SubscriptionTier;
+    await superadminRepository.updateSchool(id, name, address, tierEnum, adminData, paymentPlan);
     fetchSchools();
   };
 
@@ -63,8 +81,11 @@ export function useSuperadminDashboardViewModel() {
   };
 
   return {
-    schools,
+    schools: filteredSchools,
+    rawSchools: schools,
     loading,
+    paymentFilter,
+    setPaymentFilter,
     selectedSchool,
     setSelectedSchool,
     members,

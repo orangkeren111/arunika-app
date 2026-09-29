@@ -367,7 +367,7 @@ export function ReportTemplate({
                       </td>
                       <td className="p-4 align-top text-center">
                         <p className="text-[#39434D]/80 leading-relaxed">
-                          {q.catatanKoreksi || "No teacher comment has been provided."}
+                          {q.catatanKoreksi || "-"}
                         </p>
                       </td>
                     </tr>

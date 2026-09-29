@@ -53,6 +53,9 @@ export default function BabPage({
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [jumlahSoal, setJumlahSoal] = useState<number>(10);
+  const [jumlahSoalMcq, setJumlahSoalMcq] = useState<number>(7);
+  const [jumlahSoalEssay, setJumlahSoalEssay] = useState<number>(3);
+  const [pilihanPerMcq, setPilihanPerMcq] = useState<number>(4);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -96,6 +99,9 @@ export default function BabPage({
     setIsUploadModalOpen(false);
     setSelectedFile(null);
     setJumlahSoal(10);
+    setJumlahSoalMcq(7);
+    setJumlahSoalEssay(3);
+    setPilihanPerMcq(4);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -107,7 +113,7 @@ export default function BabPage({
   const submitUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedFile) {
-      await handleUploadBook(selectedFile, jumlahSoal);
+      await handleUploadBook(selectedFile, jumlahSoal, jumlahSoalMcq, jumlahSoalEssay, pilihanPerMcq);
       closeUploadModal();
       router.push("/guru/buku");
     }
@@ -335,17 +341,41 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal per Bab
+                  Jumlah Soal Pilihan Ganda
                 </label>
                 <input
                   type="number"
                   min={1}
                   max={30}
-                  value={jumlahSoal}
-                  onChange={(e) => setJumlahSoal(Number(e.target.value))}
+                  value={jumlahSoalMcq}
+                  onChange={(e) => setJumlahSoalMcq(Number(e.target.value))}
                   className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"
                   required
                 />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Jumlah Soal Essay
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={10}
+                  value={jumlahSoalEssay}
+                  onChange={(e) => setJumlahSoalEssay(Number(e.target.value))}
+                  className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] focus:outline-none focus:ring-2 focus:ring-[var(--primary)] text-sm md:text-base"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
+                  Jumlah Pilihan Ganda
+                </label>
+                <input type="radio" name="pilihan_per_mcq" value="3" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 3 Pilihan
+                <input type="radio" name="pilihan_per_mcq" value="4" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 4 Pilihan
+                <input type="radio" name="pilihan_per_mcq" value="5" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 5 Pilihan
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6 pt-4">

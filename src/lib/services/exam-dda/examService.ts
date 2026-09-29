@@ -63,14 +63,28 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
   const totalQuestions = enabledComp.length > 0
     ? enabledComp.reduce((sum, tk) => sum + tk.jumlahSoal, 0)
     : examData.ujian.jumlahSoal || 10;
-  const durationMinutes = examData.ujian.durasiMenit || 90;
+  const totalDurationMinutes = examData.ujian.durasiMenit || 90;
+
+  // Calculate how much time has actually passed since the exam started
+  const elapsedMs = Date.now() - session.waktuMulai.getTime();
+  const elapsedSeconds = Math.floor(elapsedMs / 1000);
+  const totalDurationSeconds = totalDurationMinutes * 60;
+
+  // Math.max ensures we don't send negative time if they resume after expiration
+  const remainingSeconds = Math.max(0, totalDurationSeconds - elapsedSeconds);
+
+  // Optional but recommended: Auto-finish if they open the exam after time is up
+  if (remainingSeconds === 0) {
+    // await finishExamSession(session.id); // Uncomment if you have this function available here
+  }
 
   return {
     sessionId: session.id,
     currentElo: session.currentElo,
     answeredCount: session.jawabanSiswa.length,
     totalQuestions,
-    durationMinutes,
+    remainingSeconds,
+    cheatCount: session.cheatCount,
     nextQuestion,
     isResuming,
   };
@@ -103,6 +117,20 @@ export async function submitSingleAnswer(
     },
   });
   if (!session) throw new Error("Session not found");
+  const durasiMenit = session.jadwalUjian?.ujian?.durasiMenit || 90;
+  const examEndTime = new Date(session.waktuMulai.getTime() + (durasiMenit + 5) * 60000);
+
+  if (new Date() > examEndTime) {
+    // The absolute server time has passed. The student is out of time.
+    await finishExamSession(sesiId);
+
+    // You can throw an error, or return a finished state so the frontend redirects them.
+    return {
+      isFinished: true,
+      finalElo: session.currentElo,
+      error: "TIME_EXPIRED"
+    };
+  }
 
   // 2. Find the original question to grade it
   const originalQuestion = await prisma.bankSoal.findUnique({
@@ -252,7 +280,6 @@ export async function finishExamSession(sesiId: number) {
 
   await siswaDB.finishSession(sesiId, finalScore);
 }
-
 async function _findNextQuestion(
   allQuestions: any[],
   answeredIds: (number | null)[],
@@ -262,19 +289,45 @@ async function _findNextQuestion(
 ) {
   // 1. Filter out questions already answered
   const availableQuestions = allQuestions.filter(
-    (q) => !answeredIds.includes(q.id),
+    (q) => !answeredIds.includes(q.id)
   );
   if (availableQuestions.length === 0) return null;
 
-  // 2. Fetch already answered questions details to count by competency
+  // 2. Fetch already answered questions details
   const answeredQuestions = await prisma.bankSoal.findMany({
     where: { id: { in: answeredIds.filter((id): id is number => id !== null) } },
   });
 
-  // 3. Find the first enabled competency that hasn't met its limit
+  // 3. 80/20 Format Split Controller
   const activeCompetencies = templateKompetensi.filter((tk) => tk.isEnabled);
-  let targetCompetency = null;
 
+  // Calculate total N for the exam based on competencies
+  const totalQuestions = activeCompetencies.length > 0
+    ? activeCompetencies.reduce((sum, tk) => sum + tk.jumlahSoal, 0)
+    : 10; // Fallback if no competencies are defined
+
+  const targetMcq = Math.floor(totalQuestions * 0.8);
+  const targetEssay = Math.ceil(totalQuestions * 0.2);
+
+  const answeredMcqCount = answeredQuestions.filter(q => q.type === TipeSoal.MCQ).length;
+  const answeredEssayCount = answeredQuestions.filter(q => q.type === TipeSoal.ESSAY).length;
+
+  const remainingEssaysNeeded = targetEssay - answeredEssayCount;
+  const remainingQuestionsTotal = totalQuestions - answeredQuestions.length;
+
+  let needsEssay = false;
+  if (remainingEssaysNeeded > 0) {
+    // If the remaining slots exactly match the required essays, force an essay.
+    // Otherwise, serve an essay if MCQ quota is met, or with a 20% random chance to spread them out.
+    if (remainingQuestionsTotal <= remainingEssaysNeeded) {
+      needsEssay = true;
+    } else {
+      needsEssay = (answeredMcqCount >= targetMcq) || (Math.random() < 0.2);
+    }
+  }
+
+  // 4. Find the first enabled competency that hasn't met its limit
+  let targetCompetency = null;
   for (const tk of activeCompetencies) {
     const answeredCount = answeredQuestions.filter((q) => q.kompetensiBabId === tk.kompetensiBabId).length;
     if (answeredCount < tk.jumlahSoal) {
@@ -283,46 +336,36 @@ async function _findNextQuestion(
     }
   }
 
-  if (!targetCompetency) return null; // All competency target limits met!
+  if (!targetCompetency) return null; // All competency target limits met
 
-  // 4. Filter available questions to only those matching target competency
+  // 5. Filter available questions to matching competency
   let competencyQuestions = availableQuestions.filter(
     (q) => targetCompetency && q.kompetensiBabId === targetCompetency.kompetensiBabId
   );
 
   if (competencyQuestions.length === 0) {
-    // Fallback: If no remaining questions match this specific competency, pick from any available question in the exam
+    // Fallback: pick from any available question in the exam if competency pool is dry
     competencyQuestions = availableQuestions;
   }
 
-  // 5. Check if we have Essay questions. Essay questions must be statically served (same for all students)
-  const essayQuestions = competencyQuestions.filter((q) => q.type === TipeSoal.ESSAY);
-  if (essayQuestions.length > 0) {
-    // Sort statically by ID so every student gets exactly the same essay questions in the same order
-    essayQuestions.sort((a, b) => a.id - b.id);
-    const bestQuestion = essayQuestions[0];
-    return {
-      id: bestQuestion.id.toString(),
-      babId: bestQuestion.babId?.toString(),
-      type: bestQuestion.type,
-      text: bestQuestion.teksSoal,
-      options: bestQuestion.opsiJawaban,
-      difficulty: bestQuestion.difficulty,
-      bloomLevel: bestQuestion.bloomLevel,
-      linkGambarSoal: bestQuestion.linkGambarSoal || null,
-    };
+  // 6. Filter Candidates by the Required Type (MCQ vs Essay)
+  let candidates = competencyQuestions.filter(
+    (q) => q.type === (needsEssay ? TipeSoal.ESSAY : TipeSoal.MCQ)
+  );
+
+  // Fallback if we run out of the specific type requested
+  if (candidates.length === 0) {
+    candidates = competencyQuestions;
   }
 
-  // 6. Serve MCQ: Adaptively using ELO closest match (if isAdaptive = true), or Randomized (if isAdaptive = false)
-  const mcqQuestions = competencyQuestions.filter((q) => q.type === TipeSoal.MCQ);
-  if (mcqQuestions.length === 0) return null;
-
-  let bestQuestion = mcqQuestions[0];
+  // 8. Nearest-Neighbor Selection (for BOTH MCQ and Essay)
+  let bestQuestion = candidates[0];
 
   if (isAdaptive) {
     let smallestEloDifference = Infinity;
-    for (const q of mcqQuestions) {
-      const qElo = DDAHelper.mapDifficultyToElo(q.difficulty);
+
+    for (const q of candidates) {
+      const qElo = DDAHelper.calculateQElo(q.bloomLevel, q.difficulty);
       const diff = Math.abs(qElo - currentElo);
 
       if (diff < smallestEloDifference) {
@@ -331,9 +374,9 @@ async function _findNextQuestion(
       }
     }
   } else {
-    // Non-adaptive mode: pick a random question from available MCQ candidates
-    const randomIndex = Math.floor(Math.random() * mcqQuestions.length);
-    bestQuestion = mcqQuestions[randomIndex];
+    // Non-adaptive mode: pick a random question
+    const randomIndex = Math.floor(Math.random() * candidates.length);
+    bestQuestion = candidates[randomIndex];
   }
 
   return {

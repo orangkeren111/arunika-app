@@ -172,7 +172,7 @@ export const siswaRepository = {
 
         return {
           jadwalId: j.id.toString(),
-          title: j.ujian.judulUjian,
+          title: j.judulJadwal,
           className: rawKelas.namaKelas,
           startTime: j.waktuMulaiAktif?.toISOString() || "Unknown",
           durationMinutes: j.ujian.durasiMenit,
@@ -221,8 +221,29 @@ export const siswaRepository = {
       nextQuestion: sessionState.nextQuestion,
       answeredCount: sessionState.answeredCount,
       totalQuestions: sessionState.totalQuestions,
-      durationMinutes: sessionState.durationMinutes,
+      remainingSeconds: sessionState.remainingSeconds,
+      cheatCount: sessionState.cheatCount,
     };
+  },
+  handleCheatViolation: async (
+    sesiId: string,
+    siswaId: number,
+    violationType: string,
+    nomorSoal: number
+  ) => {
+    try {
+      // Panggil fungsi dari siswaDB.ts
+      const result = await siswaDB.logCheatingAttempt(
+        parseInt(sesiId),
+        siswaId,
+        violationType,
+        nomorSoal
+      );
+      return { success: true, data: result };
+    } catch (error) {
+      console.error("Error logging cheat in repo:", error);
+      return { success: false, error: "Failed to log violation" };
+    }
   },
 
   /**
@@ -359,7 +380,7 @@ export const siswaRepository = {
         ? a.waktuSelesai.toISOString()
         : "Belum Selesai",
       score: a.nilaiAkhir,
-      status: a.nilaiAkhir !== null ? "Dinilai" : "Menunggu Koreksi",
+      status: a.nilaiAkhir !== null && a.isChecked ? "Dinilai" : "Menunggu Koreksi",
       feedback: a.jawabanSiswa?.[0]?.catatanKoreksi || null,
       aiSummary: a.aiLogs?.[0]?.overview || null,
     };

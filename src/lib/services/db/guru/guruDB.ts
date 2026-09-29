@@ -280,6 +280,42 @@ export async function updateSoal(id: number, data: Prisma.BankSoalUpdateInput) {
   });
 }
 
+export async function batchCreateSoal(
+  babId: number,
+  rows: Array<{
+    type: TipeSoal;
+    teksSoal: string;
+    difficulty: number;
+    bloomLevel: string;
+    opsiJawaban: string[] | null;
+    jawabanBenarMcq: string | null;
+    jawabanBenarEssay: string | null;
+    tags: string[];
+    kompetensiBabId: number | null;
+  }>
+) {
+  const lockStatus = await getExamLockStatusForBab(babId);
+  if (lockStatus.isLocked) {
+    throw new Error(`Soal tidak dapat diimpor: ${lockStatus.message}`);
+  }
+  return await prisma.bankSoal.createMany({
+    data: rows.map((r) => ({
+      babId,
+      type: r.type,
+      teksSoal: r.teksSoal,
+      difficulty: r.difficulty,
+      bloomLevel: r.bloomLevel,
+      opsiJawaban: r.opsiJawaban ?? undefined,
+      jawabanBenarMcq: r.jawabanBenarMcq,
+      jawabanBenarEssay: r.jawabanBenarEssay,
+      tags: r.tags,
+      kompetensiBabId: r.kompetensiBabId,
+      isAccepted: true,
+      isRejected: false,
+    })),
+  });
+}
+
 // --- TEMPLATES UJIAN ---
 export async function getUjianTemplates(guruId: number) {
   const guru = await prisma.user.findUnique({
@@ -755,7 +791,7 @@ export async function getExamLockStatusForBab(babId: number) {
       },
       OR: [
         { status: { in: [StatusUjian.ONGOING, StatusUjian.SCHEDULED] } },
-        { waktuMulaiAktif: { lte: now } },
+        // { waktuMulaiAktif: { lte: now } },
       ],
     },
     include: { ujian: true },
@@ -1406,6 +1442,122 @@ export async function getBookAiProcessingStatus(bukuId: number) {
     activeTaskCount: hasTask ? 1 : 0,
   };
 }
+
+export async function getLiveExamProgress(jadwalId: number) {
+  const jadwal = await prisma.jadwalUjian.findUnique({
+    where: { id: jadwalId },
+    include: {
+      ujian: {
+        select: {
+          id: true,
+          judulUjian: true,
+          jumlahSoal: true,
+        },
+      },
+      tipeUjian: {
+        select: {
+          namaTipeUjian: true,
+        },
+      },
+      kelas: {
+        select: {
+          id: true,
+          namaKelas: true,
+          members: {
+            where: {
+              user: {
+                role: "SISWA",
+              },
+            },
+            select: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                },
+              },
+            },
+          },
+        },
+      },
+      sesiSiswa: {
+        include: {
+          jawabanSiswa: {
+            select: {
+              id: true,
+              jawabanSiswa: true,
+            },
+          },
+          aiLogs: true
+        },
+      },
+    },
+  });
+
+  if (!jadwal) return null;
+
+
+  const totalQuestions = jadwal.ujian.jumlahSoal || 0;
+  const enrolledStudents = (jadwal.kelas?.members || []).map((m) => m.user);
+
+  const studentProgressMap = new Map<number, any>();
+
+  jadwal.sesiSiswa.forEach((sesi) => {
+    const answeredCount = sesi.jawabanSiswa.filter(
+      (j) => j.jawabanSiswa !== null && j.jawabanSiswa.trim() !== ""
+    ).length;
+
+    studentProgressMap.set(sesi.siswaId, {
+      attemptId: sesi.id,
+      waktuMulai: sesi.waktuMulai,
+      waktuSelesai: sesi.waktuSelesai,
+      answeredCount,
+      cheatCount: sesi.cheatCount || 0,
+      nilaiAkhir: sesi.nilaiAkhir,
+      isAIResponded: sesi.aiLogs.length > 0 && (sesi.aiLogs[0].overview !== null),
+      status: sesi.waktuSelesai
+        ? "COMPLETED"
+        : sesi.waktuMulai
+          ? "IN_PROGRESS"
+          : "NOT_STARTED",
+    });
+  });
+
+  const studentsProgress = enrolledStudents.map((student) => {
+    const progress = studentProgressMap.get(student.id) || {
+      attemptId: null,
+      waktuMulai: null,
+      waktuSelesai: null,
+      answeredCount: 0,
+      cheatCount: 0,
+      nilaiAkhir: null,
+      isAIResponded: false,
+      status: "NOT_STARTED",
+    };
+
+    return {
+      studentId: student.id,
+      studentName: student.name,
+      studentEmail: student.email,
+      ...progress,
+    };
+  });
+
+  return {
+    jadwalId: jadwal.id,
+    title: jadwal.judulJadwal || jadwal.ujian.judulUjian,
+    type: jadwal.tipeUjian?.namaTipeUjian || "Ujian",
+    status: jadwal.status,
+    waktuMulaiAktif: jadwal.waktuMulaiAktif,
+    waktuSelesaiAktif: jadwal.waktuSelesaiAktif,
+    kelasId: jadwal.kelasId,
+    kelasName: jadwal.kelas?.namaKelas || "",
+    totalQuestions,
+    studentsProgress,
+  };
+}
+
 
 
 

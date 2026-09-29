@@ -14,7 +14,13 @@ export const DDAHelper = {
     const normalized = Math.max(1, Math.min(10, difficulty));
     return MIN_ELO + ((normalized - 1) * (MAX_ELO - MIN_ELO)) / 9;
   },
-
+  calculateQElo: (bloomLevel: string, difficulty: number): number => {
+    const bloomFloors: Record<string, number> = {
+      "C1": 760, "C2": 920, "C3": 1080, "C4": 1240, "C5": 1400, "C6": 1560
+    };
+    const baseFloor = bloomFloors[bloomLevel?.toUpperCase()] || 760; // Default C1 if undefined
+    return baseFloor + (difficulty * 40);
+  },
   /**
    * Calculates the expected probability of a student getting a question right.
    * Returns a float between 0.0 and 1.0

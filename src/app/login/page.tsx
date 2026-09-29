@@ -138,9 +138,6 @@ function LoginForm() {
               <label className="block text-sm font-medium text-[var(--foreground)]">
                 Kata Sandi
               </label>
-              <span className="text-xs text-[var(--secondary)] hover:underline cursor-pointer">
-                Lupa Sandi?
-              </span>
             </div>
             <div className="relative">
               <Lock className="absolute left-3.5 top-3 w-5 h-5 text-[var(--muted-foreground)]" />

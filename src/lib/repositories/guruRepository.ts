@@ -342,6 +342,27 @@ export const guruRepository = {
     };
   },
 
+  batchImportSoal: async (
+    babId: string,
+    rows: Array<{
+      type: "MCQ" | "ESSAY";
+      teksSoal: string;
+      difficulty: number;
+      bloomLevel: string;
+      opsiJawaban: string[] | null;
+      jawabanBenarMcq: string | null;
+      jawabanBenarEssay: string | null;
+      tags: string[];
+      kompetensiBabId: number | null;
+    }>
+  ) => {
+    const dbRows = rows.map((r) => ({
+      ...r,
+      type: r.type === "MCQ" ? TipeSoal.MCQ : TipeSoal.ESSAY,
+    }));
+    return await guruDB.batchCreateSoal(parseInt(babId), dbRows);
+  },
+
   editSoal: async (idSoal: string, soal: any) => {
     const babIdNum = soal.babId ? parseInt(soal.babId) : 0;
 
@@ -915,4 +936,9 @@ export const guruRepository = {
   getAvailableSoalCounts: async (babIds: number[]) => {
     return await guruDB.getAvailableSoalCounts(babIds);
   },
+
+  getLiveExamProgress: async (jadwalId: string) => {
+    return await guruDB.getLiveExamProgress(Number(jadwalId));
+  },
 };
+

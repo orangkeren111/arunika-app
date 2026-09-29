@@ -53,6 +53,12 @@ enum JobStatus {
   FAILED
 }
 
+enum SubscriptionTier {
+  FREE
+  BOOK_ONLY
+  PREMIUM
+}
+
 // ==========================================
 // USERS & TENANCY
 // ==========================================
@@ -66,9 +72,28 @@ model Sekolah {
   users       User[]
   kelas       Kelas[]
 
+  pembayaran  Pembayaran[] 
+
+  aktifSampai DateTime? @map("aktif_sampai")
+  tier        SubscriptionTier @default(FREE)
+
   isRetired Boolean @default(false) @map("is_retired")
 
   @@map("sekolah")
+}
+
+model Pembayaran {
+  id            Int           @id @default(autoincrement())
+  
+  sekolahId     Int           @map("sekolah_id")
+  sekolah       Sekolah       @relation(fields: [sekolahId], references: [id])
+  
+  jumlahBulan   Int           @map("jumlah_bulan")
+  tanggalBayar  DateTime      @default(now()) @map("tanggal_bayar") 
+  
+  nominal       Float?        
+
+  @@map("pembayaran")
 }
 
 model User {
@@ -167,6 +192,11 @@ model GenerationJob {
   fileUrl      String?   @map("file_url") // Bisa diset null/dihapus kalau file lokal sudah di-unlink
   errorMessage String?   @map("error_message") @db.Text
   jumlahSoal   Int       @default(10) @map("jumlah_soal")
+
+  jumlahMcq       Int       @default(0) @map("jumlah_mcq")
+  jumlahEssay     Int       @default(0) @map("jumlah_essay")
+  pilihanPerMcq   Int       @default(4) @map("pilihan_per_mcq") // e.g., 4 for A-D, 5 for A-E
+
   tokensSpent  Int       @default(0) @map("tokens_spent")
   attempts     Int       @default(0)
 
@@ -306,6 +336,9 @@ model SesiUjianSiswa {
   nilaiAkhir    Float?    @map("nilai_akhir")
 
   currentElo    Float     @default(1000.0) @map("current_elo")
+
+  cheatCount    Int       @default(0) @map("cheat_count")
+  cheatLogs     Json?     @map("cheat_logs")
 
   isChecked     Boolean   @default(false) @map("is_checked")
 

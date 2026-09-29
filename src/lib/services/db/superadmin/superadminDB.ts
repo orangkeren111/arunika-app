@@ -3,11 +3,15 @@ import { Tingkat } from "@/src/app/types/admin";
 import prisma from "../prisma";
 import bcrypt from "bcryptjs";
 
+type SubscriptionTier = "FREE" | "BOOK_ONLY" | "PREMIUM";
 export async function getSchoolsWithStats() {
   const schools = await prisma.sekolah.findMany({
     include: {
       users: true,
       kelas: true,
+      pembayaran: {
+        orderBy: { tanggalBayar: "desc" },
+      },
     },
     orderBy: { id: "asc" },
   });
@@ -29,6 +33,8 @@ export async function getSchoolsWithStats() {
     },
   });
 
+  const now = new Date();
+
   return schools.map((school) => {
     // 1. Calculate GenerationJob tokens
     const schoolJobs = jobs.filter((j) => j.buku?.guru?.sekolahId === school.id);
@@ -47,14 +53,33 @@ export async function getSchoolsWithStats() {
       return sum;
     }, 0);
 
+    // 3. Calculate Payment Status
+    const isPastDue = !school.aktifSampai || new Date(school.aktifSampai) < now;
+    const paymentStatus: "ACTIVE" | "PAST_DUE" = isPastDue ? "PAST_DUE" : "ACTIVE";
+
+    // 4. Find primary Admin user if any
+    const adminUser = school.users.find((u) => u.role === "ADMIN");
+
     return {
       id: school.id,
       name: school.namaSekolah,
       isRetired: school.isRetired,
       address: school.alamat || "",
+      tingkat: school.tingkat,
+      tier: school.tier,
+      aktifSampai: school.aktifSampai,
+      paymentStatus,
       userCount: school.users.length,
       classCount: school.kelas.length,
       totalTokensSpent: genTokens + reportTokens,
+      adminUser: adminUser
+        ? {
+          id: adminUser.id,
+          name: adminUser.name,
+          email: adminUser.email,
+        }
+        : null,
+      latestPembayaran: school.pembayaran[0] || null,
     };
   });
 }
@@ -63,15 +88,35 @@ export async function createSchool(
   namaSekolah: string,
   alamat?: string,
   tingkat?: Tingkat,
-  adminData?: { name: string; email: string; password?: string }
+  tier?: SubscriptionTier,
+  adminData?: { name: string; email: string; password?: string },
+  paymentPlan?: { jumlahBulan: number; nominal?: number }
 ) {
+  let aktifSampai: Date | null = null;
+  if (paymentPlan && paymentPlan.jumlahBulan > 0) {
+    aktifSampai = new Date();
+    aktifSampai.setMonth(aktifSampai.getMonth() + paymentPlan.jumlahBulan);
+  }
+
   const school = await prisma.sekolah.create({
     data: {
       namaSekolah,
       alamat,
       tingkat: tingkat || "SD",
+      tier: tier || "FREE",
+      aktifSampai,
     },
   });
+
+  if (paymentPlan && paymentPlan.jumlahBulan > 0) {
+    await prisma.pembayaran.create({
+      data: {
+        sekolahId: school.id,
+        jumlahBulan: paymentPlan.jumlahBulan,
+        nominal: paymentPlan.nominal || 0,
+      },
+    });
+  }
 
   if (adminData && adminData.email) {
     const rawPassword = adminData.password || "admin123";
@@ -91,14 +136,119 @@ export async function createSchool(
   return school;
 }
 
-export async function updateSchool(id: number, namaSekolah: string, alamat?: string) {
-  return await prisma.sekolah.update({
+export async function updateSchool(
+  id: number,
+  namaSekolah: string,
+  alamat?: string,
+  tier?: SubscriptionTier,
+  adminData?: { name?: string; email?: string; password?: string },
+  paymentPlan?: { addMonths?: number; nominal?: number; aktifSampai?: string }
+) {
+  const currentSchool = await prisma.sekolah.findUnique({
+    where: { id },
+    include: { users: true },
+  });
+
+  if (!currentSchool) throw new Error("Sekolah tidak ditemukan.");
+
+  let updatedAktifSampai = currentSchool.aktifSampai;
+
+  if (paymentPlan) {
+    if (paymentPlan.aktifSampai) {
+      updatedAktifSampai = new Date(paymentPlan.aktifSampai);
+    } else if (paymentPlan.addMonths && paymentPlan.addMonths > 0) {
+      const baseDate = currentSchool.aktifSampai && new Date(currentSchool.aktifSampai) > new Date()
+        ? new Date(currentSchool.aktifSampai)
+        : new Date();
+      baseDate.setMonth(baseDate.getMonth() + paymentPlan.addMonths);
+      updatedAktifSampai = baseDate;
+
+      await prisma.pembayaran.create({
+        data: {
+          sekolahId: id,
+          jumlahBulan: paymentPlan.addMonths,
+          nominal: paymentPlan.nominal || 0,
+        },
+      });
+    }
+  }
+
+  const updatedSchool = await prisma.sekolah.update({
     where: { id },
     data: {
       namaSekolah,
       alamat,
+      aktifSampai: updatedAktifSampai,
+      tier: tier || currentSchool.tier,
     },
   });
+
+  // Upsert admin user if admin email is provided
+  if (adminData && adminData.email) {
+    const existingAdmin = currentSchool.users.find((u) => u.role === "ADMIN");
+
+    if (existingAdmin) {
+      const updateData: any = {
+        name: adminData.name || existingAdmin.name,
+        email: adminData.email,
+      };
+      if (adminData.password && adminData.password.trim() !== "") {
+        updateData.password = await bcrypt.hash(adminData.password, 10);
+      }
+
+      await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: updateData,
+      });
+    } else {
+      const rawPassword = adminData.password || "admin123";
+      const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+      await prisma.user.create({
+        data: {
+          name: adminData.name || "School Admin",
+          email: adminData.email,
+          password: hashedPassword,
+          role: "ADMIN",
+          sekolahId: id,
+        },
+      });
+    }
+  }
+
+  return updatedSchool;
+}
+
+export async function addSchoolPayment(
+  sekolahId: number,
+  jumlahBulan: number,
+  nominal?: number
+) {
+  const school = await prisma.sekolah.findUnique({ where: { id: sekolahId } });
+  if (!school) throw new Error("Sekolah tidak ditemukan.");
+
+  const baseDate = school.aktifSampai && new Date(school.aktifSampai) > new Date()
+    ? new Date(school.aktifSampai)
+    : new Date();
+
+  baseDate.setMonth(baseDate.getMonth() + jumlahBulan);
+
+  const payment = await prisma.pembayaran.create({
+    data: {
+      sekolahId,
+      jumlahBulan,
+      nominal: nominal || 0,
+    },
+  });
+
+  await prisma.sekolah.update({
+    where: { id: sekolahId },
+    data: {
+      aktifSampai: baseDate,
+    },
+  });
+
+  return payment;
 }
 
 export async function deleteSchool(id: number) {
@@ -132,6 +282,9 @@ export async function getSchoolDetailStats(sekolahId: number) {
     include: {
       users: true,
       kelas: true,
+      pembayaran: {
+        orderBy: { tanggalBayar: "desc" },
+      },
     },
   });
 
@@ -240,7 +393,15 @@ export async function getSchoolDetailStats(sekolahId: number) {
       name: school.namaSekolah,
       address: school.alamat,
       isRetired: school.isRetired,
+      aktifSampai: school.aktifSampai,
+      tier: school.tier,
     },
+    pembayaranHistory: school.pembayaran.map((p) => ({
+      id: p.id,
+      jumlahBulan: p.jumlahBulan,
+      tanggalBayar: p.tanggalBayar,
+      nominal: p.nominal,
+    })),
     counts: {
       membersCount: school.users.length,
       teachersCount: school.users.filter((u) => u.role === "GURU").length,

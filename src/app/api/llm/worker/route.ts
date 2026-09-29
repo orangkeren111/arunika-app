@@ -199,7 +199,7 @@ async function processGenerationStateMachine() {
 
       if (job.babId) {
         // Single Bab generation
-        results = [await generateQuestionsWithLLM(job.babId, job.jumlahSoal)];
+        results = [await generateQuestionsWithLLM(job.babId, job.jumlahSoal, job.jumlahMcq, job.jumlahEssay, job.pilihanPerMcq)];
       } else {
         // Use nested relation to get babs tied to the buku for this job
         const babs = await prisma.bab.findMany({
@@ -227,7 +227,7 @@ async function processGenerationStateMachine() {
 
         // Execute Groq concurrently for massive speed
         results = await Promise.all(
-          babs.map((bab: any) => generateQuestionsWithLLM(bab.id, job.jumlahSoal)),
+          babs.map((bab: any) => generateQuestionsWithLLM(bab.id, job.jumlahSoal, job.jumlahMcq, job.jumlahEssay, job.pilihanPerMcq)),
         );
       }
 
@@ -347,9 +347,12 @@ async function processTaskQueueBatch() {
         } else if (task.type === "generate_soal") {
           const result = await generateQuestionsWithLLM(
             payload.babId,
-            payload.totalJumlahSoal || 10
+            payload.totalJumlahSoal || 10,
+            payload.jumlahSoalMcq || 7,
+            payload.jumlahSoalEssay || 3,
+            payload.pilihanMcq || 4
           );
-          tokensSpent = result.tokens;
+          tokensSpent = result?.tokens ?? 0;
         }
 
         // Mark task as completed

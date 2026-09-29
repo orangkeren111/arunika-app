@@ -37,6 +37,9 @@ ${summary}
 
   generateQuestionsByKompetensi: (
     jumlahSoal: number,
+    jumlahSoalMcq: number,
+    jumlahSoalEssay: number,
+    jumlahPilihan: number,
     judulBab: string,
     kompetensiCode: string,
     kompetensiText: string,
@@ -44,7 +47,7 @@ ${summary}
     badQuestions: string[],
     tingkatan?: string,
   ) => `
-Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various types, mostly MCQ with a sprinkle of ESSAY if necessary (optimal ratio is 5:1). The target is for ${tingkatan} students, so adjust the difficulty, vocabulary, and complexity accordingly.
+Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various types, mainly MCQ and a few ESSAY. The target is for ${tingkatan} students, so adjust the difficulty, vocabulary, and complexity accordingly.
 
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex), with each question having its own Bloom's Taxonomy level (C1 to C6).
 
@@ -89,8 +92,9 @@ QUESTION REQUIREMENTS:
 * Difficulty must be an integer from 1 to 10.
 * The difficulty should reflect the actual cognitive complexity of the question.
 * Do not make every question the same difficulty or Bloom's level.
-* MCQ questions must have exactly 4 options.
+* MCQ questions must have exactly ${jumlahPilihan} options.
 * For MCQ, correctIndex must be a zero-based index corresponding to the correct option.
+* The amount of MCQ question must be exactly ${jumlahSoalMcq} and ESSAY question must be exactly ${jumlahSoalEssay}
 * ESSAY questions must not contain correctIndex or options.
 * Avoid duplicate or near-duplicate questions.
 * Make distractors in MCQ questions plausible and relevant to the competency.
@@ -105,7 +109,11 @@ For MCQ:
 "bloomLevel": "C1",
 "difficulty": 5,
 "soal": "What is the primary function of...",
-"options": ["A", "B", "C", "D"],
+"options": [
+    "Option 1",
+    "Option 2",
+    "... exactly ${jumlahPilihan} options ..."
+],
 "correctIndex": 0,
 "tipeSoal": "MCQ",
 "linkGambarSoal": "string",

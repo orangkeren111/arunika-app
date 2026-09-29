@@ -5,7 +5,7 @@ import prisma from "../db/prisma";
 import { BOOK_PROMPTS } from "../llm/prompts";
 import { callSmartText } from "../llm/router";
 
-export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: number = 10) {
+export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: number = 10, jumlahSoalMcq: number = 7, jumlahSoalEssay: number = 3, pilihanMcq: number = 4) {
   // 1. Fetch chapter (bab) details
   const bab = await prisma.bab.findUnique({
     where: { id: babId },
@@ -42,23 +42,30 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
       keywords: true,
     },
   });
+  const numCompetencies = competencies.length
+  const baseMcq = Math.floor(jumlahSoalMcq / numCompetencies);
+  const baseEssay = Math.floor(jumlahSoalEssay / numCompetencies);
 
-  for (const comp of competencies) {
+  // 2. Calculate the leftovers
+  const remainderMcq = jumlahSoalMcq % numCompetencies;
+  const remainderEssay = jumlahSoalEssay % numCompetencies;
+
+  for (const [i, comp] of competencies.entries()) {
     // 2. Fetch existing good and bad questions context
-    const goodSoals = await prisma.bankSoal.findMany({
-      where: { babId, kompetensiBabId: comp.id, isAccepted: true },
-      take: 10,
-      select: { teksSoal: true },
-    });
+    // const goodSoals = await prisma.bankSoal.findMany({
+    //   where: { babId, kompetensiBabId: comp.id, isAccepted: true },
+    //   take: 10,
+    //   select: { teksSoal: true },
+    // });
 
-    const badSoals = await prisma.bankSoal.findMany({
-      where: { babId, kompetensiBabId: comp.id, isRejected: true },
-      take: 10,
-      select: { teksSoal: true },
-    });
+    // const badSoals = await prisma.bankSoal.findMany({
+    //   where: { babId, kompetensiBabId: comp.id, isRejected: true },
+    //   take: 10,
+    //   select: { teksSoal: true },
+    // });
 
-    const goodList = goodSoals.map((s) => s.teksSoal);
-    const badList = badSoals.map((s) => s.teksSoal);
+    // const goodList = goodSoals.map((s) => s.teksSoal);
+    // const badList = badSoals.map((s) => s.teksSoal);
 
     // Build image catalog prompt string if images are available
     let imageCatalogPrompt = "";
@@ -73,14 +80,22 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
         2
       )}\n\Note: If the soal fits an image, you can put "linkGambarSoal" with the imagePath in the soal object. If the soal does not need an image, leave "linkGambarSoal" as null. If there are no image that fits, leave it at null. Please remember that not every question has to have an image, and don't make your own imagePath`;
     }
+    const currentMcqCount = baseMcq + (i < remainderMcq ? 1 : 0);
+    const currentEssayCount = baseEssay + (i < remainderEssay ? 1 : 0);
+
+    const currentTotal = currentMcqCount + currentEssayCount;
+    if (currentTotal === 0) return null;
 
     const prompt = `${BOOK_PROMPTS.generateQuestionsByKompetensi(
-      questionsPerComp,
+      currentTotal,
+      jumlahSoalMcq,
+      jumlahSoalEssay,
+      pilihanMcq,
       bab.judulBab,
       comp.nomerKompetensi,
       comp.isiKompetensi,
-      goodList,
-      badList,
+      [],
+      [],
       buku?.guru?.sekolah?.tingkat ?? "SMA",
     )}${imageCatalogPrompt}`;
 
@@ -158,13 +173,16 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
   return { questions: allGenerated, tokens: totalTokens };
 }
 
-export async function enqueueGenerateQuestions(babId: number, totalJumlahSoal: number = 10) {
+export async function enqueueGenerateQuestions(babId: number, totalJumlahSoal: number = 10, jumlahSoalMcq: number = 7, jumlahSoalEssay: number = 3, pilihanMcq: number = 4) {
   await prisma.taskQueue.create({
     data: {
       type: "generate_soal",
       payload: {
         babId,
         totalJumlahSoal,
+        jumlahSoalMcq,
+        jumlahSoalEssay,
+        pilihanMcq,
       },
     },
   });

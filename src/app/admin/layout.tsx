@@ -13,6 +13,7 @@ import {
   X,
   FileText,
   MonitorCog,
+  CreditCard,
 } from "lucide-react";
 import { signOut, useSession } from "next-auth/react";
 
@@ -32,6 +33,7 @@ export default function AdminLayout({
     { href: "/admin/users", label: "Pengguna", icon: Users },
     { href: "/admin/kelas", label: "Kelas", icon: BookOpen },
     // { href: "/admin/kurikulum", label: "Kurikulum", icon: FileText },
+    { href: "/admin/payments", label: "Riwayat Pembayaran", icon: CreditCard },
     { href: "/admin/control", label: "Control Center", icon: MonitorCog },
   ];
 
