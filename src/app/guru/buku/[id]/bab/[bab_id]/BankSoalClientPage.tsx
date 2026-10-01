@@ -292,6 +292,7 @@ export default function BankSoalClientPage({
         onUploadImage={handleUploadImage}
       />
 
+
       <UploadPdfModal
         isOpen={isUploadPdfModalOpen}
         onClose={() => setIsUploadPdfModalOpen(false)}

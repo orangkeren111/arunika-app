@@ -96,6 +96,7 @@ export async function updateQuizActivity(sessionId: number) {
   return await prisma.quizSession.update({
     where: { id: sessionId },
     data: {
+      wrongStreak: 0,
       lastActiveAt: new Date(),
     },
   });

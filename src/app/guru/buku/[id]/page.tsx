@@ -167,7 +167,7 @@ export default function BabPage({
             href={`/guru/buku/${buku.id}/export`}
             className="flex-1 sm:flex-none flex items-center justify-center gap-2 border border-green-600/30 text-green-600 bg-green-500/10 px-3 py-2 rounded-lg hover:bg-green-500/20 transition text-sm md:text-base font-semibold whitespace-nowrap"
           >
-            <FileSpreadsheet size={18} /> Export Excel
+            <FileSpreadsheet size={18} /> Export Soal
           </Link>
           <button
             onClick={() => setIsUploadModalOpen(true)}
@@ -341,7 +341,7 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal Pilihan Ganda
+                  Jumlah Soal Pilihan Ganda (per Kompetensi)
                 </label>
                 <input
                   type="number"
@@ -356,7 +356,7 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal Essay
+                  Jumlah Soal Essay (per Kompetensi)
                 </label>
                 <input
                   type="number"
@@ -371,11 +371,40 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Pilihan Ganda
+                  Jumlah Pilihan per Soal Pilihan Ganda
                 </label>
-                <input type="radio" name="pilihan_per_mcq" value="3" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 3 Pilihan
-                <input type="radio" name="pilihan_per_mcq" value="4" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 4 Pilihan
-                <input type="radio" name="pilihan_per_mcq" value="5" onChange={(e) => setPilihanPerMcq(Number(e.target.value))} /> 5 Pilihan
+                <div className="flex gap-4">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="pilihan_per_mcq"
+                      value="3"
+                      checked={pilihanPerMcq === 3}
+                      onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
+                      className="text-[var(--primary)] focus:ring-[var(--primary)]"
+                    /> 3 Pilihan
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="pilihan_per_mcq"
+                      value="4"
+                      checked={pilihanPerMcq === 4}
+                      onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
+                      className="text-[var(--primary)] focus:ring-[var(--primary)]"
+                    /> 4 Pilihan
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="pilihan_per_mcq"
+                      value="5"
+                      checked={pilihanPerMcq === 5}
+                      onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
+                      className="text-[var(--primary)] focus:ring-[var(--primary)]"
+                    /> 5 Pilihan
+                  </label>
+                </div>
               </div>
 
               <div className="flex flex-col-reverse sm:flex-row justify-end gap-2 sm:gap-3 mt-6 pt-4">

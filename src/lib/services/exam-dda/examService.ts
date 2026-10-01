@@ -362,11 +362,26 @@ async function _findNextQuestion(
   let bestQuestion = candidates[0];
 
   if (isAdaptive) {
+    const progress = totalQuestions > 0
+      ? Math.min(1, answeredQuestions.length / totalQuestions)
+      : 0;
+
+    // B. Define maximum allowable bias stretch (e.g., up to +200 Elo push by the end)
+    const maxBias = 200;
+
+    // C. Scale the bias using a smooth curve
+    const upwardBias = Math.pow(progress, 0.8) * maxBias;
+
+    // D. Calculate target search Elo and clamp it strictly between your 800 and 2000 limits
+    const targetSearchElo = Math.max(800, Math.min(2000, currentElo + upwardBias));
+
     let smallestEloDifference = Infinity;
 
     for (const q of candidates) {
       const qElo = DDAHelper.calculateQElo(q.bloomLevel, q.difficulty);
-      const diff = Math.abs(qElo - currentElo);
+
+      // Compare against the biased target Elo instead of raw currentElo
+      const diff = Math.abs(qElo - targetSearchElo);
 
       if (diff < smallestEloDifference) {
         smallestEloDifference = diff;

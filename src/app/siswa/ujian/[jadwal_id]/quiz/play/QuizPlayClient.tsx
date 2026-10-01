@@ -165,10 +165,6 @@ export default function QuizPlayClient({
         </div>
 
         <div className="flex items-center justify-between sm:justify-end gap-4 text-xs sm:text-sm font-bold">
-          <div className="flex items-center gap-1.5 bg-red-50 px-3 py-1.5 rounded-full border border-red-200">
-            <AlertTriangle className="text-red-500" size={16} />
-            <span>Kesalahan: <strong className="text-red-600">{session?.wrongStreak || 0}</strong> / 5</span>
-          </div>
           <div className="flex items-center gap-1.5 bg-[#FDF5E6] px-3.5 py-1.5 rounded-full border border-[#D2B48C]">
             <Timer className="text-[#6B8E23] animate-pulse" size={16} />
             <span>Sisa Waktu: <strong className="text-[#8B5A2B]">{timeLeft}</strong></span>

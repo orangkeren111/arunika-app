@@ -165,9 +165,6 @@ export const quizRepository = {
     } else {
       await quizDB.updateQuizSessionHistory(sessionId, competencyLog, false);
       if (result.nextAction === "REMEDIATE_CHAT") {
-        for (let i = 0; i < wrongCount; i++) {
-          await quizDB.incrementWrongStreak(sessionId);
-        }
         await quizDB.updateQuizSessionMode(sessionId, "CHAT_REMEDIATION");
       } else {
         await quizDB.updateQuizSessionMode(sessionId, "QUIZ_ACTIVE");
