@@ -882,7 +882,7 @@ export async function getExamsByKelas(kelasId: number) {
       ujian: true,
       tipeUjian: true,
     },
-    orderBy: { id: "desc" },
+    orderBy: { waktuMulaiAktif: "desc" },
   });
 }
 

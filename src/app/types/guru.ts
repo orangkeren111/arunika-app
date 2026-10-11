@@ -85,6 +85,7 @@ export interface JadwalUjian {
   startTime: string;
   status: string;
   type: string;
+  classId?: string;
 
   isGenerating?: boolean;
   isReportReady?: boolean;

@@ -96,6 +96,9 @@ export async function getRiwayatUjian(
     const data = await prisma.sesiUjianSiswa.findMany({
       ...query,
       take: options.limit,
+      orderBy: {
+        waktuMulai: "desc",
+      },
     });
 
     return {
@@ -114,6 +117,9 @@ export async function getRiwayatUjian(
       ...query,
       skip,
       take: pageSize,
+      orderBy: {
+        waktuMulai: "desc",
+      },
     }),
 
     prisma.sesiUjianSiswa.count({
@@ -309,7 +315,7 @@ export async function logCheatingAttempt(
   // 1. Fetch current logs to safely append
   const session = await prisma.sesiUjianSiswa.findFirst({
     where: { jadwalUjianId: sesiId, siswaId: siswaId },
-    select: { cheatLogs: true, cheatCount: true }
+    select: { id: true, cheatLogs: true, cheatCount: true }
   });
 
   if (!session) throw new Error("Session not found");
@@ -325,7 +331,7 @@ export async function logCheatingAttempt(
 
   // 3. Update database: atomic increment and overwrite JSON with the appended array
   const updatedSession = await prisma.sesiUjianSiswa.update({
-    where: { id: sesiId, siswaId: siswaId },
+    where: { id: session.id, siswaId: siswaId },
     data: {
       cheatCount: { increment: 1 },
       cheatLogs: [...currentLogs, newEvent]

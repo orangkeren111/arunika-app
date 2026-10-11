@@ -248,8 +248,8 @@ export default function SiswaDashboardPage() {
                 learningInsight.scoreTrend !== 0 && (
                   <div
                     className={`flex items-center gap-1 text-sm font-semibold ${learningInsight.scoreTrend > 0
-                        ? "text-[var(--success)]"
-                        : "text-[var(--error)]"
+                      ? "text-[var(--success)]"
+                      : "text-[var(--error)]"
                       }`}
                   >
                     {learningInsight.scoreTrend > 0 ? (
@@ -319,7 +319,7 @@ export default function SiswaDashboardPage() {
                           </p>
                         </div>
 
-                        {hist.score !== null && (
+                        {hist.score !== null && hist.status === "Dinilai" && (
                           <span className="text-lg font-bold text-[var(--foreground)] shrink-0">
                             {hist.score}
                           </span>
@@ -329,8 +329,8 @@ export default function SiswaDashboardPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2 mt-3">
                         <span
                           className={`text-xs px-2.5 py-1 rounded-full border inline-flex items-center gap-1.5 ${isGraded
-                              ? "bg-[var(--success)]/15 border-[var(--success)]/30 text-[var(--foreground)]"
-                              : "bg-[var(--warning)]/15 border-[var(--warning)]/30 text-[var(--foreground)]"
+                            ? "bg-[var(--success)]/15 border-[var(--success)]/30 text-[var(--foreground)]"
+                            : "bg-[var(--warning)]/15 border-[var(--warning)]/30 text-[var(--foreground)]"
                             }`}
                         >
                           {isGraded ? (

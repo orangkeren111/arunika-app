@@ -598,6 +598,7 @@ export const guruRepository = {
               ? "Completed"
               : "Draft",
       type: j.tipeUjian?.namaTipeUjian || "Ujian",
+      classId: j.kelasId.toString(),
     }));
   },
 

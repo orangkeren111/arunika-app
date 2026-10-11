@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { X } from "lucide-react";
 
 interface ScheduleModalProps {
@@ -40,6 +40,13 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const [searchTemplate, setSearchTemplate] = useState("");
+  const [showTemplates, setShowTemplates] = useState(false);
+
+  const filteredTemplates = templateList.filter((t) =>
+    t.title.toLowerCase().includes(searchTemplate.toLowerCase())
+  );
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-[var(--card)] w-full max-w-md p-6 rounded-xl border border-[var(--border)] shadow-xl relative max-h-[90vh] overflow-y-auto">
@@ -72,18 +79,45 @@ export const ScheduleModal: React.FC<ScheduleModalProps> = ({
             <label className="block text-sm font-semibold text-[var(--foreground)] mb-1">
               Pilih Template Ujian
             </label>
-            <select
-              value={selectedTemplate}
-              onChange={(e) => setSelectedTemplate(e.target.value)}
-              className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
-            >
-              <option value="">-- Pilih Template --</option>
-              {templateList.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.title} ({t.questionCount} Soal)
-                </option>
-              ))}
-            </select>
+            <div className="relative w-full">
+              <input
+                type="text"
+                value={searchTemplate}
+                onChange={(e) => {
+                  setSearchTemplate(e.target.value);
+                  setShowTemplates(true);
+                  setSelectedTemplate("");
+                }}
+                onFocus={() => setShowTemplates(true)}
+                placeholder="Cari template..."
+                className="w-full p-2.5 border border-[var(--border)] rounded-lg bg-[var(--background)] text-[var(--foreground)] text-sm focus:ring-2 focus:ring-[var(--primary)]"
+              />
+
+              {showTemplates && (
+                <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto border border-[var(--border)] rounded-lg bg-[var(--background)] shadow-lg">
+                  {filteredTemplates.length > 0 ? (
+                    filteredTemplates.map((t) => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => {
+                          setSelectedTemplate(String(t.id));
+                          setSearchTemplate(t.title);
+                          setShowTemplates(false);
+                        }}
+                        className="w-full text-left p-2.5 text-sm text-[var(--foreground)] hover:bg-[var(--muted)]"
+                      >
+                        {t.title} ({t.questionCount} Soal)
+                      </button>
+                    ))
+                  ) : (
+                    <div className="p-2.5 text-sm text-[var(--muted-foreground)]">
+                      Template tidak ditemukan.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div>

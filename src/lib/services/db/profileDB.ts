@@ -36,6 +36,9 @@ export async function findStudentExamAttempts(userId: number) {
             waktuSelesai: true,
             nilaiAkhir: true,
         },
+        orderBy: {
+            waktuSelesai: "desc",
+        },
     });
 }
 
