@@ -5,7 +5,7 @@ interface GenerateSoalModalProps {
   isOpen: boolean;
   isGeneratingSoal: boolean;
   onClose: () => void;
-  onGenerate: (jumlahSoal: number) => Promise<void>;
+  onGenerate: (jumlahSoalMcq: number, jumlahSoalEssay: number, pilihanMcq: number) => Promise<void>;
 }
 
 export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
@@ -14,15 +14,23 @@ export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
   onClose,
   onGenerate,
 }) => {
-  const [jumlahSoalGen, setJumlahSoalGen] = useState<number>(10);
+  const [jumlahMcq, setJumlahMcq] = useState<number>(7);
+  const [jumlahEssay, setJumlahEssay] = useState<number>(3);
+  const [pilihanPerMcq, setPilihanPerMcq] = useState<number>(4);
   const [isSubmittingGen, setIsSubmittingGen] = useState(false);
 
   if (!isOpen) return null;
 
+  const totalQuestions = jumlahMcq + jumlahEssay;
+
   const handleConfirmGenerate = async () => {
+    if (totalQuestions <= 0) {
+      alert("Harap tentukan minimal 1 soal (Pilihan Ganda atau Esai).");
+      return;
+    }
     setIsSubmittingGen(true);
     try {
-      await onGenerate(jumlahSoalGen);
+      await onGenerate(jumlahMcq, jumlahEssay, pilihanPerMcq);
       onClose();
     } catch (err) {
       // Handled by viewmodel showError
@@ -40,7 +48,7 @@ export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
           </h3>
           <button
             onClick={onClose}
-            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)]"
+            className="text-[var(--muted-foreground)] hover:text-[var(--foreground)] cursor-pointer"
           >
             <X size={20} />
           </button>
@@ -59,34 +67,72 @@ export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
         ) : (
           <div className="space-y-4">
             <p className="text-sm text-[var(--muted-foreground)]">
-              Pilih jumlah soal yang ingin digenerate oleh AI berdasarkan materi PDF bab ini.
+              Konfigurasi jumlah soal Pilihan Ganda (MCQ) dan Esai yang ingin digenerate oleh AI.
             </p>
-            <div>
-              <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                Jumlah Soal (1 - 20)
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={jumlahSoalGen}
-                onChange={(e) => setJumlahSoalGen(Number(e.target.value))}
-                className="w-full p-2 border border-[var(--input)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)]"
-              />
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                  Pilihan Ganda (MCQ)
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={30}
+                  value={jumlahMcq}
+                  onChange={(e) => setJumlahMcq(Math.max(0, Number(e.target.value)))}
+                  className="w-full p-2 border border-[var(--input)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)]"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                  Soal Esai
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={20}
+                  value={jumlahEssay}
+                  onChange={(e) => setJumlahEssay(Math.max(0, Number(e.target.value)))}
+                  className="w-full p-2 border border-[var(--input)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)]"
+                />
+              </div>
             </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
+                Jumlah Pilihan per Soal MCQ
+              </label>
+              <select
+                value={pilihanPerMcq}
+                onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
+                className="w-full p-2 border border-[var(--input)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)]"
+              >
+                <option value={4}>4 Pilihan (A - D)</option>
+                <option value={5}>5 Pilihan (A - E)</option>
+                <option value={3}>3 Pilihan (A - C)</option>
+              </select>
+            </div>
+
+            <div className="bg-[var(--muted)]/50 p-2.5 rounded-lg flex items-center justify-between text-xs font-medium text-[var(--foreground)]">
+              <span>Total Soal:</span>
+              <span className="font-bold text-sm text-[var(--primary)]">{totalQuestions} Soal</span>
+            </div>
+
             <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)]"
+                className="px-4 py-2 rounded-lg text-sm font-medium text-[var(--muted-foreground)] hover:bg-[var(--muted)] cursor-pointer"
               >
                 Batal
               </button>
               <button
                 type="button"
                 onClick={handleConfirmGenerate}
-                disabled={isSubmittingGen}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition flex items-center gap-2"
+                disabled={isSubmittingGen || totalQuestions <= 0}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition flex items-center gap-2 cursor-pointer"
               >
                 {isSubmittingGen ? "Proses..." : "Mulai Generate"}
               </button>

@@ -41,12 +41,27 @@ export const reportRepository = {
     const questions = rawAnswers.map((ans) => {
       if (ans.isCorrect) correctCount++;
 
+      const options = Array.isArray(ans.opsiJawaban)
+        ? (ans.opsiJawaban as string[])
+        : Array.isArray(ans.soalAsli?.opsiJawaban)
+        ? (ans.soalAsli?.opsiJawaban as string[])
+        : undefined;
+
+      const correctAnswer =
+        ans.type === "MCQ"
+          ? ans.jawabanBenarMcq || ans.soalAsli?.jawabanBenarMcq || undefined
+          : ans.jawabanBenarEssay || ans.soalAsli?.jawabanBenarEssay || undefined;
+
       return {
         id: ans.id.toString(),
         prompt: ans.teksSoal,
         studentAnswer: ans.jawabanSiswa || "No answer provided",
-        catatanKoreksi: ans.catatanKoreksi || "",
+        catatanKoreksi: ans.catatanKoreksi || ans.aiResponse || "",
         isCorrect: ans.isCorrect || false,
+        linkGambarSoal: ans.soalAsli?.linkGambarSoal || undefined,
+        options,
+        correctAnswer,
+        type: ans.type as "MCQ" | "ESSAY",
       };
     });
 

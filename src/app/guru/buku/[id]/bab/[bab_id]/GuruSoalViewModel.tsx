@@ -110,13 +110,24 @@ export function useSoalViewModel(babId: string) {
     setIsErrorModalOpen(true);
   };
 
-  const handleGenerateQuestion = async (jumlahSoal: number = 10) => {
+  const handleGenerateQuestion = async (
+    jumlahSoalMcq: number = 7,
+    jumlahSoalEssay: number = 3,
+    pilihanMcq: number = 4
+  ) => {
     try {
       if (isLockedByExam) {
         showError(lockMessage || "Soal tidak dapat digenerate karena Ujian sedang aktif/terjadwal.");
         return;
       }
-      await guruRepository.retryGenerateSoal(Number(babId), jumlahSoal);
+      const totalJumlahSoal = jumlahSoalMcq + jumlahSoalEssay;
+      await guruRepository.retryGenerateSoal(
+        Number(babId),
+        totalJumlahSoal,
+        jumlahSoalMcq,
+        jumlahSoalEssay,
+        pilihanMcq
+      );
       await checkGenerationStatus();
       fetchSoal();
     } catch (err: any) {

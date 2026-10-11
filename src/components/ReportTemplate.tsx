@@ -19,6 +19,7 @@ export function ReportTemplate({
   const [activeTab, setActiveTab] = useState<
     "overview" | "competency" | "review"
   >("overview");
+  const [selectedQuestion, setSelectedQuestion] = useState<QuestionDetail | null>(null);
   const tabs = [
     {
       id: "overview" as const,
@@ -307,15 +308,18 @@ export function ReportTemplate({
       {/* ==================== DETAILED REVIEW ==================== */}
       {activeTab === "review" && (
         <section>
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-1.5 h-6 bg-[#7FA88F] rounded-full" />
+          <div className="flex items-center justify-between gap-3 mb-6">
+            <div className="flex items-center gap-3">
+              <div className="w-1.5 h-6 bg-[#7FA88F] rounded-full" />
 
-            <h2 className="text-xl font-bold text-[#39434D]">
-              Detailed Review
-            </h2>
+              <h2 className="text-xl font-bold text-[#39434D]">
+                Detailed Review
+              </h2>
+            </div>
+            <span className="text-xs text-[#39434D]/60 font-medium hidden sm:inline">
+              Klik baris atau tombol Detail untuk melihat pilihan & kunci jawaban
+            </span>
           </div>
-
-
 
           {/* Questions */}
           <div className="w-full bg-white rounded-2xl border border-[#7FA88F]/30 shadow-sm overflow-hidden">
@@ -334,6 +338,9 @@ export function ReportTemplate({
                     <th className="p-4 w-28 text-center font-bold">
                       Teacher's Comment
                     </th>
+                    <th className="p-4 w-20 text-center font-bold">
+                      Aksi
+                    </th>
                   </tr>
                 </thead>
 
@@ -341,18 +348,23 @@ export function ReportTemplate({
                   {questions.map((q, idx) => (
                     <tr
                       key={q.id}
-                      className="hover:bg-[#FAF8F3]/50 transition-colors"
+                      onClick={() => setSelectedQuestion(q)}
+                      className="hover:bg-[#FAF8F3]/70 transition-colors cursor-pointer group"
                     >
                       <td className="p-4 text-center align-top font-bold text-[#7FA88F]">
                         {idx + 1}
                       </td>
 
-                      <td className="p-4 align-top pr-6 text-[#39434D]/90 leading-relaxed">
-                        {q.prompt}
+                      <td className="p-4 align-top pr-6 text-[#39434D]/90 leading-relaxed font-medium">
+                        <div className="line-clamp-2 group-hover:line-clamp-none transition-all">
+                          {q.prompt}
+                        </div>
                       </td>
 
                       <td className="p-4 align-top font-semibold text-[#39434D]">
-                        {q.studentAnswer}
+                        <div className="line-clamp-2">
+                          {q.studentAnswer}
+                        </div>
                       </td>
 
                       <td className="p-4 align-top text-center">
@@ -366,9 +378,21 @@ export function ReportTemplate({
                         </span>
                       </td>
                       <td className="p-4 align-top text-center">
-                        <p className="text-[#39434D]/80 leading-relaxed">
+                        <p className="text-[#39434D]/80 leading-relaxed text-xs line-clamp-2">
                           {q.catatanKoreksi || "-"}
                         </p>
+                      </td>
+                      <td className="p-4 align-top text-center">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedQuestion(q);
+                          }}
+                          className="px-3 py-1 bg-[#7FA88F]/15 hover:bg-[#7FA88F] text-[#39434D] hover:text-white rounded-lg text-xs font-bold transition-colors cursor-pointer"
+                        >
+                          Detail
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -377,6 +401,143 @@ export function ReportTemplate({
             </div>
           </div>
         </section>
+      )}
+
+      {/* ==================== QUESTION DETAIL MODAL ==================== */}
+      {selectedQuestion && (
+        <div
+          className="fixed inset-0 z-50 bg-[#39434D]/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setSelectedQuestion(null)}
+        >
+          <div
+            className="bg-white rounded-3xl max-w-2xl w-full p-6 md:p-8 shadow-2xl border border-[#7FA88F]/30 max-h-[90vh] overflow-y-auto space-y-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-start gap-4 border-b border-gray-100 pb-4">
+              <div>
+                <span className="inline-block px-3 py-1 rounded-full text-xs font-bold bg-[#7FA88F]/15 text-[#7FA88F] mb-2">
+                  {selectedQuestion.type === "ESSAY" ? "Soal Esai" : "Pilihan Ganda (MCQ)"}
+                </span>
+                <h3 className="text-xl font-extrabold text-[#39434D]">
+                  Detail Soal & Jawaban
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedQuestion(null)}
+                className="w-9 h-9 rounded-full bg-gray-100 hover:bg-gray-200 text-[#39434D] flex items-center justify-center font-black transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Prompt */}
+            <div className="space-y-3">
+              <h4 className="text-xs uppercase tracking-wider font-bold text-[#7FA88F]">Pertanyaan</h4>
+              <p className="text-base font-semibold text-[#39434D] leading-relaxed">
+                {selectedQuestion.prompt}
+              </p>
+              {selectedQuestion.linkGambarSoal && (
+                <div className="p-2 bg-[#FAF8F3] rounded-2xl border border-[#7FA88F]/20 flex justify-center">
+                  <img
+                    src={selectedQuestion.linkGambarSoal}
+                    alt="Gambar Soal"
+                    className="max-h-56 object-contain rounded-xl"
+                  />
+                </div>
+              )}
+            </div>
+
+            {/* MCQ Options Display */}
+            {selectedQuestion.options && selectedQuestion.options.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-xs uppercase tracking-wider font-bold text-[#7FA88F]">Pilihan Jawaban</h4>
+                <div className="space-y-2">
+                  {selectedQuestion.options.map((opt, i) => {
+                    const isSelected = selectedQuestion.studentAnswer === opt;
+                    const isCorrectAnswer = selectedQuestion.correctAnswer === opt;
+
+                    let bgClass = "bg-[#FAF8F3] border-gray-200 text-[#39434D]";
+                    if (isCorrectAnswer) {
+                      bgClass = "bg-green-50 border-green-400 text-green-900";
+                    } else if (isSelected && !selectedQuestion.isCorrect) {
+                      bgClass = "bg-red-50 border-red-300 text-red-900";
+                    }
+
+                    return (
+                      <div
+                        key={i}
+                        className={`p-3.5 rounded-2xl border flex items-center justify-between gap-3 text-sm font-medium ${bgClass}`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="w-7 h-7 rounded-full bg-white shadow-xs flex items-center justify-center font-bold text-xs shrink-0 border border-gray-200">
+                            {String.fromCharCode(65 + i)}
+                          </span>
+                          <span>{opt}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          {isSelected && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-blue-100 text-blue-800">
+                              Pilihan Siswa
+                            </span>
+                          )}
+                          {isCorrectAnswer && (
+                            <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-emerald-600 text-white">
+                              ✓ Jawaban Benar
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Responses Comparison */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+              <div className={`p-4 rounded-2xl border ${selectedQuestion.isCorrect ? "bg-green-50/70 border-green-200" : "bg-red-50/70 border-red-200"}`}>
+                <span className="text-xs font-bold uppercase tracking-wider text-gray-500 block mb-1">
+                  Jawaban Siswa ({selectedQuestion.isCorrect ? "Benar" : "Salah"})
+                </span>
+                <p className="text-sm font-bold text-[#39434D]">
+                  {selectedQuestion.studentAnswer || "(Tidak ada jawaban)"}
+                </p>
+              </div>
+
+              <div className="p-4 rounded-2xl border bg-emerald-50/70 border-emerald-200">
+                <span className="text-xs font-bold uppercase tracking-wider text-emerald-800 block mb-1">
+                  Kunci / Referensi Benar
+                </span>
+                <p className="text-sm font-bold text-emerald-950">
+                  {selectedQuestion.correctAnswer || "(Evaluasi Guru/AI)"}
+                </p>
+              </div>
+            </div>
+
+            {/* Teacher / AI Notes */}
+            {selectedQuestion.catatanKoreksi && (
+              <div className="p-4 rounded-2xl bg-[#FAF8F3] border border-[#7FA88F]/30 space-y-1">
+                <span className="text-xs font-bold uppercase tracking-wider text-[#7FA88F] block">
+                  Catatan Koreksi / Penjelasan
+                </span>
+                <p className="text-sm text-[#39434D]/90 leading-relaxed">
+                  {selectedQuestion.catatanKoreksi}
+                </p>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setSelectedQuestion(null)}
+                className="px-6 py-2.5 rounded-full font-bold text-sm bg-[#7FA88F] hover:bg-[#6c8f7a] text-white shadow-md transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -29,9 +29,10 @@ export function useExamAttempt(jadwalId: string) {
   const [warnings, setWarnings] = useState(0);
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState("");
+  const [showTimeoutModal, setShowTimeoutModal] = useState(false);
 
   const { data: session, status } = useSession();
-  const router = useRouter()
+  const router = useRouter();
 
   // Handle tab-out (blur) warning and auto-submission
   useEffect(() => {
@@ -168,7 +169,7 @@ export function useExamAttempt(jadwalId: string) {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSubmitExam();
+          handleTimeoutExam();
           return 0;
         }
         return prev - 1;
@@ -238,6 +239,36 @@ export function useExamAttempt(jadwalId: string) {
     }
   };
 
+  // 6. Handle Exam Timeout
+  const handleTimeoutExam = async () => {
+    if (!session?.user?.id) return;
+    setIsSubmitting(true);
+    try {
+      const currentAnswer = currentQ ? { [currentQ.id]: answers[currentQ.id] || "" } : {};
+
+      await siswaRepository.submitExamAttempt(
+        jadwalId,
+        currentAnswer,
+        Number(session.user.id),
+        undefined,
+        true,
+      );
+      setIsFinished(true);
+      setCurrentQ(null);
+      setShowTimeoutModal(true);
+    } catch (error) {
+      console.error("Failed to finish exam on timeout:", error);
+      setShowTimeoutModal(true);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmTimeout = () => {
+    setShowTimeoutModal(false);
+    router.push(`/siswa/history`);
+  };
+
   const formatTime = (seconds: number) => {
     const m = Math.floor(seconds / 60)
       .toString()
@@ -258,8 +289,10 @@ export function useExamAttempt(jadwalId: string) {
     showWarningModal,
     warningMessage,
     dismissWarningModal: () => setShowWarningModal(false),
+    showTimeoutModal,
+    handleConfirmTimeout,
     timeLeft: formatTime(timeLeft),
-    isFinished: isFinished || timeLeft === 0,
+    isFinished,
     loading: loading || isSubmitting,
     progress: totalQuestions > 0 ? Math.min(100, Math.round(((currentIndex + 1) / totalQuestions) * 100)) : 0,
   };

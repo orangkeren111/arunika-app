@@ -12,6 +12,9 @@ export interface QuestionDetail {
   isCorrect: boolean;
   catatanKoreksi: string;
   linkGambarSoal?: string;
+  options?: string[];
+  correctAnswer?: string;
+  type?: "MCQ" | "ESSAY";
 }
 
 export interface ReportProps {

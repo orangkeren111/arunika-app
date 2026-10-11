@@ -268,6 +268,15 @@ export async function incrementWrongStreak(sessionId: number) {
   });
 }
 
+export async function updateWrongStreak(sessionId: number, streak: number) {
+  return await prisma.quizSession.update({
+    where: { id: sessionId },
+    data: {
+      wrongStreak: streak,
+    },
+  });
+}
+
 export async function getUjianIdByJadwal(jadwalId: number) {
   const jadwal = await prisma.jadwalUjian.findUnique({
     where: { id: jadwalId },

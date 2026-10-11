@@ -514,8 +514,14 @@ export const guruRepository = {
   uploadAndGenerateBookPdf: async (formData: FormData) => {
     return await initiatePdfExtraction(formData);
   },
-  retryGenerateSoal: async (babId: number, totalJumlahSoal: number = 10) => {
-    return await enqueueGenerateQuestions(babId, totalJumlahSoal);
+  retryGenerateSoal: async (
+    babId: number,
+    totalJumlahSoal: number = 10,
+    jumlahSoalMcq: number = 7,
+    jumlahSoalEssay: number = 3,
+    pilihanMcq: number = 4
+  ) => {
+    return await enqueueGenerateQuestions(babId, totalJumlahSoal, jumlahSoalMcq, jumlahSoalEssay, pilihanMcq);
   },
   getSoalGenerationStatus: async (babId: number) => {
     return await guruDB.getSoalGenerationStatus(babId);

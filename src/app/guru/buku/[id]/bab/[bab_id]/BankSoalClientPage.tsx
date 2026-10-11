@@ -305,8 +305,8 @@ export default function BankSoalClientPage({
         isOpen={isGenerateModalOpen}
         isGeneratingSoal={isGeneratingSoal}
         onClose={() => setIsGenerateModalOpen(false)}
-        onGenerate={async (n) => {
-          await handleGenerateQuestion(n);
+        onGenerate={async (mcq, essay, ops) => {
+          await handleGenerateQuestion(mcq, essay, ops);
         }}
       />
 

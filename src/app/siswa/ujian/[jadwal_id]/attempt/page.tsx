@@ -42,6 +42,8 @@ export default function ExamAttemptPage({
     showWarningModal,
     warningMessage,
     dismissWarningModal,
+    showTimeoutModal,
+    handleConfirmTimeout,
   } = useExamAttempt(resolvedParams.jadwal_id);
 
   useOwnerGuard({
@@ -60,10 +62,11 @@ export default function ExamAttemptPage({
   const [isFinishing, setIsFinishing] = useState(false);
 
   useEffect(() => {
-    if (isFinished) {
+    // Only auto-redirect if finished naturally without timeout modal pending
+    if (isFinished && !showTimeoutModal) {
       router.push("/siswa/history");
     }
-  }, [isFinished, router]);
+  }, [isFinished, showTimeoutModal, router]);
 
   const executeSubmit = async () => {
     setIsFinishing(true);
@@ -308,6 +311,34 @@ export default function ExamAttemptPage({
                 className="w-full px-6 py-3 rounded-2xl font-extrabold text-white bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 transition shadow-[0_0_20px_rgba(245,158,11,0.3)] border border-amber-400/30 cursor-pointer active:scale-95"
               >
                 Saya Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Timeout Modal overlay (Liquid Glass) */}
+      {showTimeoutModal && (
+        <div className="fixed inset-0 bg-slate-950/85 backdrop-blur-xl flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-slate-900/95 border border-rose-500/30 rounded-3xl p-8 max-w-md w-full shadow-[0_0_50px_rgba(225,29,72,0.3)] text-center space-y-6 relative backdrop-blur-2xl">
+            <div className="w-16 h-16 rounded-2xl bg-rose-500/20 border border-rose-500/40 text-rose-400 flex items-center justify-center mx-auto shadow-inner">
+              <Timer size={32} className="animate-pulse" />
+            </div>
+
+            <div className="space-y-2">
+              <h3 className="text-2xl font-black text-slate-100">Waktu Ujian Telah Habis</h3>
+              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                Waktu pengerjaan Anda telah selesai. Seluruh jawaban yang telah Anda berikan telah tersimpan secara otomatis ke dalam sistem.
+              </p>
+            </div>
+
+            <div className="pt-2">
+              <button
+                onClick={handleConfirmTimeout}
+                className="w-full px-6 py-3.5 rounded-2xl font-extrabold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 transition shadow-[0_0_20px_rgba(59,130,246,0.4)] border border-blue-400/30 cursor-pointer active:scale-95 flex items-center justify-center gap-2"
+              >
+                <CheckCircle size={18} />
+                Lihat Riwayat & Hasil
               </button>
             </div>
           </div>

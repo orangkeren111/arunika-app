@@ -1,6 +1,7 @@
 "use server";
 
 import { generateText } from "ai";
+import { Prisma } from "@prisma/client";
 import prisma from "../db/prisma";
 import { BOOK_PROMPTS } from "../llm/prompts";
 import { callSmartText } from "../llm/router";
@@ -88,8 +89,8 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
 
     const prompt = `${BOOK_PROMPTS.generateQuestionsByKompetensi(
       currentTotal,
-      jumlahSoalMcq,
-      jumlahSoalEssay,
+      currentMcqCount,
+      currentEssayCount,
       pilihanMcq,
       bab.judulBab,
       comp.nomerKompetensi,
@@ -147,26 +148,76 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
     const tokens = result.tokens ?? 0;
     totalTokens += tokens;
 
-    const questions = parsedResponse.questions || [];
-    allGenerated.push(...questions);
+    const rawQuestions = parsedResponse.questions || [];
 
-    // 4. Save the final questions to the database linked to this competency
-    await prisma.bankSoal.createMany({
-      data: questions.map((q: any) => ({
+    // 4. Validate questions before inserting into database
+    const validQuestions = rawQuestions.filter((q: any) => {
+      if (!q || !q.soal || typeof q.soal !== "string" || q.soal.trim() === "") {
+        return false;
+      }
+
+      const type = q.tipeSoal || "MCQ";
+      if (type === "MCQ") {
+        // Strict check: MCQ must have non-null options array with at least 2 items and valid correctIndex
+        if (
+          !Array.isArray(q.options) ||
+          q.options.length < 2 ||
+          q.options.some((opt: any) => typeof opt !== "string" || opt.trim() === "")
+        ) {
+          console.warn(`[Question Generator] Dropped invalid MCQ with missing/null options: "${q.soal}"`);
+          return false;
+        }
+
+        if (
+          q.correctIndex === undefined ||
+          typeof q.correctIndex !== "number" ||
+          q.correctIndex < 0 ||
+          q.correctIndex >= q.options.length
+        ) {
+          console.warn(`[Question Generator] Dropped invalid MCQ with out-of-bounds correctIndex: "${q.soal}"`);
+          return false;
+        }
+      }
+
+      return true;
+    });
+
+    allGenerated.push(...validQuestions);
+
+    if (validQuestions.length > 0) {
+      // 5. Save the validated questions to the database linked to this competency
+      await prisma.bankSoal.createMany({
+        data: validQuestions.map((q: any) => ({
+          babId: bab.id,
+          kompetensiBabId: comp.id,
+          teksSoal: q.soal,
+          type: q.tipeSoal || "MCQ",
+          opsiJawaban: q.options || null,
+          jawabanBenarMcq: q.options && q.correctIndex !== undefined ? q.options[q.correctIndex] : null,
+          jawabanBenarEssay: q.explanation || q.jawabanBenarEssay || null,
+          difficulty: Number(q.difficulty ?? 5),
+          bloomLevel: q.bloomLevel || "C1",
+          tags: Array.isArray(q.tags) ? q.tags.map(String) : [],
+          linkGambarSoal: q.linkGambarSoal && isValidImagePath(q.linkGambarSoal) ? q.linkGambarSoal : null,
+          isAccepted: true,
+          isRejected: false,
+        })),
+      });
+    }
+
+    // 6. Delete any legacy corrupt questions from bank soal where type = MCQ and opsiJawaban is null or missing
+    await prisma.bankSoal.deleteMany({
+      where: {
         babId: bab.id,
         kompetensiBabId: comp.id,
-        teksSoal: q.soal,
-        type: q.tipeSoal || "MCQ",
-        opsiJawaban: q.options || null,
-        jawabanBenarMcq: q.options && q.correctIndex !== undefined ? q.options[q.correctIndex] : null,
-        jawabanBenarEssay: q.explanation || q.jawabanBenarEssay || null,
-        difficulty: Number(q.difficulty ?? 5),
-        bloomLevel: q.bloomLevel || "C1",
-        tags: Array.isArray(q.tags) ? q.tags.map(String) : [],
-        linkGambarSoal: q.linkGambarSoal && isValidImagePath(q.linkGambarSoal) ? q.linkGambarSoal : null,
-        isAccepted: true,
-        isRejected: false,
-      })),
+        type: "MCQ",
+        OR: [
+          { opsiJawaban: { equals: Prisma.JsonNull } },
+          { jawabanBenarMcq: null },
+        ],
+      },
+    }).catch((err) => {
+      console.warn("[Question Generator] Cleanup of invalid questions skipped/warned:", err);
     });
   }
 

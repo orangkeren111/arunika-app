@@ -341,11 +341,11 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal Pilihan Ganda (per Kompetensi)
+                  Jumlah Soal Pilihan Ganda
                 </label>
                 <input
                   type="number"
-                  min={1}
+                  min={0}
                   max={30}
                   value={jumlahSoalMcq}
                   onChange={(e) => setJumlahSoalMcq(Number(e.target.value))}
@@ -356,11 +356,11 @@ export default function BabPage({
 
               <div>
                 <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
-                  Jumlah Soal Essay (per Kompetensi)
+                  Jumlah Soal Essay
                 </label>
                 <input
                   type="number"
-                  min={1}
+                  min={0}
                   max={10}
                   value={jumlahSoalEssay}
                   onChange={(e) => setJumlahSoalEssay(Number(e.target.value))}

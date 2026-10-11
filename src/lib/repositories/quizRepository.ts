@@ -155,7 +155,17 @@ export const quizRepository = {
       timestamp: new Date().toISOString(),
     };
 
-    // Lock Database State based entirely on the Agent's decision
+    // Calculate accuracy and update wrongStreak
+    const isPassing = wrongCount <= 1; // 4 or 5 out of 5 correct
+    let updatedWrongStreak = isPassing ? 0 : currentStreak + 1;
+
+    // Fail-fast guard: if wrongStreak reaches 3 or more and agent didn't set MASTERED
+    if (updatedWrongStreak >= 3 && result.nextAction !== "MASTERED") {
+      result.nextAction = "FAIL_SESSION";
+      result.feedback = "Kapten Chili melihat kamu perlu istirahat sejenak. Pelajari kembali materi modul ini ya!";
+    }
+
+    // Lock Database State based on outcome
     if (result.nextAction === "MASTERED") {
       await quizDB.updateQuizSessionHistory(sessionId, competencyLog, true);
       await quizDB.updateQuizSessionMode(sessionId, "MASTERED");
@@ -164,6 +174,9 @@ export const quizRepository = {
       await quizDB.updateQuizSessionMode(sessionId, "FAILED");
     } else {
       await quizDB.updateQuizSessionHistory(sessionId, competencyLog, false);
+      // Persist the incremented/reset wrongStreak to DB via quizDB
+      await quizDB.updateWrongStreak(sessionId, updatedWrongStreak);
+
       if (result.nextAction === "REMEDIATE_CHAT") {
         await quizDB.updateQuizSessionMode(sessionId, "CHAT_REMEDIATION");
       } else {

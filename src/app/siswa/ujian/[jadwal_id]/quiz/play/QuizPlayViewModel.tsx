@@ -246,10 +246,11 @@ export function useQuizPlayViewModel(
 
     const evalBatchData = activeQuestions.map((q) => {
       const studentAns = (userAnswers[q.id] || "").trim();
+      const isMcqCorrect = q.type === "ESSAY" ? false : studentAns.toLowerCase() === (q.correctAnswer || "").trim().toLowerCase();
       return {
         ...q,
         studentAnswer: studentAns,
-        isCorrect: false, // Will be updated by Agent's response
+        isCorrect: isMcqCorrect, // Deterministic for MCQ; Essay will be evaluated by Agent
         correctAnswer: q.correctAnswer,
         difficulty: q.difficulty || 5,
         bloomLevel: q.bloomLevel || "C1",
