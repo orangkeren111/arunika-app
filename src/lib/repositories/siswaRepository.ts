@@ -39,6 +39,7 @@ export const siswaRepository = {
         return {
           attemptId: h.id.toString(),
           jadwalId: h.jadwalUjianId.toString(),
+          kelasId: h.jadwalUjian.kelasId.toString(),
 
           title: h.jadwalUjian.judulJadwal || h.jadwalUjian.ujian.judulUjian,
 

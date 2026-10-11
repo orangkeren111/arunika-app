@@ -29,6 +29,7 @@ export interface ExamQuestion {
 export interface ExamHistoryDetail {
   attemptId: string;
   jadwalId: string;
+  kelasId: string;
   title: string;
   submittedAt: string;
   score: number | null;

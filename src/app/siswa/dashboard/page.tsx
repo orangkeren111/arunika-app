@@ -344,7 +344,7 @@ export default function SiswaDashboardPage() {
 
                         {isGraded ? (
                           <Link
-                            href={`/siswa/ujian/${hist.attemptId}/laporan`}
+                            href={`/siswa/kelas/${hist.kelasId}/report/${hist.attemptId}`}
                             className="flex items-center gap-1 text-xs font-semibold text-[var(--primary)] hover:opacity-75 transition"
                           >
                             <FileText size={13} />

@@ -135,6 +135,9 @@ export const quizRepository = {
     // 3. NOW calculate the wrong count accurately based on the AI's grading
     const wrongCount = gradedBatchData.filter((item: any) => !item.isCorrect).length;
 
+    if (wrongCount >= 3) {
+      await quizDB.incrementWrongStreak(sessionId);
+    }
     let nextQuestions: any[] = [];
     if (result.nextAction === "NEXT_BATCH" && result.nextQuestionIds.length > 0) {
       nextQuestions = await quizRepository.fetchBatchQuestionDetails(result.nextQuestionIds);
