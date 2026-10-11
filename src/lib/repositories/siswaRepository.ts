@@ -343,6 +343,8 @@ export const siswaRepository = {
       data: rawData.data.map((h: any) => ({
         attemptId: h.id.toString(),
 
+        kelasId: h.jadwalUjian.kelasId.toString(),
+
         jadwalId: h.jadwalUjianId.toString(),
 
         title: h.jadwalUjian.judulJadwal || h.jadwalUjian.ujian.judulUjian,

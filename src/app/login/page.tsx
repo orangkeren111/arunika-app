@@ -4,7 +4,7 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import {
-  Mail,
+  User,
   Lock,
   Sun,
   ArrowRight,
@@ -119,15 +119,15 @@ function LoginForm() {
         <div className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-[var(--foreground)] mb-1.5">
-              Alamat Email
+              Username / Email
             </label>
             <div className="relative">
-              <Mail className="absolute left-3.5 top-3 w-5 h-5 text-[var(--muted-foreground)]" />
+              <User className="absolute left-3.5 top-3 w-5 h-5 text-[var(--muted-foreground)]" />
               <input
-                type="email"
+                type="text"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="nama@arunika.edu"
+                placeholder="username atau email"
                 className="w-full pl-11 pr-4 py-2.5 rounded-xl border border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] placeholder-[var(--muted-foreground)] focus:ring-2 focus:ring-[var(--ring)] focus:border-transparent outline-none transition"
               />
             </div>

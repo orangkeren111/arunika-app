@@ -15,9 +15,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       name: "Arunika Credentials",
       credentials: {
         email: {
-          label: "Email",
-          type: "email",
-          placeholder: "budi@arunika.edu",
+          label: "Username / Email",
+          type: "text",
+          placeholder: "username atau email",
         },
         password: { label: "Password", type: "password" },
       },

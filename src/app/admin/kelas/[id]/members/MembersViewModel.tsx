@@ -10,8 +10,16 @@ export function useMembersViewModel(kelasId: string) {
   const [availableStudents, setAvailableStudents] = useState<User[]>([]);
   const [availableTeachers, setAvailableTeachers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [batchLoading, setBatchLoading] = useState(false);
   const { data: session, status } = useSession();
   const sekolahId = session?.user?.sekolah_id ?? 0;
+
+  const refreshMembers = () =>
+    adminRepository.getKelasMembers(Number(kelasId)).then((res) => {
+      setKelasDetail(res.kelasDetail);
+      setTeacher(res.teacher);
+      setMembers(res.members);
+    });
 
   useEffect(() => {
     setLoading(true);
@@ -59,14 +67,37 @@ export function useMembersViewModel(kelasId: string) {
     });
   };
 
+  /**
+   * Batch-add students to the class by username/email array (from Excel).
+   * Returns the result summary ({ inserted, skipped, notFound }).
+   */
+  const handleBatchAddStudents = async (
+    usernames: string[],
+  ): Promise<{ inserted: number; skipped: number; notFound: string[] }> => {
+    setBatchLoading(true);
+    try {
+      const result = await adminRepository.addSiswaBatchKeKelas(
+        Number(kelasId),
+        sekolahId,
+        usernames,
+      );
+      await refreshMembers();
+      return result;
+    } finally {
+      setBatchLoading(false);
+    }
+  };
+
   return {
     kelasDetail,
     teacher,
     members,
     loading,
+    batchLoading,
     handleRemoveStudent,
     handleAssignTeacher,
     handleAddStudent,
+    handleBatchAddStudents,
     availableStudents,
     availableTeachers,
   };

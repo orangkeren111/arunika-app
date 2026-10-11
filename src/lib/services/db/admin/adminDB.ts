@@ -271,6 +271,52 @@ export async function removeSiswaFromKelas({
   });
 }
 
+/**
+ * Batch-inserts students into a class by username/email.
+ * Returns counts of inserted, skipped (already member), and not-found rows.
+ */
+export async function addSiswaBatchKeKelas(
+  kelasId: number,
+  sekolahId: number,
+  usernames: string[],
+): Promise<{ inserted: number; skipped: number; notFound: string[] }> {
+  const trimmed = usernames.map((u) => u.trim()).filter(Boolean);
+
+  // Find all SISWA users matching the given usernames/emails in this school
+  const users = await prisma.user.findMany({
+    where: {
+      email: { in: trimmed },
+      role: "SISWA",
+      sekolahId,
+    },
+    select: { id: true, email: true },
+  });
+
+  const foundEmails = new Set(users.map((u) => u.email));
+  const notFound = trimmed.filter((u) => !foundEmails.has(u));
+
+  // Find which users are already members
+  const existingMembers = await prisma.kelasMember.findMany({
+    where: {
+      kelasId,
+      userId: { in: users.map((u) => u.id) },
+    },
+    select: { userId: true },
+  });
+  const existingMemberIds = new Set(existingMembers.map((m) => m.userId));
+
+  const toInsert = users.filter((u) => !existingMemberIds.has(u.id));
+  const skipped = users.length - toInsert.length;
+
+  if (toInsert.length > 0) {
+    await prisma.kelasMember.createMany({
+      data: toInsert.map((u) => ({ kelasId, userId: u.id })),
+    });
+  }
+
+  return { inserted: toInsert.length, skipped, notFound };
+}
+
 export async function getKompetensiPelajaranList() {
   return await prisma.kompetensiPelajaran.findMany({
     orderBy: [{ namaBuku: "asc" }, { nomerKompetensi: "asc" }],

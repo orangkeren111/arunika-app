@@ -252,6 +252,21 @@ export const adminRepository = {
       siswaId: siswaId,
     });
   },
+
+  /**
+   * Batch-insert students into a class by username/email.
+   * Returns { inserted, skipped, notFound } summary.
+   */
+  addSiswaBatchKeKelas: async (
+    kelasId: number,
+    sekolahId: number,
+    usernames: string[],
+  ) => {
+    if (usernames.length === 0) {
+      throw new Error("Tidak ada username/email yang dimasukkan.");
+    }
+    return await adminDB.addSiswaBatchKeKelas(kelasId, sekolahId, usernames);
+  },
   getKompetensiPelajaranList: async () => {
     return await adminDB.getKompetensiPelajaranList();
   },

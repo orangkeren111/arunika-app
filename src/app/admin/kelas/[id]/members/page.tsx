@@ -1,8 +1,9 @@
 "use client";
 
-import React, { use, useState } from "react";
+import React, { use, useRef, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Plus, X } from "lucide-react";
+import * as XLSX from "xlsx";
+import { ArrowLeft, Download, FileSpreadsheet, Plus, Upload, X } from "lucide-react";
 import { useMembersViewModel } from "./MembersViewModel";
 
 export default function MembersPage({
@@ -12,29 +13,102 @@ export default function MembersPage({
 }) {
   const resolvedParams = use(params);
 
-  // Destructure tambahan data teachers dan students dari ViewModel
   const {
     kelasDetail,
     teacher,
     members,
     availableTeachers = [],
     availableStudents = [],
+    batchLoading,
     handleRemoveStudent,
     handleAssignTeacher,
     handleAddStudent,
+    handleBatchAddStudents,
   } = useMembersViewModel(resolvedParams.id);
 
-  // State untuk mengontrol modal dan pilihan dropdown
-  const [activeModal, setActiveModal] = useState<"student" | "teacher" | null>(
-    null,
-  );
+  // Single-add modal
+  const [activeModal, setActiveModal] = useState<"student" | "teacher" | "batch" | null>(null);
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
   const [selectedTeacherId, setSelectedTeacherId] = useState<string>("");
+
+  // Batch upload state
+  const [batchRows, setBatchRows] = useState<string[]>([]); // list of usernames
+  const [batchError, setBatchError] = useState("");
+  const [batchResult, setBatchResult] = useState<{ inserted: number; skipped: number; notFound: string[] } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const closeModal = () => {
     setActiveModal(null);
     setSelectedStudentId("");
     setSelectedTeacherId("");
+    setBatchRows([]);
+    setBatchError("");
+    setBatchResult(null);
+  };
+
+  // --- Excel parsing for batch member upload ---
+  const handleExcelUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setBatchError("");
+    setBatchRows([]);
+    setBatchResult(null);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array" });
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
+      const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+        defval: "",
+      });
+
+      if (rawRows.length === 0) {
+        throw new Error("File Excel tidak memiliki data.");
+      }
+
+      const usernames: string[] = [];
+
+      for (let i = 0; i < rawRows.length; i++) {
+        const raw = rawRows[i];
+        const username = String(
+          raw.username ?? raw.Username ?? raw.USERNAME ??
+          raw.email ?? raw.Email ?? raw.EMAIL ?? ""
+        ).trim();
+
+        if (!username) {
+          throw new Error(`Baris ${i + 2}: username/email wajib diisi.`);
+        }
+
+        usernames.push(username);
+      }
+
+      setBatchRows(usernames);
+    } catch (error: any) {
+      setBatchError(error?.message || "Gagal membaca file Excel.");
+    }
+
+    event.target.value = "";
+  };
+
+  const submitBatch = async () => {
+    if (batchRows.length === 0) return;
+    try {
+      const result = await handleBatchAddStudents(batchRows);
+      setBatchResult(result);
+      setBatchRows([]);
+
+      let msg = `${result.inserted} siswa berhasil ditambahkan.`;
+      if (result.skipped > 0) msg += ` ${result.skipped} sudah menjadi anggota (dilewati).`;
+      if (result.notFound.length > 0)
+        msg += ` ${result.notFound.length} username/email tidak ditemukan: ${result.notFound.join(", ")}.`;
+
+      alert(msg);
+      closeModal();
+    } catch (error: any) {
+      setBatchError(error?.message || "Gagal menambahkan siswa secara massal.");
+    }
   };
 
   if (!kelasDetail)
@@ -117,12 +191,20 @@ export default function MembersPage({
                   {members.length}
                 </span>
               </h3>
-              <button
-                onClick={() => setActiveModal("student")}
-                className="w-full sm:w-auto flex items-center justify-center gap-1 text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-3 py-1.5 rounded-md hover:opacity-90 transition"
-              >
-                <Plus size={16} /> Tambah Siswa
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={() => setActiveModal("batch")}
+                  className="flex items-center justify-center gap-1 text-sm border border-[var(--border)] text-[var(--foreground)] px-3 py-1.5 rounded-md hover:bg-[var(--muted)] transition"
+                >
+                  <Upload size={15} /> Import Excel
+                </button>
+                <button
+                  onClick={() => setActiveModal("student")}
+                  className="flex items-center justify-center gap-1 text-sm bg-[var(--primary)] text-[var(--primary-foreground)] px-3 py-1.5 rounded-md hover:opacity-90 transition"
+                >
+                  <Plus size={16} /> Tambah Siswa
+                </button>
+              </div>
             </div>
 
             {members.length === 0 ? (
@@ -172,7 +254,11 @@ export default function MembersPage({
       {/* Modal Overlay */}
       {activeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm p-4">
-          <div className="bg-[var(--card)] w-full max-w-md p-5 md:p-6 rounded-xl border border-[var(--border)] shadow-lg relative max-h-[90vh] overflow-y-auto">
+          <div
+            className={`bg-[var(--card)] w-full p-5 md:p-6 rounded-xl border border-[var(--border)] shadow-lg relative max-h-[90vh] overflow-y-auto ${
+              activeModal === "batch" ? "max-w-2xl" : "max-w-md"
+            }`}
+          >
             <button
               onClick={closeModal}
               className="absolute top-4 right-4 text-[var(--muted-foreground)] hover:text-[var(--foreground)] transition"
@@ -180,15 +266,17 @@ export default function MembersPage({
               <X size={20} />
             </button>
 
-            <h3 className="text-lg md:text-xl font-bold mb-4 text-[var(--foreground)] pr-6">
+            <h3 className="text-lg md:text-xl font-bold mb-1 text-[var(--foreground)] pr-6">
               {activeModal === "student"
                 ? "Tambah Siswa"
+                : activeModal === "batch"
+                ? "Import Siswa via Excel"
                 : "Tugaskan / Ganti Guru"}
             </h3>
 
-            {/* Form Konten Berdasarkan Tipe Modal */}
-            {activeModal === "student" ? (
-              <div className="space-y-4">
+            {/* ---- SINGLE STUDENT ---- */}
+            {activeModal === "student" && (
+              <div className="space-y-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
                     Pilih Siswa
@@ -229,8 +317,11 @@ export default function MembersPage({
                   </button>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-4">
+            )}
+
+            {/* ---- TEACHER ---- */}
+            {activeModal === "teacher" && (
+              <div className="space-y-4 mt-4">
                 <div>
                   <label className="block text-sm font-medium text-[var(--foreground)] mb-1">
                     Pilih Guru
@@ -268,6 +359,115 @@ export default function MembersPage({
                     className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] bg-[var(--primary)] rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Simpan Guru
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ---- BATCH EXCEL UPLOAD ---- */}
+            {activeModal === "batch" && (
+              <div className="space-y-5 mt-2">
+                {/* Info format */}
+                <div className="rounded-lg bg-[var(--muted)] p-4 text-sm text-[var(--muted-foreground)]">
+                  <p className="font-medium text-[var(--foreground)] flex items-center gap-2">
+                    <FileSpreadsheet size={16} /> Format Excel
+                  </p>
+                  <p className="mt-1">
+                    Kolom wajib:{" "}
+                    <strong className="text-[var(--foreground)]">username</strong>{" "}
+                    atau{" "}
+                    <strong className="text-[var(--foreground)]">email</strong>{" "}
+                    (nama kolom bisa keduanya)
+                  </p>
+                  <p className="mt-1">
+                    Isi dengan username atau email siswa yang sudah terdaftar di
+                    sekolah ini (role: SISWA).
+                  </p>
+                </div>
+
+                {/* File picker + template download */}
+                <div className="flex flex-col gap-3">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept=".xlsx,.xls"
+                    onChange={handleExcelUpload}
+                    className="hidden"
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[var(--border)] p-8 hover:bg-[var(--muted)] transition text-[var(--foreground)]"
+                  >
+                    <Upload size={20} />
+                    Pilih File Excel
+                  </button>
+
+                  <a
+                    href="/template/TemplateImportAnggotaKelas.xlsx"
+                    download="TemplateImportAnggotaKelas.xlsx"
+                    className="flex items-center justify-center gap-2 text-sm text-[var(--primary)] hover:underline"
+                  >
+                    <Download size={16} />
+                    Unduh Template Excel
+                  </a>
+                </div>
+
+                {/* Error */}
+                {batchError && (
+                  <div className="rounded-lg bg-red-500/10 border border-red-500/30 p-4 text-sm text-red-600 dark:text-red-400">
+                    {batchError}
+                  </div>
+                )}
+
+                {/* Preview table */}
+                {batchRows.length > 0 && (
+                  <div className="overflow-auto rounded-lg border border-[var(--border)]">
+                    <table className="w-full text-sm">
+                      <thead className="bg-[var(--muted)]">
+                        <tr>
+                          <th className="px-3 py-2 text-left font-medium">#</th>
+                          <th className="px-3 py-2 text-left font-medium">
+                            Username / Email
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {batchRows.map((row, index) => (
+                          <tr
+                            key={index}
+                            className="border-t border-[var(--border)]"
+                          >
+                            <td className="px-3 py-2 text-[var(--muted-foreground)]">
+                              {index + 1}
+                            </td>
+                            <td className="px-3 py-2 text-[var(--foreground)]">
+                              {row}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Footer actions */}
+                <div className="flex justify-end gap-2 pt-2 border-t border-[var(--border)]">
+                  <button
+                    onClick={closeModal}
+                    className="rounded-lg border border-[var(--border)] bg-[var(--background)] px-4 py-2 text-sm text-[var(--foreground)] hover:bg-[var(--muted)] transition"
+                  >
+                    Batal
+                  </button>
+                  <button
+                    onClick={submitBatch}
+                    disabled={batchLoading || batchRows.length === 0}
+                    className="rounded-lg bg-[var(--primary)] px-4 py-2 text-sm text-[var(--primary-foreground)] hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {batchLoading
+                      ? "Memproses..."
+                      : `Import ${batchRows.length} Siswa`}
                   </button>
                 </div>
               </div>
