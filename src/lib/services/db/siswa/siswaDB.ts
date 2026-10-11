@@ -251,6 +251,17 @@ export async function getActiveSession(jadwalId: number, siswaId: number) {
     },
   });
 }
+export async function getForceActiveSession(jadwalId: number, siswaId: number) {
+  return prisma.sesiUjianSiswa.findFirst({
+    where: {
+      jadwalUjianId: jadwalId,
+      siswaId: siswaId,
+    },
+    include: {
+      jawabanSiswa: true,
+    },
+  });
+}
 
 export async function createSesiUjian(jadwalId: number, siswaId: number) {
   return prisma.sesiUjianSiswa.create({
@@ -296,8 +307,8 @@ export async function logCheatingAttempt(
   nomorSoal: number
 ) {
   // 1. Fetch current logs to safely append
-  const session = await prisma.sesiUjianSiswa.findUnique({
-    where: { id: sesiId, siswaId: siswaId },
+  const session = await prisma.sesiUjianSiswa.findFirst({
+    where: { jadwalUjianId: sesiId, siswaId: siswaId },
     select: { cheatLogs: true, cheatCount: true }
   });
 

@@ -10,7 +10,7 @@ export async function startExamSession(jadwalId: string, siswaId: number) {
   const jId = parseInt(jadwalId);
 
   // 1. Check for disconnects
-  let session = await siswaDB.getActiveSession(jId, siswaId);
+  let session = await siswaDB.getForceActiveSession(jId, siswaId);
   let isResuming = true;
 
   // 2. Create new session if none exists
