@@ -144,6 +144,11 @@ async function processGenerationStateMachine() {
           updatedAt: new Date(),
         },
       });
+      if (job.fileUrl && nextStatus === "GENERATING_QUESTIONS") {
+        // remove if extracting image is activated
+        await fs.unlink(job.fileUrl).catch(() => { });
+      }
+
       return;
     }
 

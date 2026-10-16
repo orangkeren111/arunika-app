@@ -47,7 +47,7 @@ export const DDAHelper = {
     const newElo = currentElo + K_FACTOR * (actualScore - expectedScore);
 
     // Ensure ELO doesn't drop below a minimum threshold
-    return Math.max(0, Math.round(newElo));
+    return Math.max(760, Math.round(newElo));
   },
 
   // determineTargetBloomLevel: (

@@ -68,7 +68,6 @@ export function useExamAttempt(jadwalId: string) {
 
     // --- EVENT HANDLERS ---
 
-    const handleBlur = () => recordViolation("WINDOW_BLUR");
 
     const handleVisibilityChange = () => {
       if (document.hidden) recordViolation("TAB_HIDDEN");
@@ -106,7 +105,6 @@ export function useExamAttempt(jadwalId: string) {
     };
 
     // --- ATTACH LISTENERS ---
-    window.addEventListener("blur", handleBlur);
     document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("contextmenu", handleContextMenu);
     window.addEventListener("copy", handleCopy);
@@ -115,7 +113,6 @@ export function useExamAttempt(jadwalId: string) {
 
     return () => {
       // --- CLEANUP ---
-      window.removeEventListener("blur", handleBlur);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("contextmenu", handleContextMenu);
       window.removeEventListener("copy", handleCopy);

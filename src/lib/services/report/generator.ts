@@ -7,35 +7,35 @@ import { callPromptGuard, callSmartText } from "../llm/router";
 export async function generateReport(task: any, payload: any) {
   let tokensSpent = 0;
 
-  // Step 1: Prompt Guard Verification
-  const textToGuard = String(
-    payload.studentInputOnly || payload.prompt || ""
-  ).slice(0, 1500);
+  // // Step 1: Prompt Guard Verification
+  // const textToGuard = String(
+  //   payload.studentInputOnly || payload.prompt || ""
+  // ).slice(0, 1500);
 
-  const guardCheck = await callPromptGuard(textToGuard);
-  tokensSpent += guardCheck.tokens;
+  // const guardCheck = await callPromptGuard(textToGuard);
+  // tokensSpent += guardCheck.tokens;
 
-  if (!guardCheck.safe) {
-    console.warn(
-      `Task ${task.id} failed prompt guard check:`,
-      guardCheck.text
-    );
+  // if (!guardCheck.safe) {
+  //   console.warn(
+  //     `Task ${task.id} failed prompt guard check:`,
+  //     guardCheck.text
+  //   );
 
-    await prisma.savedResponses.update({
-      where: { attemptId: payload.attemptId },
-      data: {
-        overview:
-          "Peringatan Keamanan: Terdeteksi indikasi manipulasi prompt pada jawaban/pertanyaan.",
-        weakness:
-          "Tidak dapat menganalisis karena masalah keamanan.",
-        recommendation:
-          "Silakan periksa jawaban siswa secara manual.",
-        status: "FAILED",
-      },
-    });
+  //   await prisma.savedResponses.update({
+  //     where: { attemptId: payload.attemptId },
+  //     data: {
+  //       overview:
+  //         "Peringatan Keamanan: Terdeteksi indikasi manipulasi prompt pada jawaban/pertanyaan.",
+  //       weakness:
+  //         "Tidak dapat menganalisis karena masalah keamanan.",
+  //       recommendation:
+  //         "Silakan periksa jawaban siswa secara manual.",
+  //       status: "FAILED",
+  //     },
+  //   });
 
-    throw new Error("Prompt guard rejected payload");
-  }
+  //   throw new Error("Prompt guard rejected payload");
+  // }
 
   // Step 2: Smart Text Execution
   const result = await callSmartText(payload.prompt);
