@@ -148,7 +148,7 @@ export async function submitSingleAnswer(
   const eloBefore = session.currentElo;
   const eloAfter =
     isCorrect !== null
-      ? DDAHelper.calculateNewElo(eloBefore, originalQuestion.difficulty, isCorrect)
+      ? DDAHelper.calculateNewElo(eloBefore, originalQuestion.difficulty, originalQuestion.bloomLevel, isCorrect)
       : eloBefore;
 
   // 5. Snapshot the answer to DB if not already submitted

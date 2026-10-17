@@ -2,7 +2,7 @@ import { ExamQuestion } from "@/src/app/types/siswa";
 import { siswaRepository } from "@/src/lib/repositories/siswaRepository";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type ViolationType =
   | "WINDOW_BLUR"
@@ -30,6 +30,7 @@ export function useExamAttempt(jadwalId: string) {
   const [showWarningModal, setShowWarningModal] = useState(false);
   const [warningMessage, setWarningMessage] = useState("");
   const [showTimeoutModal, setShowTimeoutModal] = useState(false);
+  const isRecordingViolation = useRef(false);
 
   const { data: session, status } = useSession();
   const router = useRouter();
@@ -39,36 +40,46 @@ export function useExamAttempt(jadwalId: string) {
     if (isFinished || loading || !session) return;
 
     // Helper to handle both UI warnings and Backend Logging
-    const recordViolation = async (violationType: ViolationType) => {
-      // 1. Fire and forget to your backend (so it's saved even if they refresh)
-      await siswaRepository.handleCheatViolation(
-        jadwalId,
-        Number(session?.user?.id) || 0,
-        violationType,
-        Number(currentQ?.id) || 0
-      );
 
-      // 2. Update local UI state
-      setWarnings((prev) => {
-        if (prev >= 3) return prev;
-        const nextWarnings = prev + 1;
+    const recordViolation = async (violationType: ViolationType) => {
+      if (isRecordingViolation.current) return;
+      isRecordingViolation.current = true;
+
+      try {
+        await siswaRepository.handleCheatViolation(
+          jadwalId,
+          Number(session?.user?.id) || 0,
+          violationType,
+          Number(currentQ?.id) || 0
+        );
+
+        const nextWarnings = Math.min(warnings + 1, 3);
+
+        setWarnings(nextWarnings);
 
         if (nextWarnings >= 3) {
-          setWarningMessage("Anda telah melakukan pelanggaran 3 kali. Ujian Anda otomatis selesai dan dikumpulkan.");
-          setShowWarningModal(true);
-          handleSubmitExam();
-          return 3;
+          setWarningMessage(
+            "Anda telah melakukan pelanggaran 3 kali. Ujian Anda otomatis selesai dan dikumpulkan."
+          );
         } else {
-          setWarningMessage(`Peringatan! Terdeteksi aktivitas mencurigakan (${violationType}). Pelanggaran: ${nextWarnings}/3. Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan.`);
-          setShowWarningModal(true);
-          return nextWarnings;
+          setWarningMessage(
+            `Peringatan! Terdeteksi aktivitas mencurigakan (${violationType}). ` +
+            `Pelanggaran: ${nextWarnings}/3. ` +
+            "Pada pelanggaran ke-3, ujian akan otomatis dikumpulkan."
+          );
         }
-      });
+
+        setShowWarningModal(true);
+
+        if (nextWarnings >= 3) {
+          await handleSubmitExam();
+        }
+      } catch (error) {
+        console.error("Failed to record violation:", error);
+      }
     };
 
     // --- EVENT HANDLERS ---
-
-
     const handleVisibilityChange = () => {
       if (document.hidden) recordViolation("TAB_HIDDEN");
     };
@@ -285,7 +296,10 @@ export function useExamAttempt(jadwalId: string) {
     warnings,
     showWarningModal,
     warningMessage,
-    dismissWarningModal: () => setShowWarningModal(false),
+    dismissWarningModal: () => {
+      isRecordingViolation.current = false;
+      setShowWarningModal(false);
+    },
     showTimeoutModal,
     handleConfirmTimeout,
     timeLeft: formatTime(timeLeft),

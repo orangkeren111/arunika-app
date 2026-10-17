@@ -3,7 +3,7 @@
 // Configure this based on your difficulty scale (e.g., Bobot 1-5 or 1-10)
 const MIN_ELO = 800;
 const MAX_ELO = 2000;
-const K_FACTOR = 32; // Volatility factor. Higher = faster ELO changes.
+const K_FACTOR = 64; // Volatility factor. Higher = faster ELO changes.
 
 export const DDAHelper = {
   /**
@@ -35,9 +35,10 @@ export const DDAHelper = {
   calculateNewElo: (
     currentElo: number,
     questionDifficulty: number,
+    bloomLevel: string | null,
     isCorrect: boolean,
   ): number => {
-    const questionElo = DDAHelper.mapDifficultyToElo(questionDifficulty);
+    const questionElo = DDAHelper.calculateQElo(bloomLevel ?? "C1", questionDifficulty);
     const expectedScore = DDAHelper.calculateExpectedScore(
       currentElo,
       questionElo,
@@ -49,18 +50,4 @@ export const DDAHelper = {
     // Ensure ELO doesn't drop below a minimum threshold
     return Math.max(760, Math.round(newElo));
   },
-
-  // determineTargetBloomLevel: (
-  //   questionsAnswered: number,
-  //   criteria?: { reqC1: number; reqC2: number; reqC3: number; reqC4: number },
-  // ): string => {
-  //   const c1 = criteria?.reqC1 ?? 10;
-  //   const c2 = criteria?.reqC2 ?? 10;
-  //   const c3 = criteria?.reqC3 ?? 10;
-
-  //   if (questionsAnswered < c1) return "C1";
-  //   if (questionsAnswered < c1 + c2) return "C2";
-  //   if (questionsAnswered < c1 + c2 + c3) return "C3";
-  //   return "C4";
-  // },
 };
