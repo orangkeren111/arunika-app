@@ -47,47 +47,49 @@ ${summary}
     goodQuestions: string[],
     badQuestions: string[],
     tingkatan?: string,
-  ) => `
+  ) => String.raw`
 Based on the following chapter title, competency code, and competency description, generate ${jumlahSoal} questions with various types, mainly MCQ and a few ESSAY. The target is for ${tingkatan} students, so adjust the difficulty, vocabulary, and complexity accordingly.
 
 Join various complexity weights ranging from 1 to 10 (1 being simplest, 10 being highly complex), with each question having its own Bloom's Taxonomy level (C1 to C6).
 
 LANGUAGE RULES:
-
-* First determine the subject/lesson language from the chapter title, competency description, and provided context.
-* Generate the questions, options, explanations, and tags primarily in the language being taught.
-* If the lesson is English, use English.
-* If the lesson is Mandarin/Chinese, use Chinese Hanzi characters. Pinyin may be included when pedagogically relevant, but do not replace Hanzi with Latin transliteration when Hanzi is appropriate.
-* If the lesson is another foreign language, use that target language and its appropriate writing system/script.
-* If the lesson is Indonesian, use Indonesian.
-* For foreign-language lessons, the target language of the lesson takes priority over the language used in the chapter metadata or competency description.
-* Do not translate a foreign-language lesson into Indonesian merely because the competency description or chapter metadata is written in Indonesian.
-* For questions testing the meaning or translation of a foreign-language word, phrase, or sentence, use the target language where appropriate and provide the Indonesian translation only when it is necessary to test or explain the intended learning objective.
-* If the subject is not a specific foreign language class (e.g., Math, Science), generate the output in the exact language used in the Chapter Title and Competency Description.
+1. Determine the intended output language from the uploaded learning material, including its content, subject, and competencies. Do not determine the language solely from the chapter title, competency code, application interface, or presumed country of origin.
+2. For ordinary academic subjects that are not foreign-language lessons, generate all questions, options, explanations, and tags in the language used by the learning material and its competency descriptions.
+3. For English-language learning materials, generate questions, options, explanations, and tags primarily in English.
+4. For Mandarin/Chinese-language learning materials, generate questions, options, explanations, and tags primarily in Chinese Hanzi characters. Pinyin may be included when pedagogically appropriate.
+5. For other foreign-language lessons, use the target language being taught and its appropriate writing system, regardless of the language used in the chapter title or competency description.
+6. A chapter title may intentionally contain multiple languages. For example, "HSK 3 组词成句 Menyusun kalimat (A5)" is a Mandarin-learning chapter. Generate questions primarily in Mandarin Hanzi; use Indonesian when needed for translation exercises or to assess the intended learning objective.
+7. For mathematics, science, and other non-language subjects, use the language of the actual learning material and competency descriptions. For example, if the uploaded material and competencies are in English, generate the questions, options, explanations, and tags in English, even if the application or surrounding metadata uses Indonesian.
+8. Do not translate the entire question into Indonesian merely because the application is used in Indonesia or because some metadata is written in Indonesian.
+9. Keep the language consistent across questions, options, explanations, and tags, except when another language is explicitly needed for the learning objective.
+10. If the language cannot be determined confidently from the learning material, use the competency description as the fallback. If that is also inconclusive, use the chapter title.
 
 FORMATTING RULES:
-
 * All generated text fields must use plain text.
 * Do NOT use Markdown formatting.
 * Do NOT use **bold**, *italic*, headings, bullet Markdown, backticks, or other Markdown syntax.
 * Use normal numbered lists or simple hyphen lists when needed.
 * Do not include formatting characters such as **, *, ##, # or >.
 
-IMPORTANT FOR MATHEMATICAL & CHEMICAL FORMULAS (LATEX & JSON ESCAPING):
-
-* Whenever generating questions, options, or explanations containing mathematical equations, formulas, fractions, powers, roots, variables, or chemical equations/compounds (e.g. H2O, CO2, chemical reactions):
-* You MUST use LaTeX syntax enclosed in $...$ for inline math/chemistry (e.g., $x^2 + y^2 = z^2$, $\text{H}_2\text{O}$, $2\text{H}_2 + \text{O}_2 \rightarrow 2\text{H}_2\text{O}$, $\frac{a}{b}$, $\sqrt{x}$) or \(...\) for block math.
-* CRITICAL JSON ESCAPING RULE: Because your response MUST be valid JSON, EVERY backslash '' in LaTeX syntax MUST be double-escaped as '\\' in the output string (e.g., write "\\frac{x + 2}{5}" NOT "\frac{x + 2}{5}", write "\\text{H}_2\\text{O}" NOT "\text{H}_2\text{O}", write "\\sqrt{x}" NOT "\sqrt{x}").
-* Single backslashes such as \f or \t inside LaTeX will cause JSON parser errors.
-* Never output raw LaTeX commands without $...$ or \(...\) delimiters.
+IMPORTANT MATHEMATICAL NOTATION AND JSON ESCAPING RULES:
+* Represent mathematical expressions, equations, fractions, powers, roots, and chemical formulas using LaTeX notation when appropriate.
+* Use $...$ for inline mathematical notation and [...] for display equations.
+* For chemical formulas, use LaTeX notation such as $\text{H}_2\text{O}$ when appropriate.
+* Since the output must be valid JSON, every LaTeX backslash inside a JSON string must be escaped with another backslash. For example, the JSON representation of $\frac{x+2}{5}$ must contain the string "$\frac{x+2}{5}$".
+* Do not output unescaped LaTeX commands such as \frac, \sqrt, \text, \alpha, or \rightarrow inside JSON strings.
+* Preserve the mathematical meaning of all expressions. Do not replace, omit, or alter operators, variables, exponents, subscripts, or delimiters.
+* Use ordinary plain text for prose and avoid Markdown formatting, except for the required delimiters around mathematical notation.
+* Ensure the final response is syntactically valid JSON, including all quotation marks, backslashes, and control characters.
 
 COMPETENCY:
 Competency Code: ${kompetensiCode}
 Competency Description: ${kompetensiText}
-Chapter Title: ${judulBab}
-Chapter Content: ${isiBab}
-QUESTION REQUIREMENTS:
 
+CHAPTER DETAIL: 
+Chapter Title: ${judulBab}
+Chapter Content (Learning Materials): ${isiBab}
+
+QUESTION REQUIREMENTS:
 * Every question MUST directly relate to the provided competency and chapter.
 * Do not generate questions that test knowledge unrelated to the competency.
 * Ensure the questions cover a reasonable range of Bloom's Taxonomy levels from C1 to C6 when appropriate for the subject and student level.

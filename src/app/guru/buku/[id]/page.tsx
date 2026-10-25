@@ -45,6 +45,7 @@ export default function BabPage({
   });
 
   // State untuk modal Bab
+  const [isUploading, setIsUploading] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalMode, setModalMode] = useState<"add" | "edit">("add");
   const [selectedBabId, setSelectedBabId] = useState<string | null>(null);
@@ -112,10 +113,18 @@ export default function BabPage({
 
   const submitUpload = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedFile) {
+    if (!selectedFile) {
+      alert("Silakan pilih file PDF materi terlebih dahulu.");
+      return;
+    }
+    setIsUploading(true);
+    try {
       await handleUploadBook(selectedFile, jumlahSoal, jumlahSoalMcq, jumlahSoalEssay, pilihanPerMcq);
       closeUploadModal();
-      router.push("/guru/buku");
+    } catch (err: any) {
+      alert(err?.message || "Gagal mengunggah PDF materi.");
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -417,10 +426,10 @@ export default function BabPage({
                 </button>
                 <button
                   type="submit"
-                  disabled={!selectedFile}
+                  disabled={isUploading || !selectedFile || (jumlahSoalMcq + jumlahSoalEssay <= 0)}
                   className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] bg-[var(--primary)] rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Upload File
+                  {isUploading ? "Mengunggah..." : "Upload File"}
                 </button>
               </div>
             </form>

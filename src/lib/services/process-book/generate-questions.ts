@@ -105,14 +105,14 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
     // 3. Ask central Smart Text Model (providers.ts) to generate questions
     const result = await callSmartText(prompt)
 
-    let rawText = result.text.replace(/```json|```/g, "").trim();
+    // let rawText = result.text.replace(/```json|```/g, "").trim();
 
-    const sanitizeJsonLatex = (str: string) => {
-      // Convert formfeed (\f) followed by letters back to \\f (e.g., \frac)
-      let cleaned = str.replace(/\f([a-zA-Z]+)/g, "\\\\f$1");
-      // Escape any backslash that is not a valid JSON escape sequence
-      return cleaned.replace(/\\(?![\\"\/bfnrtu])/g, "\\\\");
-    };
+    // const sanitizeJsonLatex = (str: string) => {
+    //   // Convert formfeed (\f) followed by letters back to \\f (e.g., \frac)
+    //   let cleaned = str.replace(/\f([a-zA-Z]+)/g, "\\\\f$1");
+    //   // Escape any backslash that is not a valid JSON escape sequence
+    //   return cleaned.replace(/\\(?![\\"\/bfnrtu])/g, "\\\\");
+    // };
     function isValidImagePath(path: string) {
       return (
         path.startsWith("/uploads/book_images/") &&

@@ -78,7 +78,7 @@ export const UploadPdfModal: React.FC<UploadPdfModalProps> = ({
               </label>
               <input
                 type="number"
-                min={1}
+                min={0}
                 max={20}
                 value={jumlahSoalMcq}
                 onChange={(e) => setJumlahSoalMcq(Number(e.target.value))}
@@ -136,8 +136,8 @@ export const UploadPdfModal: React.FC<UploadPdfModalProps> = ({
             </button>
             <button
               type="submit"
-              disabled={isUploading || !selectedPdfFile}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition flex items-center gap-2"
+              disabled={isUploading || !selectedPdfFile || (jumlahSoalMcq + jumlahSoalEssay <= 0)}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] bg-[var(--primary)] rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isUploading ? "Mengunggah..." : "Upload & Ekstrak"}
             </button>

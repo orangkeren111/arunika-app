@@ -101,18 +101,30 @@ export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-[var(--foreground)] mb-1">
-                Jumlah Pilihan per Soal MCQ
+              <label className="block text-xs font-medium text-[var(--foreground)] mb-1">
+                Opsi MCQ
               </label>
-              <select
-                value={pilihanPerMcq}
-                onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
-                className="w-full p-2 border border-[var(--input)] rounded-lg text-sm bg-[var(--background)] text-[var(--foreground)]"
-              >
-                <option value={4}>4 Pilihan (A - D)</option>
-                <option value={5}>5 Pilihan (A - E)</option>
-                <option value={3}>3 Pilihan (A - C)</option>
-              </select>
+              <div className="flex gap-2">
+                {[3, 4, 5].map((opsi) => (
+                  <label
+                    key={opsi}
+                    className={`flex-1 p-2 border rounded-lg text-sm font-medium cursor-pointer ${pilihanPerMcq === opsi
+                      ? "border-[var(--primary)] bg-[var(--primary)]/10 text-[var(--primary)]"
+                      : "border-[var(--input)] bg-[var(--background)] text-[var(--foreground)] hover:border-[var(--primary)]/50"
+                      }`}
+                  >
+                    <input
+                      type="radio"
+                      name="opsiMcq"
+                      value={opsi}
+                      checked={pilihanPerMcq === opsi}
+                      onChange={(e) => setPilihanPerMcq(Number(e.target.value))}
+                      className="hidden"
+                    />
+                    {opsi} Opsi
+                  </label>
+                ))}
+              </div>
             </div>
 
             <div className="bg-[var(--muted)]/50 p-2.5 rounded-lg flex items-center justify-between text-xs font-medium text-[var(--foreground)]">
@@ -132,7 +144,7 @@ export const GenerateSoalModal: React.FC<GenerateSoalModalProps> = ({
                 type="button"
                 onClick={handleConfirmGenerate}
                 disabled={isSubmittingGen || totalQuestions <= 0}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition flex items-center gap-2 cursor-pointer"
+                className="w-full sm:w-auto px-4 py-2 text-sm font-medium text-[var(--primary-foreground)] bg-[var(--primary)] rounded-lg hover:opacity-90 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {isSubmittingGen ? "Proses..." : "Mulai Generate"}
               </button>
