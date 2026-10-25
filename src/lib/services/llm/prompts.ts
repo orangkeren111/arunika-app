@@ -41,6 +41,7 @@ ${summary}
     jumlahSoalEssay: number,
     jumlahPilihan: number,
     judulBab: string,
+    isiBab: string,
     kompetensiCode: string,
     kompetensiText: string,
     goodQuestions: string[],
@@ -62,6 +63,7 @@ LANGUAGE RULES:
 * For foreign-language lessons, the target language of the lesson takes priority over the language used in the chapter metadata or competency description.
 * Do not translate a foreign-language lesson into Indonesian merely because the competency description or chapter metadata is written in Indonesian.
 * For questions testing the meaning or translation of a foreign-language word, phrase, or sentence, use the target language where appropriate and provide the Indonesian translation only when it is necessary to test or explain the intended learning objective.
+* If the subject is not a specific foreign language class (e.g., Math, Science), generate the output in the exact language used in the Chapter Title and Competency Description.
 
 FORMATTING RULES:
 
@@ -83,7 +85,7 @@ COMPETENCY:
 Competency Code: ${kompetensiCode}
 Competency Description: ${kompetensiText}
 Chapter Title: ${judulBab}
-
+Chapter Content: ${isiBab}
 QUESTION REQUIREMENTS:
 
 * Every question MUST directly relate to the provided competency and chapter.

@@ -5,6 +5,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "../db/prisma";
 import { BOOK_PROMPTS } from "../llm/prompts";
 import { callSmartText } from "../llm/router";
+import { parseLLMResponse } from "../../utils/sanitizeJSON";
 
 export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: number = 10, jumlahSoalMcq: number = 7, jumlahSoalEssay: number = 3, pilihanMcq: number = 4) {
   // 1. Fetch chapter (bab) details
@@ -93,6 +94,7 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
       currentEssayCount,
       pilihanMcq,
       bab.judulBab,
+      bab.learningGoals ?? "",
       comp.nomerKompetensi,
       comp.isiKompetensi,
       [],
@@ -120,29 +122,11 @@ export async function generateQuestionsWithLLM(babId: number, totalJumlahSoal: n
 
     let parsedResponse: any = {};
     try {
-      // First attempt: direct JSON parse
-      parsedResponse = JSON.parse(rawText);
-    } catch {
-      try {
-        // Second attempt: parse sanitized text with double-escaped LaTeX backslashes
-        parsedResponse = JSON.parse(sanitizeJsonLatex(rawText));
-      } catch {
-        try {
-          // Third attempt: extract JSON substring matching outermost braces { ... }
-          const startIdx = rawText.indexOf("{");
-          const endIdx = rawText.lastIndexOf("}");
-          if (startIdx !== -1 && endIdx > startIdx) {
-            const jsonSub = rawText.slice(startIdx, endIdx + 1);
-            parsedResponse = JSON.parse(sanitizeJsonLatex(jsonSub));
-          } else {
-            throw new Error("No valid JSON object bounds found in model output.");
-          }
-        } catch (parseErr: any) {
-          console.error(`[Question Generator Error] Failed parsing JSON for Bab ID ${babId}, Competency ID ${comp.id}`);
-          console.error(`[Question Generator Error] Raw LLM Output:\n${result.text}`);
-          throw new Error(`LLM output invalid JSON: ${parseErr.message}`);
-        }
-      }
+      parsedResponse = parseLLMResponse(result.text)
+    } catch (error: any) {
+      console.error(`[Question Generator Error] Failed parsing JSON for Bab ID ${babId}, Competency ID ${comp.id}`);
+      console.error(`[Question Generator Error] Raw LLM Output:\n${result.text}`);
+      throw new Error(`LLM output invalid JSON: ${error.message}`);
     }
 
     const tokens = result.tokens ?? 0;
