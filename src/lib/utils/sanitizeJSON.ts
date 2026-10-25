@@ -40,18 +40,35 @@ export function parseLLMResponse(rawText: string): any {
         }
     }
 
-    // 3. SANITIZE LATEX & INVALID ESCAPES
-    // In JSON, \f, \t, \b are control characters (formfeed, tab, backspace).
-    // If the LLM generates LaTeX like \frac, \text, \beta, JSON.parse will crash or corrupt it.
-    // This regex preserves necessary JSON escapes (\n, \r, \", \\, \/, \u) 
-    // but double-escapes everything else so LaTeX survives the JSON parse.
-    text = text.replace(/\\(?![/"\\nru])/g, "\\\\");
+    // 3. REPAIR COMMON LATEX COMMANDS BEFORE JSON.parse()
+    // Only repairs known LaTeX commands that have been incorrectly escaped.
+    // Run this on the extracted JSON candidate.
+    const latexCommands = [
+        "frac", "dfrac", "tfrac", "text", "textrm",
+        "textbf", "mathrm", "mathbf", "mathit",
+        "sqrt", "root", "beta", "alpha", "gamma",
+        "theta", "lambda", "pi", "sigma", "Delta",
+        "sum", "prod", "int", "infty", "times",
+        "cdot", "div", "pm", "leq", "geq", "neq",
+        "approx", "rightarrow", "leftarrow", "Rightarrow",
+        "left", "right", "begin", "end", "overline",
+        "underline", "hat", "bar", "vec", "lim",
+    ];
+
+    const latexPattern = new RegExp(
+        `(?<!\\\\)\\\\(${latexCommands.join("|")})(?![a-zA-Z])`,
+        "g"
+    );
+
+    text = text.replace(latexPattern, "\\\\$1");
 
     // 4. PARSE JSON
     try {
         return JSON.parse(text);
     } catch (error: any) {
         console.error("[JSON Parse Error] Sanitized Output:", text);
-        throw new Error(`LLM output invalid JSON after sanitization: ${error.message}`);
+        throw new Error(
+            `LLM output invalid JSON after sanitization: ${error.message}`
+        );
     }
 }
