@@ -117,7 +117,7 @@ export default function GuruDashboardPage() {
       />
 
       <StatCard
-        title="Essay Menunggu Koreksi"
+        title="Ujian Menunggu Koreksi"
         value={stats?.pendingEssays || 0}
         icon={FilePenLine}
         color="var(--warning)"
@@ -204,7 +204,7 @@ export default function GuruDashboardPage() {
             {/* ESSAY */}
             {(stats?.pendingEssays || 0) > 0 && (
               <Link
-                href="/guru/essay"
+                href="/guru/reports"
                 className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 hover:bg-amber-500/10 transition"
               >
                 <div className="flex items-center gap-3">
@@ -214,7 +214,7 @@ export default function GuruDashboardPage() {
 
                   <div>
                     <h3 className="font-semibold text-[var(--foreground)]">
-                      {stats?.pendingEssays || 0} Essay Menunggu Koreksi
+                      {stats?.pendingEssays || 0} Ujian Menunggu Koreksi
                     </h3>
 
                     <p className="text-xs text-[var(--muted-foreground)] mt-1">

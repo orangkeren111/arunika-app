@@ -656,7 +656,6 @@ export const guruRepository = {
     const rawJadwal = await guruDB.getJadwal(guruId, filters);
 
     return rawJadwal
-      .filter((j: any) => j.status === StatusUjian.COMPLETED)
       .map((j: any) => {
         const totalStudents = j.sesiSiswa.length;
 

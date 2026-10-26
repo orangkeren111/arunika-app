@@ -44,8 +44,8 @@ export const reportRepository = {
       const options = Array.isArray(ans.opsiJawaban)
         ? (ans.opsiJawaban as string[])
         : Array.isArray(ans.soalAsli?.opsiJawaban)
-        ? (ans.soalAsli?.opsiJawaban as string[])
-        : undefined;
+          ? (ans.soalAsli?.opsiJawaban as string[])
+          : undefined;
 
       const correctAnswer =
         ans.type === "MCQ"
@@ -54,7 +54,7 @@ export const reportRepository = {
 
       return {
         id: ans.id.toString(),
-        prompt: ans.teksSoal,
+        teksSoal: ans.teksSoal,
         studentAnswer: ans.jawabanSiswa || "No answer provided",
         catatanKoreksi: ans.catatanKoreksi || ans.aiResponse || "",
         isCorrect: ans.isCorrect || false,
@@ -62,6 +62,9 @@ export const reportRepository = {
         options,
         correctAnswer,
         type: ans.type as "MCQ" | "ESSAY",
+        eloBefore: ans.eloBefore || 0,
+        bloomLevel: ans.bloomLevel || "C1",
+        difficulty: ans.difficulty || 0,
       };
     });
 

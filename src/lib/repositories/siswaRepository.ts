@@ -63,7 +63,7 @@ export const siswaRepository = {
       });
 
       const gradedHistory = history.filter(
-        (h: any) => h.score !== null,
+        (h: any) => h.score !== null && h.status === "Dinilai",
       );
 
       const avgScore =

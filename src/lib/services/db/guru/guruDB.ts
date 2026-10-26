@@ -15,11 +15,10 @@ export async function getActiveExamsCount(guruId: number) {
 }
 
 export async function getPendingEssaysCount(guruId: number) {
-  return await prisma.jawabanSiswa.count({
+  return await prisma.sesiUjianSiswa.count({
     where: {
-      soalAsli: { type: TipeSoal.ESSAY },
-      nilaiPoin: null, // Asumsi jika poin belum ada, berarti belum dinilai
-      attempt: { jadwalUjian: { ujian: { guruId } } },
+      isChecked: false,
+      jadwalUjian: { ujian: { guruId } }
     },
   });
 }
@@ -1508,6 +1507,9 @@ export async function getLiveExamProgress(jadwalId: number) {
       (j) => j.jawabanSiswa !== null && j.jawabanSiswa.trim() !== ""
     ).length;
 
+    const aiOverview = sesi.aiLogs.length > 0 ? sesi.aiLogs[0].overview : null;
+    const hasAIOverview = aiOverview !== null && aiOverview.trim() !== "";
+
     studentProgressMap.set(sesi.siswaId, {
       attemptId: sesi.id,
       waktuMulai: sesi.waktuMulai,
@@ -1515,7 +1517,7 @@ export async function getLiveExamProgress(jadwalId: number) {
       answeredCount,
       cheatCount: sesi.cheatCount || 0,
       nilaiAkhir: sesi.nilaiAkhir,
-      isAIResponded: sesi.aiLogs.length > 0 && (sesi.aiLogs[0].overview !== null),
+      isAIResponded: hasAIOverview,
       status: sesi.waktuSelesai
         ? "COMPLETED"
         : sesi.waktuMulai

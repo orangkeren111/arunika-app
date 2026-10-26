@@ -4,10 +4,12 @@ export interface CompetencyScore {
   correct: number;
   total: number;
 }
-
+export interface ChartProps {
+  questions: QuestionDetail[];
+}
 export interface QuestionDetail {
   id: string;
-  prompt: string;
+  teksSoal: string;
   studentAnswer: string;
   isCorrect: boolean;
   catatanKoreksi: string;
@@ -15,6 +17,9 @@ export interface QuestionDetail {
   options?: string[];
   correctAnswer?: string;
   type?: "MCQ" | "ESSAY";
+  eloBefore?: number;
+  bloomLevel?: string;
+  difficulty?: number;
 }
 
 export interface ReportProps {

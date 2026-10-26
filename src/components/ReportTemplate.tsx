@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { ReportProps, CompetencyScore, QuestionDetail } from "@/src/app/types/report";
+import { BloomProgressChart } from "./ProgressChart";
+import { BloomAccuracyChart } from "./BloomAccuracyChart";
 
 // Pastikan tipe data props sudah sesuai dengan interface kamu
 export function ReportTemplate({
@@ -258,6 +260,27 @@ export function ReportTemplate({
               </p>
             </div>
           </section>
+          {/* ========================================= */}
+          {/* ANALISIS KOGNITIF (GRAFIK TAKSONOMI BLOOM) */}
+          {/* ========================================= */}
+          <section className="mb-8">
+            <h2 className="text-2xl font-bold text-[#39434D] mb-6">
+              Cognitive Level Analysis
+            </h2>
+
+            <div className="flex flex-col gap-6">
+              {/* Chart 1: Progress Chart (Full Width) */}
+              <div className="w-full">
+                {/* Pastikan kamu mem-passing array pertanyaan dari data report-mu ke prop 'questions' */}
+                <BloomProgressChart questions={questions} />
+              </div>
+
+              {/* Chart 2: Accuracy Bar Chart (Full Width) */}
+              <div className="w-full">
+                <BloomAccuracyChart questions={questions} />
+              </div>
+            </div>
+          </section>
         </div>
       )}
 
@@ -328,7 +351,7 @@ export function ReportTemplate({
                 <thead className="bg-[#FAF8F3] text-[#39434D] border-b border-[#7FA88F]/30">
                   <tr>
                     <th className="p-4 w-12 text-center font-bold">No.</th>
-                    <th className="p-4 font-bold">Question Prompt</th>
+                    <th className="p-4 font-bold">Question</th>
                     <th className="p-4 w-1/4 font-bold">
                       Student Response
                     </th>
@@ -357,7 +380,7 @@ export function ReportTemplate({
 
                       <td className="p-4 align-top pr-6 text-[#39434D]/90 leading-relaxed font-medium">
                         <div className="line-clamp-2 group-hover:line-clamp-none transition-all">
-                          {q.prompt}
+                          {q.teksSoal}
                         </div>
                       </td>
 
@@ -435,7 +458,7 @@ export function ReportTemplate({
             <div className="space-y-3">
               <h4 className="text-xs uppercase tracking-wider font-bold text-[#7FA88F]">Pertanyaan</h4>
               <p className="text-base font-semibold text-[#39434D] leading-relaxed">
-                {selectedQuestion.prompt}
+                {selectedQuestion.teksSoal}
               </p>
               {selectedQuestion.linkGambarSoal && (
                 <div className="p-2 bg-[#FAF8F3] rounded-2xl border border-[#7FA88F]/20 flex justify-center">
